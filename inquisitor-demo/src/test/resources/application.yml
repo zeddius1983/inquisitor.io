@@ -1,0 +1,6 @@
+inquisitor:
+  base-url: http://localhost:${local.server.port}
+spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:test-key}

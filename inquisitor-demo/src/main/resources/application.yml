@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: inquisitor-demo
+  datasource:
+    url: jdbc:postgresql://localhost:5432/inquisitor_demo
+    username: ${DB_USER:demo}
+    password: ${DB_PASS:demo}
+  flyway:
+    enabled: true
+server:
+  port: 8080
