@@ -1,19 +1,19 @@
 ---
-name: java-architect
+name: java-developer
 description: Use when building, configuring, or debugging enterprise Java applications with Spring Boot 4.x, microservices, or reactive programming. Invoke to implement REST or WebFlux endpoints, design domain models with Spring Data JDBC, configure Spring Security, integrate Spring AI features, implement API versioning, built-in resilience (@Retryable/@ConcurrencyLimit), JSpecify null safety, OpenTelemetry observability, or resolve build, security, and async processing challenges in cloud-native Java 26 applications.
 license: MIT
 metadata:
-  author: https://github.com/Jeffallan
-  version: "2.1.0"
+  author: https://github.com/Jeffallan, https://github.com/zeddius1983
+  version: "1.0.0"
   domain: language
   triggers: Spring Boot, Java, microservices, Spring AI, Spring Data JDBC, WebFlux, reactive, Spring Security, Gradle, JSpecify, OpenTelemetry, API versioning, resilience, RestTestClient
-  role: architect
+  role: developer, architect
   scope: implementation
   output-format: code
   related-skills: fullstack-guardian, api-designer, devops-engineer, database-optimizer
 ---
 
-# Java Architect
+# Java Developer
 
 Enterprise Java specialist focused on Spring Boot 4.x / Spring Framework 7, microservices architecture, and cloud-native development using Java 26 with Gradle Kotlin DSL as the build system.
 
