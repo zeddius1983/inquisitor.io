@@ -22,5 +22,6 @@ include(
     "inquisitor-harness-junit-starter",
     "inquisitor-mock",
     "inquisitor-mock-starter",
+    "inquisitor-demo-db-starter",
     "inquisitor-demo"
 )

@@ -9,16 +9,12 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
-    implementation("org.flywaydb:flyway-database-postgresql")
-    runtimeOnly("org.postgresql:postgresql")
+    implementation(project(":inquisitor-demo-db-starter"))
 
     testCompileOnly(libs.lombok)
     testAnnotationProcessor(libs.lombok)
     testImplementation(project(":inquisitor-harness-junit-starter"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testRuntimeOnly("org.testcontainers:postgresql")
-    testRuntimeOnly("org.testcontainers:junit-jupiter")
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -27,5 +23,9 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.withType<Test>().configureEach {
+    jvmArgs("--enable-preview")
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     jvmArgs("--enable-preview")
 }
