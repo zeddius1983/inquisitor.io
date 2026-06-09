@@ -1,0 +1,16 @@
+# IDE
+.idea/
+
+# Firecrawl scratch output
+.firecrawl/
+
+# Gradle
+.gradle/
+build/
+
+# Java
+*.class
+*.jar
+
+# OS
+.DS_Store

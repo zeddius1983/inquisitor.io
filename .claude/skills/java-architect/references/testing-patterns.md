@@ -1,16 +1,18 @@
-# Testing Patterns (Spring Boot 4.x, Java 26)
+# Testing Patterns (Spring Boot 4.x / Spring Framework 7, Java 26)
 
 ## Mocks vs TestContainers — When to Use Which
 
 | Scenario | Approach |
 |---|---|
 | Unit test — pure business logic | `@Mock` / `@InjectMocks` (Mockito) |
-| Controller layer (`@WebMvcTest`) | `@MockBean` the service; no DB needed |
+| Controller layer (unit) | `RestTestClient.bindToController(...)` + Mockito |
+| Controller layer (`@WebMvcTest`) | `RestTestClient.bindToMockMvc(...)` or `@AutoConfigureRestTestClient` |
 | Repository / data-access test | **TestContainers** — real DB, no mocks |
-| Full integration test | **TestContainers** — `@SpringBootTest` + real DB |
+| Full integration test | **TestContainers** + `RestTestClient.bindToServer(...)` |
 | External HTTP dependency | Mock with `MockServer` or `WireMock` |
 
 > **Rule:** never mock the database or the repository layer. A test that mocks `OrderRepository` proves nothing about your SQL. Use a real Postgres container via `@ServiceConnection` instead.
+> **Rule:** use `RestTestClient` for all HTTP-layer tests — it provides one consistent DSL for unit, slice, and E2E tests. Retire `MockMvc`, `WebTestClient`, and `TestRestTemplate` in new code.
 
 ## Unit Testing with JUnit 5 + Mockito
 
@@ -61,7 +63,52 @@ class OrderServiceTest {
 }
 ```
 
-## Integration Testing — `@ServiceConnection` (Spring Boot 4.x)
+## Controller Unit Test with `RestTestClient` (Spring Framework 7)
+
+Fast, no Spring context — bind directly to the controller under test:
+
+```java
+@ExtendWith(MockitoExtension.class)
+@DisplayName("OrderController")
+class OrderControllerTest {
+
+    @Mock  OrderService orderService;
+    private RestTestClient client;
+
+    @BeforeEach
+    void setUp() {
+        client = RestTestClient.bindToController(new OrderController(orderService)).build();
+    }
+
+    @Test
+    @DisplayName("should return order by ID for version 2.0")
+    void shouldReturnOrder() {
+        val dto = new OrderDtoV2(UUID.randomUUID(), OrderStatus.PENDING, List.of());
+        when(orderService.findV2(dto.id())).thenReturn(Optional.of(dto));
+
+        client.get()
+              .uri("/api/orders/{id}", dto.id())
+              .header("Accept", "application/json;version=2.0")
+              .exchange()
+              .expectStatus().isOk()
+              .expectBody()
+              .jsonPath("$.status").isEqualTo("PENDING");
+    }
+
+    @Test
+    @DisplayName("should return 404 when not found")
+    void shouldReturn404() {
+        when(orderService.findV2(any())).thenReturn(Optional.empty());
+
+        client.get().uri("/api/orders/{id}", UUID.randomUUID())
+              .header("Accept", "application/json;version=2.0")
+              .exchange()
+              .expectStatus().isNotFound();
+    }
+}
+```
+
+## Integration Testing — `RestTestClient` + `@ServiceConnection` (Spring Boot 4.x)
 
 Spring Boot 4 auto-wires Testcontainers via `@ServiceConnection` — no manual property overrides needed:
 
@@ -74,12 +121,17 @@ class OrderIntegrationTest {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine");
 
-    @Autowired TestRestTemplate restTemplate;
+    @LocalServerPort int port;
+
     @Autowired OrderRepository orderRepository;
 
+    private RestTestClient client;
+
     @BeforeEach
-    void clean() {
+    void setUp() {
         orderRepository.deleteAll();
+        client = RestTestClient.bindToServer()
+            .baseUrl("http://localhost:" + port).build();
     }
 
     @Test
@@ -88,12 +140,18 @@ class OrderIntegrationTest {
             new OrderItemRequest("SKU-1", 1, BigDecimal.TEN)
         ));
 
-        val created = restTemplate.postForEntity("/api/v1/orders", request, OrderDto.class);
-        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        val created = client.post().uri("/api/orders")
+            .header("Accept", "application/json;version=2.0")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus().isCreated()
+            .expectBody(OrderDtoV2.class).returnResult().getResponseBody();
 
-        val fetched = restTemplate.getForEntity(
-            "/api/v1/orders/" + created.getBody().id(), OrderDto.class);
-        assertThat(fetched.getStatusCode()).isEqualTo(HttpStatus.OK);
+        client.get().uri("/api/orders/{id}", created.id())
+            .header("Accept", "application/json;version=2.0")
+            .exchange()
+            .expectStatus().isOk();
     }
 }
 ```
@@ -277,7 +335,7 @@ class SecuredEndpointTest {
 
 ## Quick Reference
 
-| Annotation | Purpose |
+| Annotation / API | Purpose |
 |---|---|
 | `@ExtendWith(MockitoExtension.class)` | Mockito JUnit 5 integration |
 | `@SpringBootTest` | Full application context |
@@ -289,3 +347,6 @@ class SecuredEndpointTest {
 | `@WithMockUser` | Inject mock security principal |
 | `StepVerifier` | Assert reactive streams |
 | `assertThat()` | AssertJ fluent assertions |
+| `RestTestClient.bindToController(...)` | Unit test — no Spring context, fast |
+| `RestTestClient.bindToMockMvc(...)` | Slice test with `@WebMvcTest` context |
+| `RestTestClient.bindToServer()` | E2E test — real HTTP against running server |

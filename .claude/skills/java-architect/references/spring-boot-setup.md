@@ -63,12 +63,16 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 
-    // Observability
+    // Observability — OpenTelemetry (Spring Boot 4 first-class support)
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // OpenAPI
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.x")
+
+    // Null safety (JSpecify — Spring Framework 7)
+    implementation("org.jspecify:jspecify:1.0.0")
 
     // Lombok
     compileOnly("org.projectlombok:lombok")
@@ -129,6 +133,12 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  tracing:
+    sampling:
+      probability: 1.0   # 1.0 for dev/staging; tune for prod
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 ```
 
 ## Main Application Class
@@ -206,6 +216,45 @@ CREATE TABLE order_item (
 );
 ```
 
+## API Versioning (Spring Framework 7 native)
+
+Choose one strategy and configure it once in `WebMvcConfigurer`. Do not mix strategies.
+
+```java
+@Configuration
+public class ApiVersioningConfig implements WebMvcConfigurer {
+    @Override
+    public void configureApiVersioning(ApiVersionConfigurer configurer) {
+        // Option A — media-type parameter (Zalando REST guidelines)
+        configurer.useMediaTypeParameterVersioning();   // Accept: application/json;version=2.0
+
+        // Option B — custom header (Microsoft REST guidelines)
+        // configurer.useHeaderVersioning("X-API-Version");
+
+        // Option C — query parameter
+        // configurer.useQueryParameterVersioning("api-version");
+    }
+}
+```
+
+Then annotate handlers with `version`:
+```java
+@GetMapping(value = "/{id}", version = "1.0")  public OrderDtoV1 getV1(...) { ... }
+@GetMapping(value = "/{id}", version = "2.0")  public OrderDtoV2 getV2(...) { ... }
+```
+
+## JSpecify Null Safety
+
+Add `package-info.java` to every package declaring `@NullMarked`. All types within are non-null by default; use `@Nullable` for explicit opt-outs.
+
+```java
+// src/main/java/com/example/domain/model/package-info.java
+@NullMarked
+package com.example.domain.model;
+
+import org.jspecify.annotations.NullMarked;
+```
+
 ## Virtual Threads (enabled via config)
 
 With `spring.threads.virtual.enabled=true`, Spring Boot 4 automatically uses virtual threads for:
@@ -225,3 +274,13 @@ Write simple blocking code — the platform handles concurrency. No reactive pip
 | `ProblemDetail` | RFC 7807 error responses |
 | `@ConfigurationProperties` | Type-safe externalized config |
 | `@ServiceConnection` | TestContainers auto-wiring in tests |
+| `@NullMarked` (package-info.java) | Declare package-wide non-null contract (JSpecify) |
+| `@Nullable` | Explicit opt-out from `@NullMarked` contract |
+| `@ImportHttpServices(Client.class)` | Zero-config HTTP interface client registration |
+| `@EnableResilientMethods` | Activate `@Retryable` / `@ConcurrencyLimit` |
+| `@Retryable` | Declarative retry with exponential backoff + jitter |
+| `@ConcurrencyLimit` | Throttle concurrent method invocations (esp. virtual threads) |
+| `@Observed` | Automatic span creation via OpenTelemetry |
+| `BeanRegistrar` | AOT-compatible programmatic/conditional bean registration |
+| `configureApiVersioning()` | Configure media-type / header / query-param versioning strategy |
+| `@GetMapping(version = "2.0")` | Route requests by API version |
