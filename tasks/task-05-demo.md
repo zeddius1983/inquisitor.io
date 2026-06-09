@@ -1,4 +1,4 @@
-# Task 06 — `inquisitor-demo` Module
+# Task 05 — `inquisitor-demo` Module
 
 ## Goal
 
@@ -19,7 +19,7 @@ dependencies {
     // in-memory storage — no DB setup required for demo
     // swap to spring-boot-starter-data-jpa + h2 if SQL scenario testing is desired
 
-    testImplementation(project(":inquisitor-spring-boot-starter"))
+    testImplementation(project(":inquisitor-harness-junit-starter"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 ```

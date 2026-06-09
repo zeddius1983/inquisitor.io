@@ -1,16 +1,18 @@
-# Task 07 — JUnit 5 Extension
+# Task 04 — `inquisitor-harness-junit` + `inquisitor-harness-junit-starter`
 
 ## Goal
 
-Implement `@InquisitorTest` and its backing JUnit 5 extension so that scenario `.md` files are auto-discovered and each runs as a named test case inside a standard `@SpringBootTest` class. Also provide `ScenarioExecutor` parameter injection for manual single-scenario tests.
+Implement `@InquisitorTest` and its backing JUnit 5 extension so that scenario `.md` files are auto-discovered and each runs as a named test case inside a standard `@SpringBootTest` class. Also provide `ScenarioExecutor` parameter injection for manual single-scenario tests. `inquisitor-harness-junit-starter` provides the Spring Boot autoconfiguration wiring for the extension.
 
 ## Module placement
 
-Implemented in `inquisitor-autoconfigure` (avoids a new module; JUnit 5 is `testImplementation` in consumers anyway). If the extension grows significantly it can be extracted to `inquisitor-test` in a later task.
+`inquisitor-harness-junit` — extension implementation, depends on `inquisitor-harness-starter`.
+`inquisitor-harness-junit-starter` — thin autoconfigure + starter, depends on `inquisitor-harness-junit`.
 
-## New dependencies in `inquisitor-autoconfigure/build.gradle.kts`
+## Dependencies in `inquisitor-harness-junit/build.gradle.kts`
 
 ```kotlin
+api(project(":inquisitor-harness-starter"))
 compileOnly("org.junit.jupiter:junit-jupiter-api")        // compile-only; consumers bring JUnit 5
 compileOnly("org.springframework.boot:spring-boot-test")  // compile-only
 ```
@@ -18,9 +20,9 @@ compileOnly("org.springframework.boot:spring-boot-test")  // compile-only
 ## Package Layout
 
 ```
-io.inquisitor.autoconfigure.testing
-├── InquisitorTest.java            @Target(TYPE) annotation
-├── InquisitorExtension.java       implements several JUnit 5 Extension interfaces
+io.inquisitor.harness.junit
+├── InquisitorTest.java             @Target(TYPE) annotation
+├── InquisitorExtension.java        implements several JUnit 5 Extension interfaces
 └── ScenarioInvocationContext.java  TestTemplateInvocationContext impl (inner or package-private)
 ```
 
