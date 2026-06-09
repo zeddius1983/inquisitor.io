@@ -1,4 +1,4 @@
-# Task 04 — `inquisitor-harness-junit` + `inquisitor-harness-junit-starter`
+# Task 05 — `inquisitor-harness-junit` + `inquisitor-harness-junit-starter`
 
 ## Goal
 

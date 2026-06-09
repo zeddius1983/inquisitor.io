@@ -1,4 +1,4 @@
-# Task 03 — `inquisitor-harness-starter` Module
+# Task 04 — `inquisitor-harness-starter` Module
 
 ## Goal
 
