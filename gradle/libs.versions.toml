@@ -1,0 +1,18 @@
+[versions]
+spring-boot      = "4.0.6"
+spring-ai        = "2.0.0-RC1"
+flexmark         = "0.64.8"
+junit-jupiter    = "5.12.2"
+dependency-mgmt  = "1.1.7"
+lombok           = "1.18.36"
+
+[libraries]
+spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+spring-ai-bom            = { module = "org.springframework.ai:spring-ai-bom",              version.ref = "spring-ai" }
+flexmark-all             = { module = "com.vladsch.flexmark:flexmark-all",                 version.ref = "flexmark" }
+junit-jupiter            = { module = "org.junit.jupiter:junit-jupiter",                   version.ref = "junit-jupiter" }
+lombok                   = { module = "org.projectlombok:lombok",                          version.ref = "lombok" }
+
+[plugins]
+spring-boot            = { id = "org.springframework.boot",         version.ref = "spring-boot" }
+spring-dependency-mgmt = { id = "io.spring.dependency-management",  version.ref = "dependency-mgmt" }
