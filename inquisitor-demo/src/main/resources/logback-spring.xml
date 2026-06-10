@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!--
+        Pulls in Spring Boot's default conversion rules (clr, wEx) and
+        the LOG_EXCEPTION_CONVERSION_WORD property used in the pattern below.
+    -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty scope="context" name="APP_NAME"
+                    source="spring.application.name" defaultValue="inquisitor"/>
+
+    <!--
+        Column layout:
+          timestamp  faint gray      2026-06-10 14:32:01.123
+          level      auto-colored    ERROR=red WARN=yellow INFO=green DEBUG=cyan TRACE=magenta
+          PID        magenta
+          separator  faint bar
+          [thread]   faint, padded to 20 chars
+          app:logger app name in blue, logger class abbreviated in cyan
+          message    plain text
+          exception  indented stack trace via wEx
+    -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%20.20t]){faint} %clr(${APP_NAME}){blue}%clr(:){faint}%clr(%-40.40logger{36}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ── dev / default ─────────────────────────────────────────────────── -->
+    <!-- Verbose for local development: app code at DEBUG, SQL at TRACE      -->
+    <springProfile name="default,dev,local">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+
+        <!-- application code -->
+        <logger name="io.inquisitor" level="DEBUG"/>
+
+        <!-- HTTP request mapping resolution -->
+        <logger name="org.springframework.web.servlet.DispatcherServlet" level="DEBUG"/>
+
+        <!-- SQL statements and parameter binding -->
+        <logger name="org.springframework.jdbc.core.JdbcTemplate" level="DEBUG"/>
+        <logger name="org.springframework.jdbc.core.StatementCreatorUtils" level="TRACE"/>
+    </springProfile>
+
+    <!-- ── prod ──────────────────────────────────────────────────────────── -->
+    <!-- Quiet in production: only INFO and above for app code               -->
+    <springProfile name="prod">
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+
+        <logger name="io.inquisitor" level="INFO"/>
+    </springProfile>
+
+</configuration>
