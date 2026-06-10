@@ -28,6 +28,7 @@ import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,7 +54,9 @@ public class AccountService {
     }
 
     public Page<Account> searchAccounts(AccountFilter filter, Pageable pageable) {
-        return accountRepository.search(filter.owner(), filter.currency(), pageable);
+        val items = accountRepository.search(filter.owner(), filter.currency(), pageable);
+        return PageableExecutionUtils.getPage(items, pageable,
+                () -> accountRepository.countSearch(filter.owner(), filter.currency()));
     }
 
     @Transactional
@@ -111,7 +114,9 @@ public class AccountService {
     public Page<Transaction> getTransactions(Long accountId, TransactionFilter filter, Pageable pageable) {
         findById(accountId);
         val type = filter.type() != null ? filter.type().name() : null;
-        return transactionRepository.search(accountId, type, filter.from(), filter.to(), pageable);
+        val items = transactionRepository.search(accountId, type, filter.from(), filter.to(), pageable);
+        return PageableExecutionUtils.getPage(items, pageable,
+                () -> transactionRepository.countSearch(accountId, type, filter.from(), filter.to()));
     }
 
     public record TransferSummary(String reference, Long fromId, Long toId, BigDecimal amount) {}

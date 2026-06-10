@@ -18,12 +18,13 @@ package io.inquisitor.demo.repository;
 
 import io.inquisitor.demo.model.Account;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jdbc.repository.query.Query;
 import org.springframework.data.repository.ListCrudRepository;
 import org.springframework.data.repository.ListPagingAndSortingRepository;
 import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 
 public interface AccountRepository
         extends ListCrudRepository<Account, Long>, ListPagingAndSortingRepository<Account, Long> {
@@ -33,7 +34,15 @@ public interface AccountRepository
             WHERE (:owner IS NULL OR LOWER(owner) LIKE LOWER('%' || :owner || '%'))
               AND (:currency IS NULL OR currency = :currency)
             """)
-    Page<Account> search(@Param("owner") @Nullable String owner,
+    List<Account> search(@Param("owner") @Nullable String owner,
                          @Param("currency") @Nullable String currency,
                          Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(*) FROM account
+            WHERE (:owner IS NULL OR LOWER(owner) LIKE LOWER('%' || :owner || '%'))
+              AND (:currency IS NULL OR currency = :currency)
+            """)
+    long countSearch(@Param("owner") @Nullable String owner,
+                     @Param("currency") @Nullable String currency);
 }

@@ -18,7 +18,6 @@ package io.inquisitor.demo.repository;
 
 import io.inquisitor.demo.model.Transaction;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jdbc.repository.query.Query;
 import org.springframework.data.repository.ListCrudRepository;
@@ -26,6 +25,7 @@ import org.springframework.data.repository.ListPagingAndSortingRepository;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 
 public interface TransactionRepository
         extends ListCrudRepository<Transaction, Long>, ListPagingAndSortingRepository<Transaction, Long> {
@@ -37,9 +37,21 @@ public interface TransactionRepository
               AND (:from IS NULL OR created_at >= :from)
               AND (:to   IS NULL OR created_at <= :to)
             """)
-    Page<Transaction> search(@Param("accountId") Long accountId,
+    List<Transaction> search(@Param("accountId") Long accountId,
                              @Param("type") @Nullable String type,
                              @Param("from") @Nullable Instant from,
                              @Param("to") @Nullable Instant to,
                              Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(*) FROM transaction
+            WHERE account_id = :accountId
+              AND (:type IS NULL OR type = :type)
+              AND (:from IS NULL OR created_at >= :from)
+              AND (:to   IS NULL OR created_at <= :to)
+            """)
+    long countSearch(@Param("accountId") Long accountId,
+                     @Param("type") @Nullable String type,
+                     @Param("from") @Nullable Instant from,
+                     @Param("to") @Nullable Instant to);
 }

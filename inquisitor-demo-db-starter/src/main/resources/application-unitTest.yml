@@ -1,3 +1,0 @@
-spring:
-  flyway:
-    clean-on-validation-error: true

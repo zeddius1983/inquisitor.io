@@ -1,4 +1,0 @@
-logging:
-  level:
-    org.flywaydb: DEBUG
-    org.springframework.jdbc.core: DEBUG
