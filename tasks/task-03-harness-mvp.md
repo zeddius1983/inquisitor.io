@@ -274,7 +274,7 @@ annotation.
         api-key: llama
         chat:
           options:
-            model: gemma-4-26B-A4B-it-qat-UD-Q4_K_XL
+            model: gemma-4-31B-it-QAT-Q4_0
             temperature: 0.0
   ```
 - `./gradlew :inquisitor-demo:test` runs the scenarios; each step shows as a
@@ -284,11 +284,21 @@ annotation.
 
 ## Phasing
 
-1. **Model + parser** (+ unit tests on the 5 demo scenarios' structure).
-2. **Tools + registries** (unit tests with the demo app / Testcontainer DB).
-3. **Executor** (ChatClient + memory + structured verdict).
+1. **Model + parser** (+ unit tests on the 5 demo scenarios' structure). ✅ done
+2. **Executor** (ChatClient + memory + structured verdict), built against a
+   `StepEvaluator` seam with **stub/mock tools** — defer real tool impls.
+   - `ScenarioExecutor` orchestration unit-tested with a *fake* `StepEvaluator`
+     (deterministic, no model; runs in normal `build`).
+   - `ChatClientStepEvaluator` (real LLM) exercised by a **gated** integration
+     test using stub `@Tool` beans + the local model.
+3. **Tools + registries** (real HTTP/SQL; unit tests with the demo app /
+   Testcontainer DB).
 4. **Starter** autoconfiguration.
 5. **JUnit `@TestFactory`** + wire into demo; run the 5 scenarios green.
+
+> Rationale for 2-before-3: lets us debug the executor + validate the local
+> model's tool-calling/structured-output reliability with canned tool responses,
+> independent of real HTTP/SQL plumbing.
 
 ## Resolved decisions
 
@@ -306,4 +316,7 @@ annotation.
       it must move to (or pull JUnit deps into) the module that has JUnit on the
       classpath. Land it in `…-junit` rather than `…-junit-starter`? (was cosmetic,
       now slightly load-bearing).
-- [x] Local model: `gemma-4-26B-A4B-it-qat-UD-Q4_K_XL`.
+- [x] Local model: `gemma-4-31B-it-QAT-Q4_0` (**dense**). MoE models (e.g.
+      `gemma-4-26B-A4B`) shortcut multi-step scenarios — they answer follow-up
+      steps from chat memory instead of calling the tool, producing hallucinated
+      PASSes. A dense model reliably calls a tool on every step.

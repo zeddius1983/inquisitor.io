@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test logging for the harness module.
+
+  LLM tracing (request/response via SimpleLoggerAdvisor + tool-call round-trips)
+  is OFF by default. Enable it to see what the model is doing:
+
+      INQUISITOR_LLM_LOG=DEBUG ./gradlew :inquisitor-harness:test
+
+  (the variable is read from a system property or environment variable).
+-->
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{42} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="org.springframework.ai" level="${INQUISITOR_LLM_LOG:-OFF}"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+</configuration>
