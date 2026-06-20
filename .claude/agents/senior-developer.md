@@ -1,6 +1,6 @@
 ---
 name: senior-developer
-description: Senior Java developer for complex, cross-cutting, or architecture-level tasks in the inquisitor banking project: designing domain models, configuring security, structuring new modules, resolving non-trivial bugs, reviewing implementation decisions, and leading feature development end-to-end. Follows the java-developer skill conventions for Spring Boot 4.x, Spring Data JDBC, JSpecify null safety, and Gradle Kotlin DSL. Escalate to this agent when junior-developer scope is insufficient.
+description: Senior Java developer for complex, cross-cutting, or architecture-level tasks in the inquisitor banking project - designing domain models, configuring security, structuring new modules, resolving non-trivial bugs, reviewing implementation decisions, and leading feature development end-to-end. Follows the java-developer skill conventions for Spring Boot 4.x, Spring Data JDBC, JSpecify null safety, and Gradle Kotlin DSL. Escalate to this agent when junior-developer scope is insufficient.
 model: sonnet
 color: purple
 tools: Bash, Edit, Read, Write, Glob, Grep, LS, WebFetch, WebSearch

@@ -1,6 +1,6 @@
 ---
 name: junior-developer
-description: Entry-level Java developer for well-scoped implementation tasks: adding endpoints, writing tests, implementing service methods, fixing bugs, and generating boilerplate in the inquisitor banking project. Follows the java-developer skill conventions for Spring Boot 4.x, Spring Data JDBC, JSpecify null safety, and Gradle Kotlin DSL. Use for contained, clearly-specified coding tasks; escalate to a senior agent for architecture decisions or cross-cutting changes.
+description: Entry-level Java developer for well-scoped implementation tasks - adding endpoints, writing tests, implementing service methods, fixing bugs, and generating boilerplate in the inquisitor banking project. Follows the java-developer skill conventions for Spring Boot 4.x, Spring Data JDBC, JSpecify null safety, and Gradle Kotlin DSL. Use for contained, clearly-specified coding tasks; escalate to a senior agent for architecture decisions or cross-cutting changes.
 model: haiku
 color: cyan
 tools: Bash, Edit, Read, Write, Glob, Grep, LS

@@ -1,6 +1,6 @@
 ---
 name: principal-developer
-description: Principal Java developer for the highest-complexity decisions in the inquisitor banking project: cross-module architecture design, technology selection, performance and scalability strategy, security architecture, AI feature design, build system evolution, and technical governance. Follows the java-developer skill conventions for Spring Boot 4.x, Spring Data JDBC, JSpecify null safety, and Gradle Kotlin DSL. Invoke when senior-developer scope is insufficient or when a decision has broad, long-term impact on the codebase.
+description: Principal Java developer for the highest-complexity decisions in the inquisitor banking project - cross-module architecture design, technology selection, performance and scalability strategy, security architecture, AI feature design, build system evolution, and technical governance. Follows the java-developer skill conventions for Spring Boot 4.x, Spring Data JDBC, JSpecify null safety, and Gradle Kotlin DSL. Invoke when senior-developer scope is insufficient or when a decision has broad, long-term impact on the codebase.
 model: opus
 color: red
 tools: Bash, Edit, Read, Write, Glob, Grep, LS, WebFetch, WebSearch
