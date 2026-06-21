@@ -51,24 +51,38 @@ record StepVerdict(Outcome outcome, String reasoning, List<String> evidence) {}
   tool responses it relied on in `evidence`.
 - Step asserts `outcome == PASS`. First FAIL aborts the rest of the scenario.
 
-### Tools — named target/datasource registries with a `primary`
+### Tools — named target/datasource registries (no default)
 
-**[DECIDE]** Registry approach (recommended): the LLM can only reach configured
-targets (allowlist); `primary` is auto-wired to the app under test.
+Registry = allow-list: the LLM can only reach configured targets/datasources.
+There is **no privileged "primary"**. Resolution when a tool omits the name:
+**exactly one registered → use it; several → must name one; none → error.**
+So single-target scenarios never name a target; multi-target ones always do.
 
 HTTP tool:
 ```
-httpRequest(target = "primary", method, path, body?, headers?)
+httpRequest(target?, method, path, body?)
 ```
-- `primary` base URL auto-resolved from the test's `@LocalServerPort`.
-- Extra targets via config; default `target=primary` so simple scenarios omit it.
+- The app under test is registered (base URL from `@LocalServerPort`); as the
+  sole target it's used when `target` is omitted.
+- Extra targets via config; once >1 exists, every call must name its target.
 
 SQL tool:
 ```
-sqlQuery(datasource = "primary", sql)     // read AND write
+sqlQuery(datasource?, sql)     // read AND write
 ```
-- `primary` auto-resolved from the app's `DataSource` bean.
+- The app's `DataSource` is registered; sole datasource used when omitted.
 - Extra datasources via config (external / mock / per-purpose DBs).
+
+**User-supplied tools (near-term requirement).** The built-in `httpRequest` /
+`sqlQuery` are not the only tools — a consumer must be able to add their own. The
+executor/starter aggregate the built-ins with any user-provided tools found in
+the Spring context:
+- tool objects (beans with `@Tool` methods) → passed via `ChatClient.tools(...)`;
+- `ToolCallback` beans (incl. MCP-provided ones from
+  `SyncMcpToolCallbackProvider`) → passed via `ChatClient.toolCallbacks(...)`.
+
+So the executor's tool input is "built-ins + everything the consumer registered",
+and the seam stays source-agnostic.
 
 Config shape:
 ```yaml
@@ -88,7 +102,8 @@ inquisitor:
         username: …
         password: …
 ```
-(`primary` for both is implicit/auto — only extras are listed.)
+(The app target/datasource is registered automatically by the starter; only
+extras are listed here.)
 
 ---
 
@@ -123,9 +138,10 @@ io.inquisitor.harness
 
 ### Tools (`tool/`)
 
-- `HttpTargetRegistry` — name → (base URL, default headers); `primary` registered
-  at runtime from the local server port.
-- `DataSourceRegistry` — name → `DataSource`; `primary` = app's `DataSource`.
+- `NamedRegistry<T>` — shared allow-list base: `register(name, entry)` + `resolve(name?)`
+  (explicit name; or sole entry when omitted; else error). Subclassed by:
+- `HttpTargetRegistry` — name → `HttpTarget` (base URL + default headers).
+- `DataSourceRegistry` — name → `DataSource`.
 - `HttpRequestTool` — `@Tool httpRequest(...)` using `RestClient`; returns status
   + headers + body as a compact JSON-ish string the model can read.
 - `SqlTool` — `@Tool sqlQuery(...)` via `JdbcTemplate`; SELECT → rows as
@@ -159,9 +175,12 @@ io.inquisitor.harness
 - `ChatClient` from the autoconfigured `ChatModel`
   (`spring-ai-starter-model-openai`, already a dep of `inquisitor-harness`).
 - `ChatMemory` (in-memory window).
-- `HttpTargetRegistry`, `DataSourceRegistry` (seed `primary` from context).
+- `HttpTargetRegistry`, `DataSourceRegistry` (register the app's target/datasource
+  from context: base URL from `@LocalServerPort`, `DataSource` bean).
 - `HttpRequestTool`, `SqlTool`.
-- `ScenarioExecutor`.
+- `ScenarioExecutor` — built with the built-in tools **plus** every user-supplied
+  tool object (`@Tool` beans) and `ToolCallback` bean (incl. MCP) collected from
+  the context.
 - `@EnableConfigurationProperties(InquisitorHarnessProperties.class)`.
 
 ---
@@ -233,7 +252,7 @@ class ScenarioReadOnlySuiteTest extends InquisitorScenarioTests {
 
 `InquisitorScenarioTests` (in `…-junit`):
 - autowires `ScenarioExecutor`; resolves the port (`local.server.port`) and
-  registers the `primary` HTTP target before tests run;
+  registers the app's HTTP target (from the local server port) before tests run;
 - hosts the Mode-A `@TestFactory` (inert when the class has no `scenarioDirs`).
 
 ### Annotation
@@ -286,23 +305,41 @@ annotation.
 
 1. **Model + parser** (+ unit tests on the 5 demo scenarios' structure). ✅ done
 2. **Executor** (ChatClient + memory + structured verdict), built against a
-   `StepEvaluator` seam with **stub/mock tools** — defer real tool impls.
+   `StepEvaluator` seam with **stub/mock tools** — defer real tool impls. ✅ done
    - `ScenarioExecutor` orchestration unit-tested with a *fake* `StepEvaluator`
      (deterministic, no model; runs in normal `build`).
    - `ChatClientStepEvaluator` (real LLM) exercised by a **gated** integration
      test using stub `@Tool` beans + the local model.
-3. **Tools + registries** (real HTTP/SQL; unit tests with the demo app /
-   Testcontainer DB).
-4. **Starter** autoconfiguration.
+3. **Tools + registries** (real HTTP/SQL; HTTP tested via a JDK `HttpServer`,
+   SQL via a Postgres Testcontainer). ✅ done
+4. **Starter** autoconfiguration (incl. aggregating user-supplied tools).
 5. **JUnit `@TestFactory`** + wire into demo; run the 5 scenarios green.
 
 > Rationale for 2-before-3: lets us debug the executor + validate the local
 > model's tool-calling/structured-output reliability with canned tool responses,
 > independent of real HTTP/SQL plumbing.
 
+## Future (Phase 6+)
+
+Not in the MVP; captured so the design leaves room for them:
+
+- **Typed tools derived from the app's API.** Generate precise, per-endpoint
+  tool definitions from the controllers' request mappings / OpenAPI spec so the
+  LLM sees exact typed operations — but keep execution over **real HTTP**
+  (delegating to the `httpRequest` path) to preserve integration-test fidelity.
+  (Calling controller/repository methods directly as tools is possible via
+  `MethodToolCallback`, but bypasses the HTTP stack — status, validation,
+  serialization, security — so it's rejected for action steps.)
+- **Consume MCP tools.** If the app under test exposes beans as MCP tools, let
+  the harness act as an MCP client (`spring-ai-starter-mcp-client` →
+  `SyncMcpToolCallbackProvider`) and feed those callbacks in. Mostly falls out of
+  the "user-supplied `ToolCallback` beans" support from phase 4.
+- **`inquisitor-mock` server** as another named HTTP target.
+
 ## Resolved decisions
 
-- [x] Named-registry tool design with auto `primary` (allowlist).
+- [x] Named-registry (allow-list) tool design, **no default/`primary`**: omitted
+      name resolves only when exactly one entry exists, else the call must name one.
 - [x] `http.allow-unlisted` escape hatch — **omit for MVP** (allowlist only; can
       add later without redesign).
 - [x] JUnit: base class + standard mechanisms — `@TestFactory` (Mode A, class +
