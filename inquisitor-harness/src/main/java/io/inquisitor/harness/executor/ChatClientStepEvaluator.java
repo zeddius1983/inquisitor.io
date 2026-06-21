@@ -31,28 +31,26 @@ import org.springframework.ai.chat.memory.ChatMemory;
  *
  * <p>Each step is sent as a user message scoped to the scenario's conversation id,
  * so the configured {@code MessageChatMemoryAdvisor} replays prior steps (and
- * their tool results) into context. The supplied {@code tools} — objects with
- * {@code @Tool} methods — are offered to the model on every call. The response is
- * mapped straight onto {@link StepVerdict} via structured output.
+ * their tool results) into context. The response is mapped straight onto
+ * {@link StepVerdict} via structured output.
  *
  * <p>The {@link ChatClient} must be pre-configured with the harness system prompt
- * ({@link HarnessSystemPrompt#TEXT}) and a chat-memory advisor.
+ * ({@link HarnessSystemPrompt#TEXT}), a chat-memory advisor, and the tools the
+ * model may call (built-in plus any user-supplied ones) — see the starter's
+ * autoconfiguration.
  */
 public class ChatClientStepEvaluator implements StepEvaluator {
 
     private final ChatClient chatClient;
-    private final List<Object> tools;
 
-    public ChatClientStepEvaluator(ChatClient chatClient, List<Object> tools) {
+    public ChatClientStepEvaluator(ChatClient chatClient) {
         this.chatClient = chatClient;
-        this.tools = List.copyOf(tools);
     }
 
     @Override
     public StepVerdict evaluate(String conversationId, Scenario scenario, Step step) {
         val verdict = chatClient.prompt()
                 .user(userMessage(scenario, step))
-                .tools(tools.toArray())
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .call()
                 .entity(StepVerdict.class);

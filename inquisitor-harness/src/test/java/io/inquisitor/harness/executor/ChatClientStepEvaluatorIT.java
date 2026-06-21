@@ -62,16 +62,17 @@ class ChatClientStepEvaluatorIT {
                         .build())
                 .build();
 
+        val tools = new StubHttpTool();
         val chatClient = ChatClient.builder(model)
                 .defaultSystem(HarnessSystemPrompt.TEXT)
                 .defaultAdvisors(
                         MessageChatMemoryAdvisor.builder(MessageWindowChatMemory.builder().build()).build(),
                         // Logs request/response at DEBUG; gated by logback-test.xml (INQUISITOR_LLM_LOG).
                         new SimpleLoggerAdvisor())
+                .defaultTools(tools)
                 .build();
 
-        val tools = new StubHttpTool();
-        ScenarioResult result = getScenarioResult(chatClient, tools);
+        ScenarioResult result = getScenarioResult(chatClient);
 
         result.results().forEach(r ->
                 System.out.printf("%s -> %s (%s)%n", r.step().title(), r.verdict().outcome(), r.verdict().reasoning()));
@@ -86,8 +87,8 @@ class ChatClientStepEvaluatorIT {
 
     }
 
-    private static @NonNull ScenarioResult getScenarioResult(ChatClient chatClient, StubHttpTool tools) {
-        val executor = new ScenarioExecutor(new ChatClientStepEvaluator(chatClient, List.of(tools)));
+    private static @NonNull ScenarioResult getScenarioResult(ChatClient chatClient) {
+        val executor = new ScenarioExecutor(new ChatClientStepEvaluator(chatClient));
 
         val scenario = new Scenario(
                 "Order lifecycle",
