@@ -35,7 +35,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  */
 class SqlToolTest {
 
-    @SuppressWarnings("resource")
     private static final PostgreSQLContainer CONTAINER = new PostgreSQLContainer("postgres:17-alpine");
 
     private static SqlTool tool;
