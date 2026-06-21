@@ -312,7 +312,17 @@ annotation.
      test using stub `@Tool` beans + the local model.
 3. **Tools + registries** (real HTTP/SQL; HTTP tested via a JDK `HttpServer`,
    SQL via a Postgres Testcontainer). ✅ done
-4. **Starter** autoconfiguration (incl. aggregating user-supplied tools).
+4. **Starter** autoconfiguration (incl. aggregating user-supplied tools). ✅ done
+   - `InquisitorHarnessProperties` (extra `targets`/`datasources`); registries,
+     built-in tools, `ChatClient`, `StepEvaluator`, `ScenarioExecutor`, parser as
+     beans. App `DataSource` auto-registered as `"app"`; model-dependent beans
+     gated `@ConditionalOnBean(ChatModel.class)`.
+   - Tools (built-ins + user `ToolCallback`/`ToolCallbackProvider` beans) are baked
+     into the `ChatClient` via the unified `defaultTools(Object...)` — the
+     `defaultToolCallbacks(...)` overloads are deprecated for removal in RC1. So
+     `ChatClientStepEvaluator` no longer takes a tools list; it just makes the call.
+   - The app's **HTTP target** depends on the random server port and is registered
+     by the JUnit layer (phase 5), not the autoconfig.
 5. **JUnit `@TestFactory`** + wire into demo; run the 5 scenarios green.
 
 > Rationale for 2-before-3: lets us debug the executor + validate the local
