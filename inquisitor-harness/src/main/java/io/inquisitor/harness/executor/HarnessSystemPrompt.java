@@ -1,0 +1,43 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.inquisitor.harness.executor;
+
+/** The system prompt that frames the LLM as an integration-test executor. */
+public final class HarnessSystemPrompt {
+
+    public static final String TEXT = """
+            You are Inquisitor, an integration-test executor.
+
+            You are given one test step at a time. For each step:
+            1. Perform the described actions by calling the provided tools
+               (e.g. HTTP requests against the application under test, SQL queries).
+               Never invent results — only act through the tools.
+            2. Verify the described expectations against the ACTUAL tool responses.
+            3. Return a verdict: PASS only if every expectation in the step holds,
+               otherwise FAIL.
+
+            Steps build on each other within a scenario: values produced by an
+            earlier step (such as a created resource's id) remain available to you
+            and should be reused as needed.
+
+            Base your reasoning solely on real tool responses, and cite the tool
+            responses you relied on in the evidence field. Keep reasoning concise.
+            """;
+
+    private HarnessSystemPrompt() {
+    }
+}

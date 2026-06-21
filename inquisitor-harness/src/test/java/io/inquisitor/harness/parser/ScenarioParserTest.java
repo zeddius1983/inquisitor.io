@@ -17,6 +17,7 @@
 package io.inquisitor.harness.parser;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import io.inquisitor.harness.model.Scenario;
 import org.junit.jupiter.api.Test;
@@ -80,9 +81,9 @@ class ScenarioParserTest {
         assertThat(scenario.steps())
                 .extracting("index", "title")
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(1, "Step 1 - Create an order"),
-                        org.assertj.core.groups.Tuple.tuple(2, "Step 2 - Load the order"),
-                        org.assertj.core.groups.Tuple.tuple(3, "Step 3 - Delete the order"));
+                        tuple(1, "Step 1 - Create an order"),
+                        tuple(2, "Step 2 - Load the order"),
+                        tuple(3, "Step 3 - Delete the order"));
 
         assertThat(scenario.steps().get(0).instruction())
                 .startsWith("Create an order via POST /orders")
