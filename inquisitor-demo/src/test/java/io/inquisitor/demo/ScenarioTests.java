@@ -94,6 +94,11 @@ class ScenarioTests {
         runScenario("scenarios/transaction-history.md");
     }
 
+    @Test
+    void databaseStateMatchesTheApi() {
+        runScenario("scenarios/database-state.md");
+    }
+
     private void runScenario(String classpathLocation) {
         val resource = new ClassPathResource(classpathLocation);
         val scenario = parser.parse(read(resource), resource.getFilename());
