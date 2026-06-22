@@ -36,6 +36,7 @@ import io.inquisitor.harness.tool.SqlTool;
 import lombok.val;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -138,7 +139,11 @@ public class InquisitorHarnessAutoConfiguration {
 
         return ChatClient.builder(chatModel)
                 .defaultSystem(HarnessSystemPrompt.TEXT)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        // Logs each request/response (incl. tool-call round-trips) at DEBUG
+                        // under org.springframework.ai — silent unless that logger is enabled.
+                        new SimpleLoggerAdvisor())
                 .defaultTools(tools.toArray())
                 .build();
     }
