@@ -14,11 +14,18 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo;
+package io.inquisitor.harness;
 
-import io.inquisitor.harness.junit.InquisitorTest;
-import org.springframework.boot.test.context.SpringBootTest;
+/** Shared constants for the harness. */
+public final class HarnessDefaults {
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@InquisitorTest(scenarioDirs = "classpath:scenarios/")
-class ScenarioSuiteTest {}
+    /**
+     * The registry name under which the application under test is registered — both
+     * its HTTP target and its datasource. A scenario only needs to use this name
+     * when more than one target/datasource exists.
+     */
+    public static final String APPLICATION = "app";
+
+    private HarnessDefaults() {
+    }
+}

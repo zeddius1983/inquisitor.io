@@ -33,15 +33,16 @@ public record Account(
         String owner,
         String currency,
         BigDecimal balance,
-        @Version Long version,
+        @Version @Nullable Long version,
         @CreatedDate @Nullable Instant createdAt
 ) {
     public static Account open(String owner, String currency) {
+        // version is left null so Spring Data JDBC treats this as a new entity (INSERT);
+        // a non-null version marks it as existing and triggers an UPDATE that matches no row.
         return Account.builder()
                 .owner(owner)
                 .currency(currency)
                 .balance(BigDecimal.ZERO)
-                .version(0L)
                 .build();
     }
 

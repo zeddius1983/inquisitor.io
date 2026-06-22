@@ -33,9 +33,10 @@ public interface TransactionRepository
     @Query("""
             SELECT * FROM transaction
             WHERE account_id = :accountId
-              AND (:type IS NULL OR type = :type)
-              AND (:from IS NULL OR created_at >= :from)
-              AND (:to   IS NULL OR created_at <= :to)
+              AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
+              AND (CAST(:from AS timestamptz) IS NULL OR created_at >= CAST(:from AS timestamptz))
+              AND (CAST(:to   AS timestamptz) IS NULL OR created_at <= CAST(:to   AS timestamptz))
+            ORDER BY created_at DESC, id DESC
             """)
     List<Transaction> search(@Param("accountId") Long accountId,
                              @Param("type") @Nullable String type,
@@ -46,9 +47,9 @@ public interface TransactionRepository
     @Query("""
             SELECT COUNT(*) FROM transaction
             WHERE account_id = :accountId
-              AND (:type IS NULL OR type = :type)
-              AND (:from IS NULL OR created_at >= :from)
-              AND (:to   IS NULL OR created_at <= :to)
+              AND (CAST(:type AS text) IS NULL OR type = CAST(:type AS text))
+              AND (CAST(:from AS timestamptz) IS NULL OR created_at >= CAST(:from AS timestamptz))
+              AND (CAST(:to   AS timestamptz) IS NULL OR created_at <= CAST(:to   AS timestamptz))
             """)
     long countSearch(@Param("accountId") Long accountId,
                      @Param("type") @Nullable String type,

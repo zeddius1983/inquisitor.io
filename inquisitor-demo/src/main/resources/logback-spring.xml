@@ -31,9 +31,9 @@
         </encoder>
     </appender>
 
-    <!-- ── dev / default ─────────────────────────────────────────────────── -->
-    <!-- Verbose for local development: app code at DEBUG, SQL at TRACE      -->
-    <springProfile name="default,dev,local">
+    <!-- ── dev / default / tests ─────────────────────────────────────────── -->
+    <!-- Verbose for local development and tests: app code at DEBUG, SQL TRACE -->
+    <springProfile name="default,dev,local,unitTest">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
         </root>
@@ -47,6 +47,10 @@
         <!-- SQL statements and parameter binding -->
         <logger name="org.springframework.jdbc.core.JdbcTemplate" level="DEBUG"/>
         <logger name="org.springframework.jdbc.core.StatementCreatorUtils" level="TRACE"/>
+
+        <!-- Spring AI (LLM prompts / tool calls); off by default, opt in via
+             INQUISITOR_LLM_LOG=DEBUG to inspect harness model interactions -->
+        <logger name="org.springframework.ai" level="${INQUISITOR_LLM_LOG:-OFF}"/>
     </springProfile>
 
     <!-- ── prod ──────────────────────────────────────────────────────────── -->

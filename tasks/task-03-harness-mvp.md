@@ -204,6 +204,13 @@ consumer of them. **Keep `…-harness` free of JUnit** so this stays true.
 
 ## JUnit integration — `inquisitor-harness-junit` (+ starter)
 
+> **Deferred (post-MVP).** Phase 5 instead proves the standalone harness directly
+> in `inquisitor-demo` with plain `@Test` methods (see "Wire-up & verification"
+> below). The `@InquisitorTest` annotation + `@TestFactory`/`@TestTemplate`
+> machinery described here is the eventual ergonomic layer, built once the core is
+> trusted. The `inquisitor-harness-junit{,-starter}` modules stay as reserved
+> scaffolding meanwhile.
+
 No custom JUnit `TestEngine` — everything builds on standard JUnit 5 mechanisms
 so `SpringExtension`/`@SpringBootTest` work out of the box (a custom engine would
 have to bootstrap Spring itself). Consumers `extends InquisitorScenarioTests` for
@@ -280,24 +287,35 @@ annotation.
 
 ## Wire-up & verification (`inquisitor-demo`)
 
-- `ScenarioSuiteTest` extends `InquisitorScenarioTests` (Mode A); the existing 5
-  scenarios in `src/test/resources/scenarios/` become the acceptance suite. Add a
-  small Mode-B class to exercise method-level annotations too.
+Proves the **standalone harness** end to end (autoconfig → `ChatClient` → tools
+over real HTTP/Postgres → local model), using the JUnit-free public contract
+(`ScenarioParser` + `ScenarioExecutor.evaluate` → `ScenarioResult`).
+
+- `inquisitor-demo` test scope depends on **`inquisitor-harness-starter`** (the
+  autoconfigured standalone harness), not the junit-starter.
+- `ScenarioTests` (`@SpringBootTest(RANDOM_PORT)`) autowires `ScenarioExecutor`,
+  `ScenarioParser`, `HttpTargetRegistry`; a `@BeforeEach` registers the app HTTP
+  target from the random port (datasource is auto-registered as `"app"`). **One
+  `@Test` per scenario** loads+parses the `.md`, calls `evaluate`, and asserts
+  `result.passed()`, dumping each step's outcome/reasoning/evidence on failure.
+- Gated with `@EnabledIfEnvironmentVariable(INQUISITOR_LLM_IT=true)` so the normal
+  `./gradlew build` stays green; run the suite with the model up via
+  `INQUISITOR_LLM_IT=true ./gradlew :inquisitor-demo:test`. Needs Docker (Postgres
+  Testcontainer) and the local model.
 - Model: **local llama.cpp, OpenAI-compatible API at `http://127.0.0.1:8000`**.
-  Config in test `application.yml`:
+  Config in test `application.yml` — env-driven (standard `OPENAI_*` vars, since a
+  consumer may share the chat model) using the flattened `chat.*` properties (the
+  nested `chat.options.*` form is deprecated for removal in Spring AI 2.0.0):
   ```yaml
   spring:
     ai:
       openai:
-        base-url: http://127.0.0.1:8000   # client appends /v1
-        api-key: llama
+        base-url: ${OPENAI_BASE_URL:http://127.0.0.1:8000}   # client appends /v1
+        api-key: ${OPENAI_API_KEY:llama}
         chat:
-          options:
-            model: gemma-4-31B-it-QAT-Q4_0
-            temperature: 0.0
+          model: ${OPENAI_MODEL:gemma-4-31B-it-QAT-Q4_0}
+          temperature: 0.0
   ```
-- `./gradlew :inquisitor-demo:test` runs the scenarios; each step shows as a
-  test. The local model must be running for the suite to pass.
 
 ---
 
@@ -322,8 +340,15 @@ annotation.
      `defaultToolCallbacks(...)` overloads are deprecated for removal in RC1. So
      `ChatClientStepEvaluator` no longer takes a tools list; it just makes the call.
    - The app's **HTTP target** depends on the random server port and is registered
-     by the JUnit layer (phase 5), not the autoconfig.
-5. **JUnit `@TestFactory`** + wire into demo; run the 5 scenarios green.
+     in the demo test (phase 5), not the autoconfig.
+5. **Standalone harness wired into `inquisitor-demo`** with plain `@Test`-per-scenario
+   tests asserting on `ScenarioResult` (gated on the local model + Docker). ✅ done —
+   all five scenarios green against the local model over real HTTP/Postgres
+   (Testcontainers via Podman). Surfaced + fixed 3 real Spring Data JDBC / Boot-4
+   bugs in the demo along the way. Scenarios rewritten in the stepped
+   Intent/Expected format; a `ControllerTracingAspect` in the demo logs each
+   controller call so harness-driven traffic is visible. The ergonomic
+   `@InquisitorTest`/`@TestFactory` JUnit layer is deferred (see JUnit section).
 
 > Rationale for 2-before-3: lets us debug the executor + validate the local
 > model's tool-calling/structured-output reliability with canned tool responses,

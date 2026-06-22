@@ -97,6 +97,9 @@ Three project agents escalate by scope: `junior-developer` (well-scoped tasks),
 
 ## Source layout note
 
-`inquisitor-harness/src` is currently a work-in-progress spike
-(`ChatClientExample.java`) and is not yet tracked in git; the real harness
-implementation is upcoming work — see [docs/roadmap.md](docs/roadmap.md).
+`inquisitor-harness` is implemented: `model/` (Scenario, Step, verdict records),
+`parser/` (flexmark markdown → `Scenario`), `tool/` (`HttpRequestTool`, `SqlTool`
++ named registries), `executor/` (`ScenarioExecutor`, `ChatClientStepEvaluator`,
+system prompt). `inquisitor-harness-starter` autoconfigures it. The standalone
+harness is exercised end-to-end by `inquisitor-demo`'s gated `ScenarioTests`. The
+`@InquisitorTest` JUnit layer is still pending — see [docs/roadmap.md](docs/roadmap.md).

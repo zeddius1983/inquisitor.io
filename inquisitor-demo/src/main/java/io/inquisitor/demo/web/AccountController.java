@@ -27,7 +27,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,7 +65,9 @@ public class AccountController {
     @GetMapping("/{id}/transactions")
     public Page<Transaction> getTransactions(@PathVariable Long id,
                                              @ModelAttribute TransactionFilter filter,
-                                             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+                                             // Ordering is in the repository query; Spring Data JDBC does
+                                             // not apply a Pageable's sort to a custom @Query.
+                                             @PageableDefault(size = 20) Pageable pageable) {
         return accountService.getTransactions(id, filter, pageable);
     }
 

@@ -21,6 +21,7 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
+import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.executor.ChatClientStepEvaluator;
 import io.inquisitor.harness.executor.HarnessSystemPrompt;
@@ -35,6 +36,7 @@ import io.inquisitor.harness.tool.SqlTool;
 import lombok.val;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -64,7 +66,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * {@link HttpRequestTool}/{@link SqlTool}, any user-supplied {@link ToolCallback}
  * beans, and any {@link ToolCallbackProvider} beans (e.g. MCP).
  */
-@AutoConfiguration
+// Ordered after the OpenAI model autoconfig so the ChatModel bean exists before our
+// @ConditionalOnBean(ChatModel.class) is evaluated (afterName avoids a hard dependency).
+@AutoConfiguration(afterName = "org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration")
 @ConditionalOnClass(ChatClient.class)
 @EnableConfigurationProperties(InquisitorHarnessProperties.class)
 public class InquisitorHarnessAutoConfiguration {
@@ -92,7 +96,7 @@ public class InquisitorHarnessAutoConfiguration {
         val registry = new DataSourceRegistry();
         val appDataSource = applicationDataSource.getIfUnique();
         if (appDataSource != null) {
-            registry.register("app", appDataSource);
+            registry.register(HarnessDefaults.APPLICATION, appDataSource);
         }
         properties.datasources().forEach((name, ds) -> registry.register(name, toDataSource(ds)));
         return registry;
@@ -135,7 +139,11 @@ public class InquisitorHarnessAutoConfiguration {
 
         return ChatClient.builder(chatModel)
                 .defaultSystem(HarnessSystemPrompt.TEXT)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        // Logs each request/response (incl. tool-call round-trips) at DEBUG
+                        // under org.springframework.ai — silent unless that logger is enabled.
+                        new SimpleLoggerAdvisor())
                 .defaultTools(tools.toArray())
                 .build();
     }

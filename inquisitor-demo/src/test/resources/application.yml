@@ -1,6 +1,15 @@
-inquisitor:
-  base-url: http://localhost:${local.server.port}
 spring:
+  profiles:
+    # Activates the inquisitor-demo-db-starter's Postgres Testcontainer.
+    active: unitTest
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY:test-key}
+      # Local OpenAI-compatible server (e.g. llama.cpp); the client appends /v1.
+      # Override per-environment via the standard OPENAI_* env vars.
+      base-url: ${OPENAI_BASE_URL:http://127.0.0.1:8000}
+      api-key: ${OPENAI_API_KEY:llama}
+      chat:
+        # Flattened properties; the nested chat.options.* form is deprecated
+        # for removal in Spring AI 2.0.0.
+        model: ${OPENAI_MODEL:gemma-4-31B-it-QAT-Q4_0}
+        temperature: 0.0
