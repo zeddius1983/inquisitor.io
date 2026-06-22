@@ -18,13 +18,13 @@ package io.inquisitor.demo.aop.log;
 
 import java.util.Arrays;
 
-import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -33,10 +33,13 @@ import org.springframework.stereotype.Component;
  * exception. Exists so we can confirm the Inquisitor harness's LLM is actually
  * driving the application through real HTTP calls, rather than fabricating
  * tool results.
+ *
+ * <p>Each line is logged under the controller's own category (e.g.
+ * {@code …web.AccountController}), not this aspect's, by deriving the logger from the
+ * invoked method's declaring type.
  */
 @Aspect
 @Component
-@Slf4j
 public class ControllerTracingAspect {
 
     @Pointcut("within(io.inquisitor.demo.web..*) "
@@ -46,6 +49,7 @@ public class ControllerTracingAspect {
 
     @Around("restController()")
     public @Nullable Object trace(ProceedingJoinPoint joinPoint) throws Throwable {
+        val log = LoggerFactory.getLogger(joinPoint.getSignature().getDeclaringType());
         val method = joinPoint.getSignature().getName();
         val args = Arrays.toString(joinPoint.getArgs());
         try {
