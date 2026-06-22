@@ -1,4 +1,16 @@
 # Fetch a non-existent account
 
-Call GET /accounts/99999.
-Verify the HTTP status is 404 and the response body is a valid RFC 9457 problem detail with type and title fields.
+Requesting an account that does not exist must return a well-formed RFC 9457
+problem detail rather than a generic error.
+
+**Intent:** Fetch an account id that has not been created.
+
+```
+GET /accounts/99999
+```
+
+**Expected response**
+- Status: `404 Not Found`
+- Content-Type `application/problem+json`
+- Body is a valid RFC 9457 problem detail (includes at least the `title` and
+  `detail` fields)

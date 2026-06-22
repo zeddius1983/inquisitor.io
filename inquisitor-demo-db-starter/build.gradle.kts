@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     api("org.springframework.boot:spring-boot-starter-data-jdbc")
-    api("org.flywaydb:flyway-core")
+    api("org.springframework.boot:spring-boot-starter-flyway")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 

@@ -21,6 +21,7 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
+import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.executor.ChatClientStepEvaluator;
 import io.inquisitor.harness.executor.HarnessSystemPrompt;
@@ -64,7 +65,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * {@link HttpRequestTool}/{@link SqlTool}, any user-supplied {@link ToolCallback}
  * beans, and any {@link ToolCallbackProvider} beans (e.g. MCP).
  */
-@AutoConfiguration
+// Ordered after the OpenAI model autoconfig so the ChatModel bean exists before our
+// @ConditionalOnBean(ChatModel.class) is evaluated (afterName avoids a hard dependency).
+@AutoConfiguration(afterName = "org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration")
 @ConditionalOnClass(ChatClient.class)
 @EnableConfigurationProperties(InquisitorHarnessProperties.class)
 public class InquisitorHarnessAutoConfiguration {
@@ -92,7 +95,7 @@ public class InquisitorHarnessAutoConfiguration {
         val registry = new DataSourceRegistry();
         val appDataSource = applicationDataSource.getIfUnique();
         if (appDataSource != null) {
-            registry.register("app", appDataSource);
+            registry.register(HarnessDefaults.APPLICATION, appDataSource);
         }
         properties.datasources().forEach((name, ds) -> registry.register(name, toDataSource(ds)));
         return registry;

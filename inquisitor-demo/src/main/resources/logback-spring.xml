@@ -31,9 +31,9 @@
         </encoder>
     </appender>
 
-    <!-- ── dev / default ─────────────────────────────────────────────────── -->
-    <!-- Verbose for local development: app code at DEBUG, SQL at TRACE      -->
-    <springProfile name="default,dev,local">
+    <!-- ── dev / default / tests ─────────────────────────────────────────── -->
+    <!-- Verbose for local development and tests: app code at DEBUG, SQL TRACE -->
+    <springProfile name="default,dev,local,unitTest">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
         </root>
