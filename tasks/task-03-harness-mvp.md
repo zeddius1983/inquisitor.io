@@ -384,10 +384,11 @@ Not in the MVP; captured so the design leaves room for them:
 
 ## Still open (non-blocking)
 
-- [ ] `@InquisitorTest` needs `@TestTemplate`/`@ExtendWith` meta-annotations →
-      it must move to (or pull JUnit deps into) the module that has JUnit on the
-      classpath. Land it in `…-junit` rather than `…-junit-starter`? (was cosmetic,
-      now slightly load-bearing).
+- [x] JUnit annotations (`@Harness`/`@Scenario`) live in `…-junit` (they need
+      JUnit + the extensions on the classpath); `…-junit-starter` re-exports
+      `…-junit` + `…-harness-starter`. The base-class/`@TestFactory` idea was
+      dropped in favour of `@Scenario` as a `@TestTemplate` (one sub-test per
+      step). See [task-04](task-04-junit-layer.md).
 - [x] Local model: `gemma-4-31B-it-QAT-Q4_0` (**dense**). MoE models (e.g.
       `gemma-4-26B-A4B`) shortcut multi-step scenarios — they answer follow-up
       steps from chat memory instead of calling the tool, producing hallucinated
