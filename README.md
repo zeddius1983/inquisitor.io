@@ -141,6 +141,8 @@ that have been benchmarked. Contributions of further results are welcome.
 | `gemma-4-31B-it-QAT` | `Q4_0` | on | 100% | 13m 53s |
 | `gemma-4-12B-it-QAT` | `Q4_0` | off | 86% | 3m 35s |
 | `gemma-4-12B-it-QAT` | `Q4_0` | on | 100% | 6m 16s |
+| `GLM-4.7-Flash` | `Q4_K_M` | off | 0% | — |
+| `GLM-4.7-Flash` | `Q4_K_M` | on | 100% | 2m 43s |
 
 With reasoning **off**, the 12B model fails the multi-step "Import accounts from
 CSV and plain text" scenario — it skips one of the import calls and rubber-stamps
