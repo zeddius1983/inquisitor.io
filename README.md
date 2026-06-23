@@ -4,6 +4,8 @@
 
 **LLM-driven integration testing for Spring applications.**
 
+*AI-powered API testing · natural language integration testing.*
+
 Write your integration tests as human-readable markdown scenarios. An
 LLM-backed harness (built on [Spring AI](https://spring.io/projects/spring-ai))
 reads each scenario, drives your running application through real HTTP and SQL,
