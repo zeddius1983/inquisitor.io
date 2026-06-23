@@ -70,6 +70,19 @@ invocations); the first failing step fails and the rest are skipped.
 > - **Don't gate critical CI on it blindly.** Review failures — a red step may be
 >   a real regression, model flakiness, or an ambiguous scenario.
 
+> [!TIP]
+> **Prefer a non-thinking model for evaluation.** Scenario steps are mostly
+> mechanical (call an endpoint, assert a status, check a row), and Inquisitor
+> relies on tool calls plus a final structured verdict. Reasoning ("thinking")
+> models add a trace that reintroduces variance — the model can talk itself out
+> of a correct call or re-decide a verdict — and on OpenAI-compatible servers the
+> thinking output can leak into the response body and mangle tool-call arguments.
+> For reproducible verdicts, a strong instruction-tuned **non-reasoning** model is
+> usually the more reliable test oracle. If you see flaky results, disable
+> thinking if your model supports it (e.g. `reasoning_effort` /
+> `chat_template_kwargs` for a self-hosted server) or switch to the non-thinking
+> variant before blaming the scenario.
+
 ## Modules
 
 | Module | Role |
@@ -115,6 +128,30 @@ Then write a `@Harness` test class with one `@Scenario` method per markdown file
 under `src/test/resources/scenarios/`. The scenario file is resolved from the
 method name (`transferBetweenAccounts()` → `transfer-between-accounts.md`) or set
 explicitly with `@Scenario("classpath:scenarios/custom.md")`.
+
+## Verified models
+
+Results of running the scenario suite (7 scenarios) against various models. The
+list is empirical, not exhaustive — other models may work; these are the ones
+that have been benchmarked. Contributions of further results are welcome.
+
+| Model | Quantization | Reasoning | Passed | Duration |
+|-------|--------------|-----------|--------|----------|
+| `gemma-4-31B-it-QAT` | `Q4_0` | off | 100% | 10m 31s |
+| `gemma-4-31B-it-QAT` | `Q4_0` | on | 100% | 13m 53s |
+| `gemma-4-12B-it-QAT` | `Q4_0` | off | 86% | 3m 35s |
+| `gemma-4-12B-it-QAT` | `Q4_0` | on | 100% | 6m 16s |
+| `GLM-4.7-Flash` | `Q4_K_M` | off | 0% | — |
+| `GLM-4.7-Flash` | `Q4_K_M` | on | 100% | 2m 43s |
+
+With reasoning **off**, the 12B model fails the multi-step "Import accounts from
+CSV and plain text" scenario — it skips one of the import calls and rubber-stamps
+the step from chat memory rather than actually executing it. Turning reasoning
+**on** recovers it (100%), at roughly 1.75× the runtime. So thinking buys
+reliability when a model is otherwise too weak for a multi-step step, but only
+costs time once the model is already capable enough (the 31B passes either way) —
+which is why the recommendation above is a default to revisit per model, not an
+absolute.
 
 ## Building
 

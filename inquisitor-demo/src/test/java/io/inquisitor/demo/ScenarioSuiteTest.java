@@ -54,4 +54,7 @@ class ScenarioSuiteTest {
 
     @Scenario
     void databaseState() {}
+
+    @Scenario
+    void importAccounts() {}
 }

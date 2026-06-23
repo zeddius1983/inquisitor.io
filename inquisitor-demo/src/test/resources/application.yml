@@ -13,3 +13,8 @@ spring:
         # for removal in Spring AI 2.0.0.
         model: ${OPENAI_MODEL:gemma-4-31B-it-QAT-Q4_0}
         temperature: 0.0
+
+logging:
+  level:
+    # Trace each harness tool call (inputs and outputs) during scenario runs.
+    io.inquisitor.harness.tool: DEBUG

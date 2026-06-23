@@ -44,6 +44,12 @@ class HttpRequestToolTest {
             val received = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             respond(exchange, 201, received);
         });
+        server.createContext("/headers", exchange -> {
+            val requestId = exchange.getRequestHeaders().getFirst("X-Request-Id");
+            val contentType = exchange.getRequestHeaders().getFirst("Content-Type");
+            exchange.getRequestBody().readAllBytes();
+            respond(exchange, 200, "X-Request-Id=" + requestId + " Content-Type=" + contentType);
+        });
         server.start();
 
         val registry = new HttpTargetRegistry();
@@ -58,28 +64,47 @@ class HttpRequestToolTest {
 
     @Test
     void returnsStatusAndBodyForSuccess() {
-        val response = tool.httpRequest(null, "GET", "/ping", null);
+        val response = tool.httpRequest(null, "GET", "/ping", null, null);
 
         assertThat(response).contains("HTTP 200").contains("\"msg\":\"pong\"");
     }
 
     @Test
     void capturesErrorStatusInsteadOfThrowing() {
-        val response = tool.httpRequest(null, "GET", "/missing", null);
+        val response = tool.httpRequest(null, "GET", "/missing", null, null);
 
         assertThat(response).contains("HTTP 404").contains("not found");
     }
 
     @Test
     void sendsRequestBody() {
-        val response = tool.httpRequest(null, "POST", "/echo", "{\"a\":1}");
+        val response = tool.httpRequest(null, "POST", "/echo", "{\"a\":1}", null);
 
         assertThat(response).contains("HTTP 201").contains("\"a\":1");
     }
 
     @Test
+    void sendsCustomHeadersAndContentType() {
+        val response = tool.httpRequest(null, "POST", "/headers", "plain text body",
+                "X-Request-Id: req-001\nContent-Type: text/plain");
+
+        assertThat(response).contains("HTTP 200")
+                .contains("X-Request-Id=req-001")
+                .contains("Content-Type=text/plain");
+    }
+
+    @Test
+    void defaultsToJsonContentTypeWhenBodyHasNoContentTypeHeader() {
+        val response = tool.httpRequest(null, "POST", "/headers", "{\"a\":1}", "X-Request-Id: req-002");
+
+        assertThat(response).contains("HTTP 200")
+                .contains("X-Request-Id=req-002")
+                .contains("Content-Type=application/json");
+    }
+
+    @Test
     void rejectsUnknownTarget() {
-        assertThatThrownBy(() -> tool.httpRequest("nope", "GET", "/ping", null))
+        assertThatThrownBy(() -> tool.httpRequest("nope", "GET", "/ping", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown HTTP target 'nope'");
     }

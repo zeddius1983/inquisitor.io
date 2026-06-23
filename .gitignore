@@ -1,5 +1,10 @@
 # IDE
 .idea/
+# Eclipse / Eclipse JDT language server
+.project
+.classpath
+.settings/
+bin/
 
 # Firecrawl scratch output
 .firecrawl/

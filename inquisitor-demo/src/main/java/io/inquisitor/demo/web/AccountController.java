@@ -25,23 +25,29 @@ import io.inquisitor.demo.web.dto.CreateAccountRequest;
 import io.inquisitor.demo.web.dto.TransactionFilter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.val;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/accounts")
 @RequiredArgsConstructor
-public class AccountController {
+public class AccountController implements AccountImport {
 
     private final AccountService accountService;
 
@@ -81,5 +87,24 @@ public class AccountController {
     @ResponseStatus(HttpStatus.CREATED)
     public Account withdraw(@PathVariable Long id, @Valid @RequestBody AmountRequest request) {
         return accountService.withdraw(id, request.amount());
+    }
+
+    /**
+     * Bulk-imports accounts from a text body — CSV ({@code text/csv}: lines of
+     * {@code owner,currency}, an optional {@code owner,currency} header row is skipped) or
+     * plain text ({@code text/plain}: one owner per line). A row that omits the currency
+     * falls back to the {@code X-Default-Currency} header (USD when unset), so a whole
+     * plain-text batch can share a single currency.
+     */
+    @PostMapping(path = "/import", consumes = {"text/csv", MediaType.TEXT_PLAIN_VALUE})
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<Account> importAccounts(
+            @RequestBody String body,
+            @RequestHeader(HttpHeaders.CONTENT_TYPE) String contentType,
+            @RequestHeader(name = "X-Default-Currency", defaultValue = "USD") String defaultCurrency) {
+        val requests = contentType.toLowerCase().contains("csv")
+                ? parseCsv(body, defaultCurrency)
+                : parsePlain(body, defaultCurrency);
+        return accountService.importAccounts(requests);
     }
 }

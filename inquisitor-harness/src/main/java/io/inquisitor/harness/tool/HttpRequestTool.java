@@ -16,8 +16,11 @@
 
 package io.inquisitor.harness.tool;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.tool.annotation.Tool;
@@ -36,6 +39,7 @@ import org.springframework.web.client.RestClientException;
  * a 404 or 422 is often the expected outcome of a step. Connection failures are
  * returned as a readable error string.
  */
+@Slf4j
 public class HttpRequestTool {
 
     private final HttpTargetRegistry registry;
@@ -52,23 +56,69 @@ public class HttpRequestTool {
             @Nullable String target,
             @ToolParam(description = "HTTP method: GET, POST, PUT, PATCH or DELETE") String method,
             @ToolParam(description = "request path, e.g. /accounts or /accounts/42") String path,
-            @ToolParam(required = false, description = "request body as JSON, or empty for none")
-            @Nullable String body) {
+            @ToolParam(required = false, description = "request body, or empty for none")
+            @Nullable String body,
+            @ToolParam(required = false,
+                    description = "extra request headers, one per line as \"Name: Value\", e.g. "
+                            + "\"X-Request-Id: req-001\". Add a \"Content-Type: ...\" line for a non-JSON "
+                            + "body; when a body is sent without one, application/json is assumed.")
+            @Nullable String headers) {
 
+        log.debug("httpRequest <- target={}, method={}, path={}, headers={}, body={}",
+                target, method, path, headers, body);
         val httpTarget = registry.resolve(target);
         val client = RestClient.builder().baseUrl(httpTarget.baseUrl()).build();
         try {
             val spec = client.method(HttpMethod.valueOf(method.strip().toUpperCase(Locale.ROOT))).uri(path);
-            httpTarget.defaultHeaders().forEach(spec::header);
-            if (body != null && !body.isBlank()) {
-                spec.contentType(MediaType.APPLICATION_JSON).body(body);
+
+            // Per-target default headers first, then the per-request ones (which win on conflict).
+            val merged = new LinkedHashMap<String, String>(httpTarget.defaultHeaders());
+            parseHeaders(headers, merged);
+
+            // Content-Type is applied alongside the body (case-insensitive lookup); every other
+            // header is set directly on the request.
+            String contentType = null;
+            for (val header : merged.entrySet()) {
+                if (header.getKey().equalsIgnoreCase(HttpHeaders.CONTENT_TYPE)) {
+                    contentType = header.getValue();
+                } else {
+                    spec.header(header.getKey(), header.getValue());
+                }
             }
+
+            if (body != null && !body.isBlank()) {
+                val mediaType = contentType != null && !contentType.isBlank()
+                        ? MediaType.parseMediaType(contentType)
+                        : MediaType.APPLICATION_JSON;
+                spec.contentType(mediaType).body(body);
+            } else if (contentType != null && !contentType.isBlank()) {
+                spec.header(HttpHeaders.CONTENT_TYPE, contentType);
+            }
+
             val response = spec.retrieve()
                     .onStatus(status -> true, (request, ignored) -> { })
                     .toEntity(String.class);
-            return formatResponse(response.getStatusCode(), response.getHeaders(), response.getBody());
+            val result = formatResponse(response.getStatusCode(), response.getHeaders(), response.getBody());
+            log.debug("httpRequest -> {}", result);
+            return result;
         } catch (RestClientException e) {
-            return "HTTP request failed: " + e.getMessage();
+            val error = "HTTP request failed: " + e.getMessage();
+            log.debug("httpRequest -> {}", error);
+            return error;
+        }
+    }
+
+    /** Parses {@code "Name: Value"} lines into {@code target}; blanks are ignored, later lines win. */
+    private static void parseHeaders(@Nullable String headers, Map<String, String> target) {
+        if (headers == null || headers.isBlank()) {
+            return;
+        }
+        for (val line : headers.lines().toList()) {
+            val trimmed = line.strip();
+            val colon = trimmed.indexOf(':');
+            if (colon > 0) {
+                target.put(trimmed.substring(0, colon).strip(), trimmed.substring(colon + 1).strip());
+            }
         }
     }
 

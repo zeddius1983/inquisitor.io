@@ -22,6 +22,7 @@ import io.inquisitor.demo.model.TransactionType;
 import io.inquisitor.demo.repository.AccountRepository;
 import io.inquisitor.demo.repository.TransactionRepository;
 import io.inquisitor.demo.web.dto.AccountFilter;
+import io.inquisitor.demo.web.dto.CreateAccountRequest;
 import io.inquisitor.demo.web.dto.TransactionFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.val;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -46,6 +48,14 @@ public class AccountService {
     @Transactional
     public Account createAccount(String owner, String currency) {
         return accountRepository.save(Account.open(owner, currency));
+    }
+
+    /** Bulk-opens accounts, e.g. from a CSV or plain-text import. */
+    @Transactional
+    public List<Account> importAccounts(List<CreateAccountRequest> requests) {
+        return requests.stream()
+                .map(request -> accountRepository.save(Account.open(request.owner(), request.currency())))
+                .toList();
     }
 
     public Account findById(Long id) {
