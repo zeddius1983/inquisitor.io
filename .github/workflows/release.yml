@@ -1,0 +1,36 @@
+name: release
+
+# Publishes the library modules + BOM to Maven Central (Central Portal) when a
+# version tag is pushed, or on manual dispatch. Credentials come from repository
+# secrets, surfaced to Gradle via ORG_GRADLE_PROJECT_* (read by the Vanniktech
+# plugin as the mavenCentral* / signingInMemory* properties). See README.md.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Verify before publishing; a tag should only ship if the build is green.
+      - run: ./gradlew build --stacktrace
+
+      - run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache --stacktrace
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
