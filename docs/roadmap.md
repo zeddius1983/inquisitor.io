@@ -16,21 +16,23 @@ The authoritative status is git history + this table.
 | 03 | `inquisitor-harness` — core scenario execution (parser, tools, executor) | ✅ done |
 | 04 | `inquisitor-harness-starter` — autoconfiguration | ✅ done |
 | 05 | Standalone harness wired into `inquisitor-demo` (`@Test`-per-scenario), green on the local model | ✅ done |
-| 05b | `inquisitor-harness-junit` + `-junit-starter` (`@InquisitorTest` ergonomic layer) | ⏳ deferred (modules are reserved scaffolding) |
+| 05b | `inquisitor-harness-junit` + `-junit-starter` (`@Harness`/`@Scenario` ergonomic layer) | ✅ done |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
 ## Now
 
-- Phase 5 is green: the autoconfigured standalone harness drives the demo over
-  real HTTP/Postgres with the local model; all five scenarios pass.
+- Phase 05b is green: a `@Harness` `@SpringBootTest` class with one `@Scenario`
+  method per scenario reports **one sub-test per step** (19 step-tests across the
+  6 demo scenarios, all PASS on the local model). Each `@Scenario` method resolves
+  its markdown by name and the app's HTTP target is auto-registered from the
+  random port — no per-scenario boilerplate. The standalone `ScenarioTests` is
+  kept as the JUnit-free compatibility test.
 
 ## Next
 
 - **OpenAPI discovery** so scenarios can drop explicit request bodies and use
   natural-language intent only (add springdoc to the demo; let the model read the
   spec). Until then scenarios keep explicit bodies.
-- Build the ergonomic `@InquisitorTest` JUnit layer (`@TestFactory`/`@TestTemplate`)
-  in `inquisitor-harness-junit{,-starter}` once the core is trusted.
 - Decide on the mock-server design before implementing the `*-mock` modules.
 
 > Keep this file current as tasks complete; move durable rationale into

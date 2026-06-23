@@ -14,15 +14,7 @@
  * limitations under the License.
  */
 
+@NullMarked
 package io.inquisitor.harness.junit;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface InquisitorTest {
-    String[] scenarioDirs() default {};
-}
+import org.jspecify.annotations.NullMarked;
