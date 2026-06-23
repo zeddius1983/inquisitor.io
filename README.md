@@ -70,6 +70,19 @@ invocations); the first failing step fails and the rest are skipped.
 > - **Don't gate critical CI on it blindly.** Review failures — a red step may be
 >   a real regression, model flakiness, or an ambiguous scenario.
 
+> [!TIP]
+> **Prefer a non-thinking model for evaluation.** Scenario steps are mostly
+> mechanical (call an endpoint, assert a status, check a row), and Inquisitor
+> relies on tool calls plus a final structured verdict. Reasoning ("thinking")
+> models add a trace that reintroduces variance — the model can talk itself out
+> of a correct call or re-decide a verdict — and on OpenAI-compatible servers the
+> thinking output can leak into the response body and mangle tool-call arguments.
+> For reproducible verdicts, a strong instruction-tuned **non-reasoning** model is
+> usually the more reliable test oracle. If you see flaky results, disable
+> thinking if your model supports it (e.g. `reasoning_effort` /
+> `chat_template_kwargs` for a self-hosted server) or switch to the non-thinking
+> variant before blaming the scenario.
+
 ## Modules
 
 | Module | Role |
@@ -115,6 +128,17 @@ Then write a `@Harness` test class with one `@Scenario` method per markdown file
 under `src/test/resources/scenarios/`. The scenario file is resolved from the
 method name (`transferBetweenAccounts()` → `transfer-between-accounts.md`) or set
 explicitly with `@Scenario("classpath:scenarios/custom.md")`.
+
+## Verified models
+
+The full scenario suite has been confirmed to pass with the models below. This
+list is empirical, not exhaustive — other models may work; these are the ones
+known to run the suite end to end. Contributions of further verified models are
+welcome.
+
+| Model | Quantization | Reasoning | Test |
+|-------|--------------|-----------|------|
+| `gemma-4-31B-it-QAT` | `Q4_0` | off | PASSED |
 
 ## Building
 
