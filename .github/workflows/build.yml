@@ -1,0 +1,33 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # JDK 26 is the toolchain version; settings.gradle.kts has no foojay
+      # resolver, so CI installs it rather than letting Gradle auto-provision.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '26'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      # Docker is preinstalled on ubuntu-latest, so the demo's Testcontainers
+      # data-layer tests run. The LLM scenario suites self-skip without
+      # INQUISITOR_LLM_IT, keeping the build green with no model.
+      - run: ./gradlew build --stacktrace

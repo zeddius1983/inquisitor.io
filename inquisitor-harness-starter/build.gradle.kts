@@ -1,5 +1,6 @@
 plugins {
     id("inquisitor.spring-conventions")
+    id("inquisitor.publish-conventions")
 }
 
 dependencies {

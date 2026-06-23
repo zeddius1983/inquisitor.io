@@ -16,7 +16,17 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **Version catalog (`libs.versions.toml`)** is the single source of dependency
   versions; module builds reference `libs.*`, never hardcode versions.
 - **Root project is a published BOM** (`inquisitor-bom`) so consumers get
-  aligned versions of the Inquisitor modules.
+  aligned versions of the Inquisitor modules. It declares `constraints` for the
+  four published modules; coordinates are overridden to `inquisitor-bom` since the
+  root project is named `inquisitor.io`.
+- **Maven Central via the Central Portal, Vanniktech plugin.** Legacy OSSRH was
+  shut down (June 2025), so publishing goes through `central.sonatype.com`. The
+  `com.vanniktech.maven.publish` plugin (applied by `inquisitor.publish-conventions`)
+  generates the sources/Javadoc jars, signs, builds the POM, and uploads in one
+  step — far less boilerplate than hand-rolling `maven-publish` + signing + nmcp.
+  Only the four harness modules + the BOM publish; the demo and the unimplemented
+  mock modules don't. Account, `io.inquisitor` namespace (domain-verified), GPG
+  key and token live outside the repo — see the README release runbook.
 
 ## Framework
 

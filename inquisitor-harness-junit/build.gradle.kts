@@ -1,19 +1,20 @@
 plugins {
     id("inquisitor.spring-conventions")
+    id("inquisitor.publish-conventions")
 }
 
 dependencies {
-    // Executor, parser, registries and model types are part of the base class's surface.
+    // Executor, parser, registries and model types the extensions drive.
     api(project(":inquisitor-harness"))
 
-    // @TestFactory / DynamicNode / @InquisitorTest are surface a consumer extends.
+    // @TestTemplate / extension callbacks behind @Harness and @Scenario.
     api("org.junit.jupiter:junit-jupiter-api")
 
-    // SpringExtension wiring, @Autowired, Environment for the base class.
+    // SpringExtension.getApplicationContext(...) to reach harness beans from the extensions.
     api("org.springframework:spring-test")
     api("org.springframework:spring-context")
 
-    // PathMatchingResourcePatternResolver for classpath scenario discovery.
+    // Resource loading for classpath scenario files.
     implementation("org.springframework:spring-core")
 
     compileOnly(libs.lombok)

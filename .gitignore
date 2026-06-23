@@ -11,6 +11,8 @@ build/
 # Java
 *.class
 *.jar
+# …but the Gradle wrapper jar must be committed so CI/clones can build.
+!gradle/wrapper/gradle-wrapper.jar
 
 # OS
 .DS_Store
