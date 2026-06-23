@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.tool.annotation.Tool;
@@ -38,6 +39,7 @@ import org.springframework.jdbc.core.StatementCallback;
  * other statement returns the affected row count. SQL errors are returned as a
  * readable string rather than thrown.
  */
+@Slf4j
 public class SqlTool {
 
     private final DataSourceRegistry registry;
@@ -55,9 +57,10 @@ public class SqlTool {
             @Nullable String datasource,
             @ToolParam(description = "the SQL statement to execute") String sql) {
 
+        log.debug("sqlQuery <- datasource={}, sql={}", datasource, sql);
         val jdbcTemplate = new JdbcTemplate(registry.resolve(datasource));
         try {
-            return jdbcTemplate.execute((StatementCallback<String>) statement -> {
+            val result = jdbcTemplate.execute((StatementCallback<String>) statement -> {
                 if (statement.execute(sql)) {
                     try (val resultSet = statement.getResultSet()) {
                         return formatRows(resultSet);
@@ -65,8 +68,12 @@ public class SqlTool {
                 }
                 return "Updated " + statement.getUpdateCount() + " row(s).";
             });
+            log.debug("sqlQuery -> {}", result);
+            return result;
         } catch (DataAccessException e) {
-            return "SQL error: " + e.getMostSpecificCause().getMessage();
+            val error = "SQL error: " + e.getMostSpecificCause().getMessage();
+            log.debug("sqlQuery -> {}", error);
+            return error;
         }
     }
 

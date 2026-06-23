@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.tool.annotation.Tool;
@@ -38,6 +39,7 @@ import org.springframework.web.client.RestClientException;
  * a 404 or 422 is often the expected outcome of a step. Connection failures are
  * returned as a readable error string.
  */
+@Slf4j
 public class HttpRequestTool {
 
     private final HttpTargetRegistry registry;
@@ -62,6 +64,8 @@ public class HttpRequestTool {
                             + "body; when a body is sent without one, application/json is assumed.")
             @Nullable String headers) {
 
+        log.debug("httpRequest <- target={}, method={}, path={}, headers={}, body={}",
+                target, method, path, headers, body);
         val httpTarget = registry.resolve(target);
         val client = RestClient.builder().baseUrl(httpTarget.baseUrl()).build();
         try {
@@ -94,9 +98,13 @@ public class HttpRequestTool {
             val response = spec.retrieve()
                     .onStatus(status -> true, (request, ignored) -> { })
                     .toEntity(String.class);
-            return formatResponse(response.getStatusCode(), response.getHeaders(), response.getBody());
+            val result = formatResponse(response.getStatusCode(), response.getHeaders(), response.getBody());
+            log.debug("httpRequest -> {}", result);
+            return result;
         } catch (RestClientException e) {
-            return "HTTP request failed: " + e.getMessage();
+            val error = "HTTP request failed: " + e.getMessage();
+            log.debug("httpRequest -> {}", error);
+            return error;
         }
     }
 
