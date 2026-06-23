@@ -99,6 +99,11 @@ class ScenarioTests {
         runScenario("scenarios/database-state.md");
     }
 
+    @Test
+    void importingAccountsFromCsvAndPlainText() {
+        runScenario("scenarios/import-accounts.md");
+    }
+
     private void runScenario(String classpathLocation) {
         val resource = new ClassPathResource(classpathLocation);
         val scenario = parser.parse(read(resource), resource.getFilename());
