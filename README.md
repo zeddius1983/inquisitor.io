@@ -131,15 +131,25 @@ explicitly with `@Scenario("classpath:scenarios/custom.md")`.
 
 ## Verified models
 
-The full scenario suite has been confirmed to pass with the models below. This
+Results of running the scenario suite (7 scenarios) against various models. The
 list is empirical, not exhaustive — other models may work; these are the ones
-known to run the suite end to end. Contributions of further verified models are
-welcome.
+that have been benchmarked. Contributions of further results are welcome.
 
-| Model | Quantization | Reasoning | Test | Duration |
-|-------|--------------|-----------|------|----------|
-| `gemma-4-31B-it-QAT` | `Q4_0` | off | PASSED | 10m 31s |
-| `gemma-4-31B-it-QAT` | `Q4_0` | on | PASSED | 13m 53s |
+| Model | Quantization | Reasoning | Passed | Duration |
+|-------|--------------|-----------|--------|----------|
+| `gemma-4-31B-it-QAT` | `Q4_0` | off | 100% | 10m 31s |
+| `gemma-4-31B-it-QAT` | `Q4_0` | on | 100% | 13m 53s |
+| `gemma-4-12B-it-QAT` | `Q4_0` | off | 86% | 3m 35s |
+| `gemma-4-12B-it-QAT` | `Q4_0` | on | 100% | 6m 16s |
+
+With reasoning **off**, the 12B model fails the multi-step "Import accounts from
+CSV and plain text" scenario — it skips one of the import calls and rubber-stamps
+the step from chat memory rather than actually executing it. Turning reasoning
+**on** recovers it (100%), at roughly 1.75× the runtime. So thinking buys
+reliability when a model is otherwise too weak for a multi-step step, but only
+costs time once the model is already capable enough (the 31B passes either way) —
+which is why the recommendation above is a default to revisit per model, not an
+absolute.
 
 ## Building
 
