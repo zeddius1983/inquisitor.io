@@ -136,9 +136,10 @@ list is empirical, not exhaustive — other models may work; these are the ones
 known to run the suite end to end. Contributions of further verified models are
 welcome.
 
-| Model | Quantization | Reasoning | Test |
-|-------|--------------|-----------|------|
-| `gemma-4-31B-it-QAT` | `Q4_0` | off | PASSED |
+| Model | Quantization | Reasoning | Test | Duration |
+|-------|--------------|-----------|------|----------|
+| `gemma-4-31B-it-QAT` | `Q4_0` | off | PASSED | 10m 31s |
+| `gemma-4-31B-it-QAT` | `Q4_0` | on | PASSED | 13m 53s |
 
 ## Building
 
