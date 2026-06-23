@@ -5,7 +5,19 @@ header. `POST /accounts/import` accepts either CSV (`text/csv`) or plain text
 (`text/plain`), and an `X-Default-Currency` header supplies the currency for any
 row that doesn't name its own.
 
-## Step 1 — Import accounts from CSV
+## Step 1 — Reset the database
+
+**Intent:** Start from a clean slate so the row count in the final step is exact,
+regardless of any accounts other scenarios may have left behind.
+
+```sql
+TRUNCATE account, transaction RESTART IDENTITY CASCADE;
+```
+
+**Expected response**
+- The statement succeeds and both tables are emptied
+
+## Step 2 — Import accounts from CSV
 
 **Intent:** Import three accounts from a CSV body. The first two name their own
 currency; the third (Carol) leaves it blank, so it must fall back to the
@@ -28,7 +40,7 @@ Carol,
 - The accounts are Alice with `currency` `USD`, Bob with `EUR`, and Carol with
   `GBP` (the header default)
 
-## Step 2 — Import accounts from plain text
+## Step 3 — Import accounts from plain text
 
 **Intent:** Import two more accounts from a plain-text body, one owner per line.
 Neither line names a currency, so both must use the `X-Default-Currency` header.
@@ -47,7 +59,7 @@ Erin
 - The response is a list of two accounts
 - Both Dave and Erin have `currency` `JPY`
 
-## Step 3 — Verify the imported accounts with SQL
+## Step 4 — Verify the imported accounts with SQL
 
 **Intent:** Confirm the imported accounts persisted with the right currencies.
 
