@@ -71,37 +71,37 @@ class ScenarioTests {
 
     @Test
     void fetchingANonExistentAccountReturnsProblemDetail() {
-        runScenario("scenarios/account-not-found.md");
+        runScenario("scenarios/positive/explicit/account-not-found.md");
     }
 
     @Test
     void openingAnAccountAndDepositing() {
-        runScenario("scenarios/open-account-and-deposit.md");
+        runScenario("scenarios/positive/explicit/open-account-and-deposit.md");
     }
 
     @Test
     void transferringBetweenAccounts() {
-        runScenario("scenarios/transfer-between-accounts.md");
+        runScenario("scenarios/positive/explicit/transfer-between-accounts.md");
     }
 
     @Test
     void overdraftIsRejected() {
-        runScenario("scenarios/overdraft-rejected.md");
+        runScenario("scenarios/positive/explicit/overdraft-rejected.md");
     }
 
     @Test
     void transactionHistoryIsRecorded() {
-        runScenario("scenarios/transaction-history.md");
+        runScenario("scenarios/positive/explicit/transaction-history.md");
     }
 
     @Test
     void databaseStateMatchesTheApi() {
-        runScenario("scenarios/database-state.md");
+        runScenario("scenarios/positive/explicit/database-state.md");
     }
 
     @Test
     void importingAccountsFromCsvAndPlainText() {
-        runScenario("scenarios/import-accounts.md");
+        runScenario("scenarios/positive/explicit/import-accounts.md");
     }
 
     private void runScenario(String classpathLocation) {

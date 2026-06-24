@@ -105,5 +105,13 @@ JUnit layer is implemented in `inquisitor-harness-junit` (`@Harness` on the test
 class + one `@Scenario` method per scenario; `@Scenario` is a `@TestTemplate` that
 reports one sub-test per step) and re-exported by
 `inquisitor-harness-junit-starter`. The demo exercises both surfaces: the gated
-`ScenarioTests` (standalone, JUnit-free contract) and `ScenarioSuiteTest`
-(`@Harness`/`@Scenario`). See [docs/roadmap.md](docs/roadmap.md).
+`ScenarioTests` (standalone, JUnit-free contract) and the `@Harness`/`@Scenario`
+suite (`PositiveScenarioSuite`, bound to a style bucket by each subclass —
+`ExplicitScenarioSuiteTest`, `CucumberScenarioSuiteTest`).
+
+Demo scenarios live under `src/test/resources/scenarios/` split by purpose then
+authoring style: `positive/{explicit,cucumber}/` (same scenarios written
+prescriptively vs. in Gherkin Given/When/Then, to gauge how a model copes with
+different engineering styles) and `negative/{explicit,cucumber}/` (reserved for
+oracle-calibration fixtures — see `tasks/task-07-negative-scenarios.md`). See
+[docs/roadmap.md](docs/roadmap.md).

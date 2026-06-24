@@ -32,10 +32,15 @@ a caveat in the README into a measured number.
 
 ### Where the scenarios live
 
-New directory `inquisitor-demo/src/test/resources/scenarios-negative/`, **separate
-from** `scenarios/`. The `@Harness` ergonomic suite (`ScenarioSuiteTest`) defaults
-`scenarioDir` to `classpath:scenarios/`, so a separate dir guarantees the positive
-suites never pick these up.
+The negative fixtures go under the existing
+`inquisitor-demo/src/test/resources/scenarios/negative/` tree, which already mirrors
+the positive layout's two authoring-style buckets: `negative/explicit/` and
+`negative/cucumber/` (both currently empty, holding a `.gitkeep`). They are
+**separate from** `scenarios/positive/`, so the positive suites (`ScenarioTests` and
+the `@Harness` `PositiveScenarioSuite` subclasses, which point at
+`scenarios/positive/explicit` and `scenarios/positive/cucumber`) never pick these
+up. Authoring each negative scenario in both styles also extends the
+style-robustness comparison to the false-assert case.
 
 ### Test class
 
