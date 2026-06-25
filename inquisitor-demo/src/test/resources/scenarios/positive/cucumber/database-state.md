@@ -19,13 +19,13 @@ in the database.
 
 ## Read the seeded account through the API
 
-- **When** Frank's account is fetched via `GET /accounts/{id}`
+- **When** Frank's account is fetched through the API
 - **Then** the response is `200 OK`
 - **And** the `owner` is Frank, the `currency` is EUR, and the `balance` is `0.00`
 
 ## Deposit through the API
 
-- **When** `75.00` is deposited into Frank's account via `POST /accounts/{id}/deposits`
+- **When** `75.00` is deposited into Frank's account through the API
 - **Then** the response is `201 Created`
 - **And** his `balance` reads `75.00`
 

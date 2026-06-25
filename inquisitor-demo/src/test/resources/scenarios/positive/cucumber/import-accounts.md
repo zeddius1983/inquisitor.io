@@ -1,8 +1,7 @@
 # Import accounts from CSV and plain text
 
-Feature: bulk import accepts both CSV (`text/csv`) and plain-text (`text/plain`)
-bodies, and an `X-Default-Currency` header supplies the currency for any row that
-does not name its own.
+Feature: bulk import accepts both CSV and plain-text bodies, and a row that does
+not name its own currency falls back to a supplied default.
 
 ## Reset the database
 
@@ -17,8 +16,8 @@ does not name its own.
 
 ## Import accounts from CSV
 
-- **When** three accounts are imported by POSTing a `text/csv` body to
-  `/accounts/import` with an `X-Default-Currency` header of GBP:
+- **When** three accounts are imported from this CSV data, with a default currency
+  of GBP for any row that leaves the currency blank:
 
   ```
   owner,currency
@@ -29,12 +28,12 @@ does not name its own.
 
 - **Then** the response is `201 Created`
 - **And** it lists three accounts: Alice in `USD`, Bob in `EUR`, and Carol in `GBP`
-  (the header default, since her row left the currency blank)
+  (the default, since her row left the currency blank)
 
 ## Import accounts from plain text
 
-- **When** two more accounts are imported by POSTing a `text/plain` body to
-  `/accounts/import` with an `X-Default-Currency` header of JPY, one owner per line:
+- **When** two more accounts are imported from this plain-text data, one owner per
+  line, with a default currency of JPY:
 
   ```
   Dave

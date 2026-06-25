@@ -5,20 +5,20 @@ source balance is left untouched.
 
 ## Fund Dave's account
 
-- **Given** a new USD account is opened for Dave via `POST /accounts`
-- **When** `100.00` is deposited into it via `POST /accounts/{id}/deposits`
+- **Given** a new USD account is opened for Dave
+- **When** `100.00` is deposited into it
 - **Then** the account is created with `201` and a numeric `id`
 - **And** after the deposit his `balance` reads `100.00`
 
 ## Open a recipient account for Erin
 
-- **When** a new USD account is opened for Erin via `POST /accounts`
+- **When** a new USD account is opened for Erin
 - **Then** the account is created with `201` and a numeric `id`
 
 ## Attempt to overdraw
 
 - **Given** Dave holds only `100.00`
-- **When** a transfer of `500.00` is attempted from Dave to Erin via `POST /transfers`
+- **When** a transfer of `500.00` is attempted from Dave to Erin
 - **Then** the request is rejected with `422 Unprocessable Entity`
 - **And** the `Content-Type` is `application/problem+json`
 - **And** the body is a valid RFC 9457 problem detail carrying at least a `title`
@@ -26,6 +26,6 @@ source balance is left untouched.
 
 ## Confirm no money moved
 
-- **When** Dave's account is reloaded via `GET /accounts/{id}`
+- **When** Dave's account is reloaded
 - **Then** the response is `200 OK`
 - **And** his `balance` is still `100.00`
