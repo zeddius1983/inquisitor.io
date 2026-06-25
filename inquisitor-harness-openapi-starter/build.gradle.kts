@@ -9,6 +9,11 @@ dependencies {
     // so the harness autoconfiguration must be on the classpath too.
     api(project(":inquisitor-harness-starter"))
 
+    // The @OpenApiDiscovery ContextCustomizerFactory hooks into the Spring TestContext
+    // framework. This starter is itself a test-scope dependency for consumers, so
+    // spring-test is already on their test classpath.
+    implementation("org.springframework:spring-test")
+
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 

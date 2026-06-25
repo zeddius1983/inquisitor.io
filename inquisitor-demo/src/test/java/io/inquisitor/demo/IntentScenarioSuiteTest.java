@@ -18,6 +18,7 @@ package io.inquisitor.demo;
 
 import io.inquisitor.harness.junit.Harness;
 import io.inquisitor.harness.junit.Scenario;
+import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -28,15 +29,14 @@ import org.springframework.boot.test.context.SpringBootTest;
  * OpenAPI spec. (SQL-tool steps keep their SQL — the database schema is not part of
  * the spec.)
  *
- * <p>OpenAPI discovery is enabled only for this class
- * ({@code inquisitor.harness.openapi.enabled=true}); the demo serves its spec at
- * {@code /v3/api-docs.yaml}, which the {@code HttpOpenApiSpecProvider} live-fetches from
- * the running app. Gated on the local LLM; run with {@code INQUISITOR_LLM_IT=true}.
+ * <p>OpenAPI discovery is enabled only for this class via {@link EnableOpenApiDiscovery};
+ * the demo serves its spec at {@code /v3/api-docs.yaml}, which the
+ * {@code HttpOpenApiSpecProvider} live-fetches from the running app. Gated on the local
+ * LLM; run with {@code INQUISITOR_LLM_IT=true}.
  */
 @Harness(scenarioDir = "classpath:scenarios/positive/intent/")
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "inquisitor.harness.openapi.enabled=true")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@EnableOpenApiDiscovery
 @EnabledIfEnvironmentVariable(named = "INQUISITOR_LLM_IT", matches = "true")
 class IntentScenarioSuiteTest {
 

@@ -17,19 +17,19 @@
 package io.inquisitor.demo;
 
 import io.inquisitor.harness.junit.Harness;
-import org.springframework.test.context.TestPropertySource;
+import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
 
 /**
  * Runs the positive suite against the <em>cucumber</em> style bucket — the same
  * scenarios written in Gherkin {@code Given}/{@code When}/{@code Then} form.
  *
- * <p>OpenAPI discovery is enabled here ({@code inquisitor.harness.openapi.enabled=true}):
- * the Gherkin steps name neither endpoints nor request bodies — they describe intent
- * in {@code Given}/{@code When}/{@code Then} prose — so the model can only succeed by
+ * <p>OpenAPI discovery is enabled here via {@link EnableOpenApiDiscovery}: the Gherkin
+ * steps name neither endpoints nor request bodies — they describe intent in
+ * {@code Given}/{@code When}/{@code Then} prose — so the model can only succeed by
  * reading the application's OpenAPI description to choose paths, methods, and payload
  * schemas. The {@code explicit} bucket keeps discovery off — its fenced requests
  * already carry full paths and bodies.
  */
 @Harness(scenarioDir = "classpath:scenarios/positive/cucumber/")
-@TestPropertySource(properties = "inquisitor.harness.openapi.enabled=true")
+@EnableOpenApiDiscovery
 class CucumberScenarioSuiteTest extends PositiveScenarioSuite {}

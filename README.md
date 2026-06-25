@@ -153,6 +153,17 @@ inquisitor:
       # target: app             # which registered HTTP target to fetch from
 ```
 
+To enable discovery per test class instead of globally, annotate the class with
+`@EnableOpenApiDiscovery` (use `@EnableOpenApiDiscovery(enabled = false)` to turn it
+off for a subclass) — equivalent to the property but scoped to that class:
+
+```java
+@Harness(scenarioDir = "classpath:scenarios/")
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+@EnableOpenApiDiscovery
+class MyScenarioTest { ... }
+```
+
 When enabled, an `OpenApiAdvisor` fetches the spec (lazily, from the running app at
 `/v3/api-docs.yaml` by default, or your `location`) and injects it into the system
 prompt. It's an explicit opt-in, so if the spec can't be obtained the run **fails

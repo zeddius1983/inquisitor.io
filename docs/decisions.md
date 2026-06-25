@@ -173,6 +173,13 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **Fail fast, not silent degrade.** Because `enabled=true` is an explicit opt-in,
   an unobtainable spec throws (naming the location) rather than running without it —
   silently omitting the spec would mislead the user into thinking it reached the model.
+- **`@EnableOpenApiDiscovery` is sugar over the property, not a parallel mechanism.**
+  The annotation maps to `inquisitor.harness.openapi.enabled` via a Spring
+  `ContextCustomizerFactory` (registered in `spring.factories`, the same approach as
+  Boot's `@AutoConfigure…` slices) — so there's one source of truth and the test
+  surface stays declarative without touching `@Harness`. It lives in the plugin
+  module, so removing the plugin removes the annotation too. (`@ApiSpec`, for
+  pointing at a specific spec, remains a possible later addition.)
 - **YAML, raw.** The spec rides in the system prompt and is re-sent every round-trip
   (chat memory), so YAML's smaller token footprint compounds; a `$ref`-resolving
   digest is a later, size-gated optimisation.

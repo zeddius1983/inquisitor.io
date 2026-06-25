@@ -1,0 +1,3 @@
+# Binds @EnableOpenApiDiscovery on a test class to inquisitor.harness.openapi.enabled.
+org.springframework.test.context.ContextCustomizerFactory=\
+io.inquisitor.harness.openapi.autoconfigure.OpenApiDiscoveryContextCustomizerFactory
