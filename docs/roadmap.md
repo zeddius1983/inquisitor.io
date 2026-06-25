@@ -21,7 +21,7 @@ The authoritative status is git history + this table.
 | 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
 | 07 | Negative (oracle-calibration) scenarios | 📝 planned (`tasks/task-07`) |
 | 08 | `benchmark` Gradle task (trustworthy-green) | 📝 planned (`tasks/task-08`) |
-| 10 | Partial OpenAPI spec retrieval (size-gated, big-API context optimisation) | 📝 planned (`tasks/task-10`) |
+| 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
 ## Now
@@ -42,10 +42,12 @@ The authoritative status is git history + this table.
   static `openapi.yaml` at `/v3/api-docs.yaml`; real consumers can use springdoc.
 - **Oracle calibration** (task-07 negative scenarios) and the **`benchmark`** task
   (task-08) are planned — see `tasks/`.
-- **Partial OpenAPI spec retrieval** (task-10) is planned: a size-gated mode in the
-  openapi plugin that surfaces only the operations a step needs (a table-of-contents +
-  `getOperationSpec` lookup tool, with vector RAG as the escalation) instead of
-  injecting the whole spec every round-trip — for big production APIs. No core change.
+- **OpenAPI context-size optimisation** (task-10) is planned: size-gated modes in the
+  openapi plugin instead of injecting the whole raw spec every round-trip — a
+  **deterministic digest** (compact operation signatures + a type dictionary, rendered
+  faithfully, *not* via an LLM) for medium specs, and **partial retrieval** (a
+  table-of-contents + `getOperationSpec` lookup tool, with vector RAG as the escalation)
+  for very large ones. No core change.
 - Decide on the mock-server design before implementing the `*-mock` modules.
 
 > Keep this file current as tasks complete; move durable rationale into
