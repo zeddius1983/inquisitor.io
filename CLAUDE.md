@@ -22,6 +22,7 @@ Base package: `io.inquisitor`. Group: `io.inquisitor`.
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness |
 | `inquisitor-harness-junit` | JUnit 5 extension that runs scenarios as tests |
 | `inquisitor-harness-junit-starter` | Autoconfiguration for the JUnit extension |
+| `inquisitor-harness-openapi` / `inquisitor-harness-openapi-starter` | Optional OpenAPI/Swagger discovery: an `OpenApiAdvisor` injects the app's spec into the system prompt. Off unless `inquisitor.harness.openapi.enabled=true`; removable without touching the core |
 | `inquisitor-mock` / `inquisitor-mock-starter` | Reserved (mock server); not yet implemented |
 | `inquisitor-demo-db-starter` | Zero-config local Postgres via Testcontainers + Flyway |
 | `inquisitor-demo` | Banking REST demo app + scenario tests; the reference consumer |

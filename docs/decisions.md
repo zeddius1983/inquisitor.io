@@ -87,16 +87,18 @@ see [roadmap.md](roadmap.md); for stable repo context see
   HTTP/Postgres → local model); the ergonomic JUnit layer is built on top later.
   The suite is gated `@EnabledIfEnvironmentVariable(INQUISITOR_LLM_IT=true)` so
   the normal `./gradlew build` stays green without a running model.
-- **Controller + repository tracing via AOP aspects.** `ControllerTracingAspect`
-  logs every `@RestController` call and `RepositoryTracingAspect` every Spring Data
-  repository call (both `io.inquisitor.demo.aop.log`, `spring-boot-starter-aspectj`),
-  each as `method(args) -> result`/`-> threw …`. Together they show the LLM-driven
-  HTTP request *and* the persistence calls behind it, confirming the harness drives
-  *real* traffic rather than fabricating tool results; aspects (vs per-method
-  logging) keep controllers/repositories clean and also trace exception paths. The
-  repository pointcut matches the Spring Data `Repository` marker via `target(...)`
-  — a per-interface `this(...)` pointcut matched the inherited `CrudRepository`
-  methods (`save`, `findById`) unreliably.
+- **Controller + repository tracing via one AOP aspect.** `TracingAspect`
+  (`io.inquisitor.demo.aop.log`, `spring-boot-starter-aspectj`) carries two
+  pointcuts — every `@RestController` call and every Spring Data repository call —
+  both delegating to a shared advice that logs `method(args) -> result`/`-> threw …`.
+  Together they show the LLM-driven HTTP request *and* the persistence calls behind
+  it, confirming the harness drives *real* traffic rather than fabricating tool
+  results; aspects (vs per-method logging) keep controllers/repositories clean and
+  also trace exception paths. The repository pointcut matches the Spring Data
+  `Repository` marker via `target(...)` — a per-interface `this(...)` pointcut
+  matched the inherited `CrudRepository` methods (`save`, `findById`) unreliably.
+  Tracing is logged at **debug** level and the advice short-circuits to `proceed()`
+  when the resolved category has debug disabled, so it adds no overhead in normal runs.
 
 ## JUnit layer
 
@@ -131,10 +133,52 @@ see [roadmap.md](roadmap.md); for stable repo context see
   extensions on the classpath; the starter just re-exports `…-junit` plus
   `…-harness-starter` so a consumer's single test dependency brings the
   annotations, extensions, and harness autoconfig.
-- **Standalone `ScenarioTests` kept alongside the JUnit `ScenarioSuiteTest`.** The
-  demo exercises both paths: `ScenarioTests` asserts on `ScenarioResult` via the
-  JUnit-free contract (compatibility), `ScenarioSuiteTest` uses the ergonomic
-  `@Harness`/`@Scenario` layer. Both are gated on `INQUISITOR_LLM_IT`.
+- **Standalone `ScenarioTests` kept alongside the JUnit suites.** The demo
+  exercises both paths: `ScenarioTests` asserts on `ScenarioResult` via the
+  JUnit-free contract (compatibility), while the `@Harness`/`@Scenario` layer is run
+  by `PositiveScenarioSuite` subclasses. Both are gated on `INQUISITOR_LLM_IT`.
+
+## Scenario layout & authoring styles
+
+- **Scenarios split by purpose then authoring style:**
+  `positive/{explicit,cucumber,intent}` and `negative/{explicit,cucumber}`. The same
+  scenarios are written in different engineering voices — `explicit` (prescriptive:
+  fenced requests + bulleted asserts), `cucumber` (Gherkin Given/When/Then), and
+  `intent` (pure natural-language intent, no endpoints) — so we can measure how a
+  model copes with each. The ergonomic suite is an abstract `PositiveScenarioSuite`
+  bound to a bucket by each subclass (`ExplicitScenarioSuiteTest`,
+  `CucumberScenarioSuiteTest`); `intent` runs via `IntentScenarioSuiteTest`, which
+  needs OpenAPI discovery. `negative/*` is reserved for oracle-calibration fixtures.
+
+## OpenAPI discovery (optional plugin)
+
+- **A separate, removable module, not a core feature.** `inquisitor-harness-openapi`
+  (+ `-starter`) is an opt-in plugin; deleting it leaves the core untouched. It earns
+  its keep only for the `intent` style, so it must not entangle the executor.
+- **Delivered as a Spring AI `Advisor`, not a custom prompt SPI.** `OpenApiAdvisor`
+  implements `BaseAdvisor` and augments the request's system message in `before(...)`
+  — the same mechanism RAG's `QuestionAnswerAdvisor` uses. The only core change is
+  that the ChatClient autoconfig now **collects `Advisor` beans** (like it already
+  collects `ToolCallback`s); with no advisor beans, behaviour is identical to before.
+  This is the whole seam — generic, not OpenAPI-aware.
+- **`augmentSystemMessage(String)` *replaces*, so we use the function overload.** The
+  String overload of `Prompt.augmentSystemMessage` overwrites the system text; to
+  *append* the spec to the harness base prompt we pass a `Function<SystemMessage,…>`
+  that concatenates. (Verified against Spring AI 2.0.0-RC1 sources.)
+- **Live-fetch, lazily, from the registered app target.** `HttpOpenApiSpecProvider`
+  reads the app base URL from `HttpTargetRegistry` and fetches `/v3/api-docs.yaml` on
+  first use (by then the server is up and the target registered), then caches — so no
+  JUnit-layer startup hook is needed. A static `location` selects
+  `ResourceOpenApiSpecProvider` instead.
+- **Fail fast, not silent degrade.** Because `enabled=true` is an explicit opt-in,
+  an unobtainable spec throws (naming the location) rather than running without it —
+  silently omitting the spec would mislead the user into thinking it reached the model.
+- **YAML, raw.** The spec rides in the system prompt and is re-sent every round-trip
+  (chat memory), so YAML's smaller token footprint compounds; a `$ref`-resolving
+  digest is a later, size-gated optimisation.
+- **The demo serves a static `openapi.yaml` at `/v3/api-docs.yaml`** rather than
+  taking on the springdoc-on-Boot-4 dependency risk. This still exercises the
+  headline live-fetch path deterministically; real consumers plug in springdoc.
 
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.

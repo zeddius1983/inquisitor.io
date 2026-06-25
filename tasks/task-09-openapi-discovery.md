@@ -14,8 +14,15 @@ This is explicitly a **nice-to-have plugin, not a core feature.** It must:
 - be **removable painlessly** — deleting the module leaves the core untouched and
   still useful.
 
-> Status: **planned — awaiting review.** No code yet. Open design decisions are
-> marked **[DECIDE]**.
+> Status: **implemented.** Modules `inquisitor-harness-openapi` (+ `-starter`) ship
+> the `OpenApiAdvisor`, the two `OpenApiSpecProvider`s, and the autoconfiguration; the
+> core ChatClient now collects `Advisor` beans. The demo serves a static
+> `openapi.yaml` at `/v3/api-docs.yaml` and exercises it via `IntentScenarioSuiteTest`
+> (`scenarios/positive/intent/`). Resolved decisions are recorded in
+> [docs/decisions.md](../docs/decisions.md); the design notes below are kept for
+> context. Remaining `[DECIDE]`/follow-up items: advisor ordering (settled to a
+> provisional `HIGHEST_PRECEDENCE + 100`), the `@ApiSpec` annotation, and the
+> `$ref`-resolving digest.
 
 ## Why
 
@@ -49,7 +56,7 @@ must keep working with this feature **absent or disabled**.
 ### Module layout & dependency direction
 
 ```
-inquisitor-harness-openapi          # OpenApiAdvisor, ApiSpecProvider(s), properties, autoconfig
+inquisitor-harness-openapi          # OpenApiAdvisor, OpenApiSpecProvider(s), properties, autoconfig
 inquisitor-harness-openapi-starter  # autoconfiguration registration
 ```
 Direction: `inquisitor-harness-openapi` → `inquisitor-harness` (for
@@ -94,7 +101,7 @@ Spring AI 2.0 reference):
 
 ```java
 class OpenApiAdvisor implements BaseAdvisor {
-    private final ApiSpecProvider specProvider;
+    private final OpenApiSpecProvider specProvider;
 
     @Override
     public ChatClientRequest before(ChatClientRequest req, AdvisorChain chain) {
@@ -125,28 +132,28 @@ Notes:
   builds the ChatClient; `ObjectProvider` is lazy, and the openapi autoconfig declares
   `@AutoConfiguration(before = InquisitorHarnessAutoConfiguration)` to be safe.
 
-### `ApiSpecProvider` strategy (lazy live-fetch first)
+### `OpenApiSpecProvider` strategy (lazy live-fetch first)
 
 ```java
-public interface ApiSpecProvider { String spec(); }   // YAML text; throws if unobtainable
+public interface OpenApiSpecProvider { String spec(); }   // YAML text; throws if unobtainable
 ```
-- `HttpApiSpecProvider` — reads the app base URL from the existing
+- `HttpOpenApiSpecProvider` — reads the app base URL from the existing
   `HttpTargetRegistry` (already populated post-startup by the JUnit layer), fetches
   `{base}{path}` **lazily on first call, then caches** for the run. **No JUnit-layer
   hook required** — the linchpin that keeps the plugin out of the core executor *and*
   the JUnit module.
-- `ResourceApiSpecProvider` — loads a static `classpath:`/`file:`/`http:` location.
+- `ResourceOpenApiSpecProvider` — loads a static `classpath:`/`file:`/`http:` location.
 
-Resolution (all gated by `enabled`): explicit `location` → `ResourceApiSpecProvider`;
-else live fetch → `HttpApiSpecProvider`. **SRP/ISP/LSP**: obtaining the spec
-(`ApiSpecProvider`) and injecting it (`OpenApiAdvisor`) are separate, one-method
+Resolution (all gated by `enabled`): explicit `location` → `ResourceOpenApiSpecProvider`;
+else live fetch → `HttpOpenApiSpecProvider`. **SRP/ISP/LSP**: obtaining the spec
+(`OpenApiSpecProvider`) and injecting it (`OpenApiAdvisor`) are separate, one-method
 responsibilities; the two providers are interchangeable.
 
 **Failure handling (decided — fail fast):** because `enabled=true` is an explicit
 opt-in to OpenAPI injection, a fetch/parse failure must **fail loudly**, not degrade
 silently — silent "no spec" would mislead the user into thinking the spec reached the
 model when it didn't. So when enabled and the spec cannot be obtained,
-`ApiSpecProvider.spec()` throws a clear exception (at first use) that surfaces on the
+`OpenApiSpecProvider.spec()` throws a clear exception (at first use) that surfaces on the
 scenario run, naming the location/URL it tried and why it failed. (No silent
 pass-through, and no separate "strict" toggle — fail-fast *is* the enabled
 behaviour.)
@@ -232,8 +239,8 @@ two keep the verdicts honest.
 1. `./gradlew build` unaffected; with the module absent **or** `enabled=false`, the
    ChatClient gets no extra advisor and the `explicit`/`cucumber` buckets behave
    exactly as before (unit-assert the advisor list).
-2. Unit tests (no LLM): `HttpApiSpecProvider` fetches + caches lazily and **throws a
-   clear error when the spec is unreachable**; `ResourceApiSpecProvider` loads a
+2. Unit tests (no LLM): `HttpOpenApiSpecProvider` fetches + caches lazily and **throws a
+   clear error when the spec is unreachable**; `ResourceOpenApiSpecProvider` loads a
    classpath spec; `OpenApiAdvisor.before(...)` augments the system message with the
    spec section.
 3. With the module enabled and the demo serving a spec, an `intent`-style smoke

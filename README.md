@@ -91,6 +91,7 @@ invocations); the first failing step fails and the rest are skipped.
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness. |
 | `inquisitor-harness-junit` | JUnit 5 layer: `@Harness` on the class + one `@Scenario` method per scenario, each step a sub-test. |
 | `inquisitor-harness-junit-starter` | Autoconfiguration for the JUnit layer — the single dependency a consumer needs. |
+| `inquisitor-harness-openapi` / `-starter` | Optional OpenAPI discovery: injects your app's spec into the prompt so scenarios can be natural-language intent. Off unless enabled. |
 | `inquisitor-bom` | Platform BOM aligning the Inquisitor module versions. |
 | `inquisitor-demo` | Banking REST demo app + scenario tests; the reference consumer. |
 
@@ -128,6 +129,40 @@ Then write a `@Harness` test class with one `@Scenario` method per markdown file
 under `src/test/resources/scenarios/`. The scenario file is resolved from the
 method name (`transferBetweenAccounts()` → `transfer-between-accounts.md`) or set
 explicitly with `@Scenario("classpath:scenarios/custom.md")`.
+
+## Optional: OpenAPI discovery
+
+By default a scenario tells the model which endpoints to call. If your app exposes an
+OpenAPI document, you can instead let the model **read the spec and choose the
+endpoints itself**, so scenarios become pure natural-language intent — no paths or
+request bodies.
+
+Add the plugin starter and turn it on:
+
+```kotlin
+testImplementation("io.inquisitor:inquisitor-harness-openapi-starter")
+```
+
+```yaml
+inquisitor:
+  harness:
+    openapi:
+      enabled: true            # explicit opt-in
+      # location:              # optional static spec (classpath:/file:/http:); omit to live-fetch
+      # path: /v3/api-docs.yaml # live-fetch path appended to the app's base URL
+      # target: app             # which registered HTTP target to fetch from
+```
+
+When enabled, an `OpenApiAdvisor` fetches the spec (lazily, from the running app at
+`/v3/api-docs.yaml` by default, or your `location`) and injects it into the system
+prompt. It's an explicit opt-in, so if the spec can't be obtained the run **fails
+fast** rather than silently proceeding without it. The module is fully optional —
+remove the dependency and the harness behaves exactly as before. The demo's
+`IntentScenarioSuiteTest` (scenarios under `scenarios/positive/intent/`) shows it in
+action.
+
+> The spec is sent to the model. With a remote model, treat a large or sensitive API
+> description accordingly.
 
 ## Verified models
 

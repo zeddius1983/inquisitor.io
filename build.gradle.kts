@@ -16,5 +16,7 @@ dependencies {
         api(project(":inquisitor-harness-starter"))
         api(project(":inquisitor-harness-junit"))
         api(project(":inquisitor-harness-junit-starter"))
+        api(project(":inquisitor-harness-openapi"))
+        api(project(":inquisitor-harness-openapi-starter"))
     }
 }

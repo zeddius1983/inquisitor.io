@@ -14,7 +14,7 @@ balance persisted.
 ## Make a deposit
 
 - **Given** Alice's newly opened account
-- **When** `500.00` is deposited into it via the account's deposits endpoint
+- **When** `500.00` is deposited into it via `POST /accounts/{id}/deposits`
 - **Then** the response is `201 Created`
 - **And** her `balance` now reads `500.00`
 

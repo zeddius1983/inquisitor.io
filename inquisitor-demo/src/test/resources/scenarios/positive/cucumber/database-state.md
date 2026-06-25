@@ -25,7 +25,7 @@ in the database.
 
 ## Deposit through the API
 
-- **When** `75.00` is deposited into Frank's account via its deposits endpoint
+- **When** `75.00` is deposited into Frank's account via `POST /accounts/{id}/deposits`
 - **Then** the response is `201 Created`
 - **And** his `balance` reads `75.00`
 

@@ -12,8 +12,9 @@ returned newest-first.
 ## Record two deposits and a withdrawal
 
 - **Given** Eve's account
-- **When** `200.00` is deposited, then `50.00` is deposited, then `30.00` is
-  withdrawn, in that order
+- **When** `200.00` is deposited, then `50.00` is deposited (each via
+  `POST /accounts/{id}/deposits`), then `30.00` is withdrawn (via
+  `POST /accounts/{id}/withdrawals`), in that order
 - **Then** each operation returns `201 Created`
 - **And** her `balance` settles at `220.00`
 

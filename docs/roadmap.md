@@ -17,6 +17,10 @@ The authoritative status is git history + this table.
 | 04 | `inquisitor-harness-starter` — autoconfiguration | ✅ done |
 | 05 | Standalone harness wired into `inquisitor-demo` (`@Test`-per-scenario), green on the local model | ✅ done |
 | 05b | `inquisitor-harness-junit` + `-junit-starter` (`@Harness`/`@Scenario` ergonomic layer) | ✅ done |
+| —  | Scenario restructure: `positive`/`negative` × `explicit`/`cucumber`/`intent` style buckets | ✅ done |
+| 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
+| 07 | Negative (oracle-calibration) scenarios | 📝 planned (`tasks/task-07`) |
+| 08 | `benchmark` Gradle task (trustworthy-green) | 📝 planned (`tasks/task-08`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
 ## Now
@@ -30,9 +34,13 @@ The authoritative status is git history + this table.
 
 ## Next
 
-- **OpenAPI discovery** so scenarios can drop explicit request bodies and use
-  natural-language intent only (add springdoc to the demo; let the model read the
-  spec). Until then scenarios keep explicit bodies.
+- **OpenAPI discovery is in** (task-09): the optional `inquisitor-harness-openapi`
+  module injects the app's spec into the system prompt via an `OpenApiAdvisor`, so
+  scenarios can be written as natural-language **intent** with no endpoints (see the
+  `scenarios/positive/intent` bucket + `IntentScenarioSuiteTest`). The demo serves a
+  static `openapi.yaml` at `/v3/api-docs.yaml`; real consumers can use springdoc.
+- **Oracle calibration** (task-07 negative scenarios) and the **`benchmark`** task
+  (task-08) are planned — see `tasks/`.
 - Decide on the mock-server design before implementing the `*-mock` modules.
 
 > Keep this file current as tasks complete; move durable rationale into

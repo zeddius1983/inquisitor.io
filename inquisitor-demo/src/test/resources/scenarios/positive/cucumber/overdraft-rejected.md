@@ -6,7 +6,7 @@ source balance is left untouched.
 ## Fund Dave's account
 
 - **Given** a new USD account is opened for Dave via `POST /accounts`
-- **When** `100.00` is deposited into it
+- **When** `100.00` is deposited into it via `POST /accounts/{id}/deposits`
 - **Then** the account is created with `201` and a numeric `id`
 - **And** after the deposit his `balance` reads `100.00`
 
