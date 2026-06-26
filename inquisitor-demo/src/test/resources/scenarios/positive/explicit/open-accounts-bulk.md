@@ -1,7 +1,8 @@
 # Open several accounts from a table
 
-Exercises opening many accounts in one step, parameterised over a table of owners
-and currencies — one `POST /accounts` per row.
+Exercises opening many accounts in one step and then funding them — parameterised
+over a table of owners/currencies and a table of deposit ranges. One `POST /accounts`
+per row, then one `POST /accounts/{id}/deposits` per row.
 
 ## Step 1 — Open every account in the table
 
@@ -38,3 +39,24 @@ GET /accounts?owner=<owner>
 - Status: `200 OK`
 - Exactly one account is returned for the owner
 - Its `currency` matches the row and its `balance` is `0.00`
+
+## Step 3 — Deposit into each account
+
+**Intent:** Make a single deposit into each account opened in Step 1, choosing any
+amount within that account's range.
+
+| owner     | min | max  |
+|-----------|-----|------|
+| Jackie C  | 100 | 500  |
+| Satoshi N | 1   | 1000 |
+| Gordon R  | 20  | 60   |
+
+```
+POST /accounts/{id}/deposits
+{ "amount": <any amount within the row's min-max range> }
+```
+
+**Expected response (for every row)**
+- Status: `201 Created`
+- `balance` equals the deposited amount, which lies within the row's `min`-`max`
+  range (the accounts started empty, so the single deposit sets the balance)

@@ -1,9 +1,8 @@
 # Open several accounts from a table
 
-Feature: opening many accounts in one go, parameterised over a table of owners and
-currencies — a Gherkin Scenario Outline. The steps name neither endpoints nor
-request bodies, so the model reads the application's OpenAPI description to choose
-the right call.
+Feature: opening many accounts in one go and then funding them, parameterised over
+Gherkin Scenario Outlines. The steps name neither endpoints nor request bodies, so
+the model reads the application's OpenAPI description to choose the right call.
 
 ## Open every account in the Examples table
 
@@ -27,3 +26,20 @@ Examples:
 - **When** each `<owner>` is looked up again
 - **Then** an account exists for them with the stated `<currency>` and a `balance`
   of `0.00`
+
+## Deposit into each account
+
+- **Given** the accounts opened above
+- **When** a single deposit of any amount within the row's `<min>`-`<max>` range is
+  made into each `<owner>`'s account
+- **Then** every deposit response is `201 Created`
+- **And** each account's `balance` afterwards equals the deposited amount and lies
+  within the row's `<min>`-`<max>` range
+
+Examples:
+
+| owner     | min | max  |
+|-----------|-----|------|
+| Jackie C  | 100 | 500  |
+| Satoshi N | 1   | 1000 |
+| Gordon R  | 20  | 60   |
