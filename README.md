@@ -33,6 +33,7 @@ test class, and drop your scenarios under `src/test/resources/scenarios/`.
 ```java
 @Harness
 @SpringBootTest(webEnvironment = RANDOM_PORT)
+@RequiresLlm
 class ScenarioSuiteTest {
     @Scenario void transferBetweenAccounts() {}
 }
@@ -40,6 +41,8 @@ class ScenarioSuiteTest {
 
 Each `## Step` is reported as its own sub-test (like a parameterized test's
 invocations); the first failing step fails and the rest are skipped.
+`@RequiresLlm` skips the suite when no model is configured, so it stays out of a
+plain CI build (see [Building](#building)).
 
 ## How it works
 
@@ -209,13 +212,22 @@ Docker/Podman for Testcontainers.
 ./gradlew :inquisitor-demo:bootRun    # run the demo app (local profile)
 ```
 
-The scenario suites that actually call an LLM are gated behind the
-`INQUISITOR_LLM_IT=true` environment variable, so a plain `./gradlew build`
-stays green without a running model:
+The scenario suites that actually call an LLM are annotated `@RequiresLlm`, which
+skips them unless a model is configured — so a plain `./gradlew build` stays green
+without a running model. Enable them either way:
 
 ```bash
+# environment variable (authoritative when set)
 INQUISITOR_LLM_IT=true ./gradlew :inquisitor-demo:test
+
+# or a JUnit configuration parameter (committable in junit-platform.properties,
+# or passed as a system property) — the fallback when the env var is unset
+./gradlew :inquisitor-demo:test -Dinquisitor.harness.llm.enabled=true
 ```
+
+`@RequiresLlm` is `@Inherited`, so a suite hierarchy declares the gate once on its
+base. Resolution order: `INQUISITOR_LLM_IT` env var → `inquisitor.harness.llm.enabled`
+config parameter → disabled.
 
 The demo's `local` profile starts a Postgres Testcontainer automatically
 (`postgres:17-alpine`, reuse enabled) and runs Flyway migrations — no manual

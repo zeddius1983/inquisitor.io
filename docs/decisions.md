@@ -136,7 +136,26 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **Standalone `ScenarioTests` kept alongside the JUnit suites.** The demo
   exercises both paths: `ScenarioTests` asserts on `ScenarioResult` via the
   JUnit-free contract (compatibility), while the `@Harness`/`@Scenario` layer is run
-  by `PositiveScenarioSuite` subclasses. Both are gated on `INQUISITOR_LLM_IT`.
+  by `PositiveScenarioSuite` subclasses. Both are gated with `@RequiresLlm`.
+- **LLM gating is a separate `@RequiresLlm`, not folded into `@Harness`.** `@Harness`
+  stays a pure capability marker; gating is an opt-in companion annotation. Baking the
+  gate into `@Harness` would couple the published API to one CI convention and, worse,
+  **silently skip** any consumer's tests merely for adding `@Harness` — a bad default.
+  Kept as its own annotation, it also covers the non-`@Harness` `ScenarioTests`.
+- **`@RequiresLlm` is `@Inherited`; a plain `@EnabledIfEnvironmentVariable` is not.**
+  JUnit's condition lookup (`AnnotationSupport.findAnnotation`) does **not** walk to a
+  superclass for a non-`@Inherited` annotation, so a gate declared on an abstract base
+  would not gate its subclasses — yet Spring **does** inherit `@SpringBootTest`, so the
+  subclasses still bootstrap and run. That asymmetry leaked the gated suites into CI
+  once. Marking `@RequiresLlm` `@Inherited` restores "declare once on the base".
+- **Env var first, then a JUnit config parameter — not a Spring property.** An
+  `ExecutionCondition` runs **before** the `TestContext` exists, so it cannot read
+  `application.yml`. Resolution is `INQUISITOR_LLM_IT` (authoritative when set) →
+  `inquisitor.harness.llm.enabled` JUnit configuration parameter (from a `-D` system
+  property or `junit-platform.properties`, the file-based equivalent available that
+  early) → disabled by default. The pure decision is split into
+  `RequiresLlmCondition.resolve(env, property)` so it is unit-testable without touching
+  the ambient environment.
 
 ## Scenario layout & authoring styles
 

@@ -17,9 +17,9 @@
 package io.inquisitor.demo;
 
 import io.inquisitor.harness.junit.Harness;
+import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
 import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
@@ -37,7 +37,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @Harness(scenarioDir = "classpath:scenarios/positive/intent/")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @EnableOpenApiDiscovery
-@EnabledIfEnvironmentVariable(named = "INQUISITOR_LLM_IT", matches = "true")
+@RequiresLlm
 class IntentScenarioSuiteTest {
 
     @Scenario

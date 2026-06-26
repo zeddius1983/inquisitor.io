@@ -16,8 +16,8 @@
 
 package io.inquisitor.demo;
 
+import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
@@ -32,10 +32,13 @@ import org.springframework.boot.test.context.SpringBootTest;
  * {@link io.inquisitor.harness.junit.Harness#scenarioDir()}, so we can compare how a
  * model copes with the two writing styles over identical scenarios.
  *
- * <p>Gated on the local LLM; run with {@code INQUISITOR_LLM_IT=true}.
+ * <p>Gated on the LLM; run with {@code INQUISITOR_LLM_IT=true}. The gate lives on this
+ * base via {@link RequiresLlm @RequiresLlm} ({@code @Inherited}), so the concrete
+ * subclasses inherit it — a plain {@code @EnabledIfEnvironmentVariable} here would
+ * <em>not</em> gate them.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@EnabledIfEnvironmentVariable(named = "INQUISITOR_LLM_IT", matches = "true")
+@RequiresLlm
 abstract class PositiveScenarioSuite {
 
     @Scenario

@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 
 import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.executor.ScenarioExecutor;
+import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.model.ScenarioResult;
 import io.inquisitor.harness.parser.ScenarioParser;
 import io.inquisitor.harness.tool.HttpTarget;
@@ -31,7 +32,6 @@ import io.inquisitor.harness.tool.HttpTargetRegistry;
 import lombok.val;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -47,7 +47,7 @@ import org.springframework.core.io.ClassPathResource;
  * so the class is gated: run with {@code INQUISITOR_LLM_IT=true}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@EnabledIfEnvironmentVariable(named = "INQUISITOR_LLM_IT", matches = "true")
+@RequiresLlm
 class ScenarioTests {
 
     @Autowired
