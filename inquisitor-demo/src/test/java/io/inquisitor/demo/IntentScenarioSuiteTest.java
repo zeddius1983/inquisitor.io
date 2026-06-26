@@ -47,6 +47,9 @@ class IntentScenarioSuiteTest {
     void openAccountAndDeposit() {}
 
     @Scenario
+    void openAccountsBulk() {}
+
+    @Scenario
     void transferBetweenAccounts() {}
 
     @Scenario

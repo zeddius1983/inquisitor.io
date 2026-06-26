@@ -48,6 +48,9 @@ abstract class PositiveScenarioSuite {
     void openAccountAndDeposit() {}
 
     @Scenario
+    void openAccountsBulk() {}
+
+    @Scenario
     void transferBetweenAccounts() {}
 
     @Scenario
