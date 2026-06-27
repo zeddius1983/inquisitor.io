@@ -34,7 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * {@code HttpOpenApiSpecProvider} live-fetches from the running app. Gated on the local
  * LLM; run with {@code INQUISITOR_LLM_IT=true}.
  */
-@Harness(scenarioDir = "classpath:scenarios/positive/intent/")
+@Harness(scenarioDir = "classpath:scenarios/intent/")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @EnableOpenApiDiscovery
 @RequiresLlm

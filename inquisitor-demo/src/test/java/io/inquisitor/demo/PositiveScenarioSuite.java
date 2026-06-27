@@ -26,8 +26,8 @@ import org.springframework.boot.test.context.SpringBootTest;
  * method name) and every {@code ## Step} is reported as its own sub-test.
  *
  * <p>The same set of scenarios is authored in two engineering styles — see
- * {@code scenarios/positive/explicit} (structured, prescriptive) and
- * {@code scenarios/positive/cucumber} (Gherkin Given/When/Then). This base holds the
+ * {@code scenarios/explicit} (structured, prescriptive) and
+ * {@code scenarios/cucumber} (Gherkin Given/When/Then). This base holds the
  * scenario methods once; each concrete subclass binds them to one style bucket via
  * {@link io.inquisitor.harness.junit.Harness#scenarioDir()}, so we can compare how a
  * model copes with the two writing styles over identical scenarios.

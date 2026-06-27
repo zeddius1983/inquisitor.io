@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
+import io.inquisitor.demo.service.AccountServiceRouter;
+import io.inquisitor.demo.service.Bug;
 import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.junit.RequiresLlm;
@@ -30,6 +32,7 @@ import io.inquisitor.harness.parser.ScenarioParser;
 import io.inquisitor.harness.tool.HttpTarget;
 import io.inquisitor.harness.tool.HttpTargetRegistry;
 import lombok.val;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,17 +41,19 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.io.ClassPathResource;
 
 /**
- * Drives the markdown scenarios against the running demo app via the standalone
- * harness ({@link ScenarioExecutor}), asserting on the verdicts ourselves — one
- * ordinary JUnit test per scenario.
+ * Oracle calibration via mutation testing: runs the <em>correct</em> positive
+ * scenarios against a deliberately buggy build and asserts the model reports the
+ * failure at the step where the seeded {@link Bug} manifests. A {@code FAIL} is the
+ * success condition — it proves the oracle catches a real defect instead of
+ * rubber-stamping it. See {@code tasks/task-07-fault-detection.md}.
  *
- * <p>Each test needs the local LLM (an OpenAI-compatible server at
- * {@code http://127.0.0.1:8000}, see {@code src/test/resources/application.yml}),
- * so the class is gated: run with {@code INQUISITOR_LLM_IT=true}.
+ * <p>Bugs are injected through the {@code @Primary} {@link AccountServiceRouter},
+ * enabled per test and reset in {@link #clearBugs()}. Like the rest of the LLM suite
+ * this is gated: run with {@code INQUISITOR_LLM_IT=true}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @RequiresLlm
-class ScenarioTests {
+class FaultDetectionTests {
 
     @Autowired
     private ScenarioExecutor executor;
@@ -59,56 +64,59 @@ class ScenarioTests {
     @Autowired
     private HttpTargetRegistry httpTargetRegistry;
 
+    @Autowired
+    private AccountServiceRouter router;
+
     @LocalServerPort
     private int port;
 
     @BeforeEach
     void registerApplicationTarget() {
-        // The app's HTTP target depends on the random port, so it is registered here
-        // rather than by the starter autoconfiguration. The datasource is auto-registered.
         httpTargetRegistry.register(HarnessDefaults.APPLICATION, HttpTarget.of("http://localhost:" + port));
     }
 
-    @Test
-    void fetchingANonExistentAccountReturnsProblemDetail() {
-        runScenario("scenarios/explicit/account-not-found.md");
+    @AfterEach
+    void clearBugs() {
+        router.disableAllBugs();
     }
 
     @Test
-    void openingAnAccountAndDepositing() {
-        runScenario("scenarios/explicit/open-account-and-deposit.md");
+    void catchesADepositThatNeverPersists() {
+        runExpectingFailureAt(Bug.DEPOSIT_NOT_PERSISTED,
+                "scenarios/explicit/open-account-and-deposit.md", "Deposit");
     }
 
     @Test
-    void transferringBetweenAccounts() {
-        runScenario("scenarios/explicit/transfer-between-accounts.md");
+    void catchesATransferThatDropsTheCredit() {
+        runExpectingFailureAt(Bug.TRANSFER_CREDIT_DROPPED,
+                "scenarios/explicit/transfer-between-accounts.md", "Verify resulting balances");
     }
 
     @Test
-    void overdraftIsRejected() {
-        runScenario("scenarios/explicit/overdraft-rejected.md");
+    void catchesAnAccountOpenedInTheWrongCurrency() {
+        runExpectingFailureAt(Bug.WRONG_CURRENCY,
+                "scenarios/explicit/open-account-and-deposit.md", "Open an account");
     }
 
-    @Test
-    void transactionHistoryIsRecorded() {
-        runScenario("scenarios/explicit/transaction-history.md");
-    }
+    private void runExpectingFailureAt(Bug bug, String classpathLocation, String expectedStepTitleFragment) {
+        router.enableBug(bug);
 
-    @Test
-    void databaseStateMatchesTheApi() {
-        runScenario("scenarios/explicit/database-state.md");
-    }
-
-    @Test
-    void importingAccountsFromCsvAndPlainText() {
-        runScenario("scenarios/explicit/import-accounts.md");
-    }
-
-    private void runScenario(String classpathLocation) {
         val resource = new ClassPathResource(classpathLocation);
         val scenario = parser.parse(read(resource), resource.getFilename());
         val result = executor.evaluate(scenario);
-        assertThat(result.passed()).withFailMessage(() -> describe(result)).isTrue();
+
+        // The model must NOT have passed everything — that would be a false positive
+        // (it failed to notice the seeded bug).
+        val failure = result.firstFailure();
+        assertThat(failure)
+                .withFailMessage(() -> "Expected the model to catch " + bug + " at a step containing \""
+                        + expectedStepTitleFragment + "\", but the scenario passed:\n" + describe(result))
+                .isPresent();
+
+        // …and it must fail at the step the bug manifests at, not somewhere upstream.
+        assertThat(failure.get().step().title())
+                .withFailMessage(() -> "Scenario failed at the wrong step:\n" + describe(result))
+                .containsIgnoringCase(expectedStepTitleFragment);
     }
 
     private static String read(ClassPathResource resource) {
@@ -120,7 +128,7 @@ class ScenarioTests {
     }
 
     private static String describe(ScenarioResult result) {
-        val message = new StringBuilder("Scenario '").append(result.scenario().name()).append("' failed:\n");
+        val message = new StringBuilder("Scenario '").append(result.scenario().name()).append("' result:\n");
         for (val step : result.results()) {
             val verdict = step.verdict();
             message.append("  [").append(verdict.outcome()).append("] ")

@@ -30,6 +30,6 @@ import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
  * schemas. The {@code explicit} bucket keeps discovery off — its fenced requests
  * already carry full paths and bodies.
  */
-@Harness(scenarioDir = "classpath:scenarios/positive/cucumber/")
+@Harness(scenarioDir = "classpath:scenarios/cucumber/")
 @EnableOpenApiDiscovery
 class CucumberScenarioSuiteTest extends PositiveScenarioSuite {}
