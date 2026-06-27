@@ -55,6 +55,21 @@ Common commands:
 ./gradlew :inquisitor-demo:bootRun    # run the demo app (local profile)
 ```
 
+## Releasing
+
+Versions are pre-1.0 semver: bump the **minor** for new features (additive public
+API), the **patch** for fixes. The version lives in `gradle.properties`; bump it on
+`main`, then push a `vX.Y.Z` tag — that triggers `.github/workflows/release.yml`,
+which publishes the library modules + BOM to Maven Central. Then write the GitHub
+release notes.
+
+**Release notes cover the published public API only.** `inquisitor-demo` exists
+purely to showcase the harness, so demo-app changes (new endpoints, scenarios, test
+wiring) do **not** belong in release notes — describe only what a consumer pulls in:
+the harness, JUnit, starter, and OpenAPI modules. Scope each note to what actually
+landed between tags (`git log vPREV..vNEW`); don't re-list a feature that shipped in
+an earlier tag.
+
 ## Running the demo
 
 The `local` profile is active by default. The `inquisitor-demo-db-starter`
