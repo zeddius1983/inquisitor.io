@@ -27,6 +27,7 @@ import io.inquisitor.harness.model.ScenarioResult;
 import io.inquisitor.harness.model.Step;
 import io.inquisitor.harness.model.StepResult;
 import io.inquisitor.harness.model.StepVerdict;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
 /**
@@ -39,6 +40,7 @@ import lombok.val;
  *
  * <p>Not thread-safe; intended to be driven from a single thread.
  */
+@Slf4j
 public class ScenarioEvaluation {
 
     private final StepEvaluator evaluator;
@@ -64,7 +66,10 @@ public class ScenarioEvaluation {
         if (!hasNext()) {
             throw new NoSuchElementException("No further steps to evaluate for scenario: " + scenario.name());
         }
+        val number = cursor + 1;
+        val total = scenario.steps().size();
         val step = scenario.steps().get(cursor);
+        log.debug("[{}] step {}/{} — evaluating: {}", scenario.name(), number, total, step.title());
         val startedNanos = System.nanoTime();
         val verdict = evaluator.evaluate(conversationId, scenario, step);
         val result = new StepResult(step, verdict, Duration.ofNanos(System.nanoTime() - startedNanos));
@@ -73,6 +78,8 @@ public class ScenarioEvaluation {
         if (!verdict.passed()) {
             failed = true;
         }
+        log.debug("[{}] step {}/{} — {} in {} ms: {}", scenario.name(), number, total,
+                verdict.outcome(), result.elapsed().toMillis(), verdict.reasoning());
         return result;
     }
 
