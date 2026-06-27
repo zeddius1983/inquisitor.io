@@ -1,0 +1,217 @@
+openapi: 3.1.0
+info:
+  title: Inquisitor Demo Banking API
+  description: >-
+    A small banking API: open accounts, deposit and withdraw funds, transfer
+    between accounts, list transactions, and bulk-import accounts. Monetary amounts
+    are decimals with two fraction digits; currencies are ISO 4217 codes (e.g. USD).
+  version: "1.0.0"
+paths:
+  /accounts:
+    post:
+      operationId: createAccount
+      summary: Open a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: Account created (starts with a zero balance)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          description: Validation error (problem detail)
+    get:
+      operationId: listAccounts
+      summary: List accounts (paged)
+      parameters:
+        - name: owner
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional filter by owner name
+      responses:
+        '200':
+          description: A page of accounts
+  /accounts/{id}:
+    get:
+      operationId: getAccount
+      summary: Fetch a single account by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: The account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          description: No such account (problem detail)
+          content:
+            application/problem+json: {}
+  /accounts/{id}/deposits:
+    post:
+      operationId: deposit
+      summary: Deposit funds into an account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmountRequest'
+      responses:
+        '201':
+          description: Deposit applied; returns the updated account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+  /accounts/{id}/withdrawals:
+    post:
+      operationId: withdraw
+      summary: Withdraw funds from an account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmountRequest'
+      responses:
+        '201':
+          description: Withdrawal applied; returns the updated account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '422':
+          description: Insufficient funds (problem detail)
+          content:
+            application/problem+json: {}
+  /accounts/{id}/transactions:
+    get:
+      operationId: getTransactions
+      summary: List an account's transactions, newest first (paged)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: A page of transactions
+  /accounts/import:
+    post:
+      operationId: importAccounts
+      summary: Bulk-import accounts from CSV or plain text
+      description: >-
+        CSV (text/csv): lines of "owner,currency" with an optional header row.
+        Plain text (text/plain): one owner per line. A row that omits the currency
+        falls back to the X-Default-Currency header (USD when unset).
+      parameters:
+        - name: X-Default-Currency
+          in: header
+          required: false
+          schema: { type: string }
+          description: Currency for rows that do not name their own
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+          text/plain:
+            schema: { type: string }
+      responses:
+        '201':
+          description: The created accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Account'
+  /transfers:
+    post:
+      operationId: transfer
+      summary: Transfer funds between two accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '201':
+          description: Transfer summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferSummary'
+        '422':
+          description: Insufficient funds (problem detail)
+          content:
+            application/problem+json: {}
+components:
+  schemas:
+    CreateAccountRequest:
+      type: object
+      required: [owner, currency]
+      properties:
+        owner: { type: string, description: Account holder name }
+        currency: { type: string, description: ISO 4217 code, e.g. USD }
+    AmountRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+          description: Positive monetary amount, at least 0.01
+    TransferRequest:
+      type: object
+      required: [fromId, toId, amount]
+      properties:
+        fromId: { type: integer, format: int64, description: Source account id }
+        toId: { type: integer, format: int64, description: Destination account id }
+        amount: { type: number, description: Amount to move, at least 0.01 }
+    Account:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        owner: { type: string }
+        currency: { type: string }
+        balance: { type: number }
+        createdAt: { type: string, format: date-time }
+    Transaction:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        accountId: { type: integer, format: int64 }
+        type: { type: string, enum: [DEPOSIT, WITHDRAWAL] }
+        amount: { type: number }
+        reference: { type: string }
+        createdAt: { type: string, format: date-time }
+    TransferSummary:
+      type: object
+      properties:
+        reference: { type: string }
+        fromId: { type: integer, format: int64 }
+        toId: { type: integer, format: int64 }
+        amount: { type: number }

@@ -33,6 +33,7 @@ test class, and drop your scenarios under `src/test/resources/scenarios/`.
 ```java
 @Harness
 @SpringBootTest(webEnvironment = RANDOM_PORT)
+@RequiresLlm
 class ScenarioSuiteTest {
     @Scenario void transferBetweenAccounts() {}
 }
@@ -40,6 +41,8 @@ class ScenarioSuiteTest {
 
 Each `## Step` is reported as its own sub-test (like a parameterized test's
 invocations); the first failing step fails and the rest are skipped.
+`@RequiresLlm` skips the suite when no model is configured, so it stays out of a
+plain CI build (see [Building](#building)).
 
 ## How it works
 
@@ -91,6 +94,7 @@ invocations); the first failing step fails and the rest are skipped.
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness. |
 | `inquisitor-harness-junit` | JUnit 5 layer: `@Harness` on the class + one `@Scenario` method per scenario, each step a sub-test. |
 | `inquisitor-harness-junit-starter` | Autoconfiguration for the JUnit layer — the single dependency a consumer needs. |
+| `inquisitor-harness-openapi` / `-starter` | Optional OpenAPI discovery: injects your app's spec into the prompt so scenarios can be natural-language intent. Off unless enabled. |
 | `inquisitor-bom` | Platform BOM aligning the Inquisitor module versions. |
 | `inquisitor-demo` | Banking REST demo app + scenario tests; the reference consumer. |
 
@@ -129,6 +133,51 @@ under `src/test/resources/scenarios/`. The scenario file is resolved from the
 method name (`transferBetweenAccounts()` → `transfer-between-accounts.md`) or set
 explicitly with `@Scenario("classpath:scenarios/custom.md")`.
 
+## Optional: OpenAPI discovery
+
+By default a scenario tells the model which endpoints to call. If your app exposes an
+OpenAPI document, you can instead let the model **read the spec and choose the
+endpoints itself**, so scenarios become pure natural-language intent — no paths or
+request bodies.
+
+Add the plugin starter and turn it on:
+
+```kotlin
+testImplementation("io.inquisitor:inquisitor-harness-openapi-starter")
+```
+
+```yaml
+inquisitor:
+  harness:
+    openapi:
+      enabled: true            # explicit opt-in
+      # location:              # optional static spec (classpath:/file:/http:); omit to live-fetch
+      # path: /v3/api-docs.yaml # live-fetch path appended to the app's base URL
+      # target: app             # which registered HTTP target to fetch from
+```
+
+To enable discovery per test class instead of globally, annotate the class with
+`@EnableOpenApiDiscovery` (use `@EnableOpenApiDiscovery(enabled = false)` to turn it
+off for a subclass) — equivalent to the property but scoped to that class:
+
+```java
+@Harness(scenarioDir = "classpath:scenarios/")
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+@EnableOpenApiDiscovery
+class MyScenarioTest { ... }
+```
+
+When enabled, an `OpenApiAdvisor` fetches the spec (lazily, from the running app at
+`/v3/api-docs.yaml` by default, or your `location`) and injects it into the system
+prompt. It's an explicit opt-in, so if the spec can't be obtained the run **fails
+fast** rather than silently proceeding without it. The module is fully optional —
+remove the dependency and the harness behaves exactly as before. The demo's
+`IntentScenarioSuiteTest` (scenarios under `scenarios/positive/intent/`) shows it in
+action.
+
+> The spec is sent to the model. With a remote model, treat a large or sensitive API
+> description accordingly.
+
 ## Verified models
 
 Results of running the scenario suite (7 scenarios) against various models. The
@@ -163,13 +212,22 @@ Docker/Podman for Testcontainers.
 ./gradlew :inquisitor-demo:bootRun    # run the demo app (local profile)
 ```
 
-The scenario suites that actually call an LLM are gated behind the
-`INQUISITOR_LLM_IT=true` environment variable, so a plain `./gradlew build`
-stays green without a running model:
+The scenario suites that actually call an LLM are annotated `@RequiresLlm`, which
+skips them unless a model is configured — so a plain `./gradlew build` stays green
+without a running model. Enable them either way:
 
 ```bash
+# environment variable (authoritative when set)
 INQUISITOR_LLM_IT=true ./gradlew :inquisitor-demo:test
+
+# or a JUnit configuration parameter (committable in junit-platform.properties,
+# or passed as a system property) — the fallback when the env var is unset
+./gradlew :inquisitor-demo:test -Dinquisitor.harness.llm.enabled=true
 ```
+
+`@RequiresLlm` is `@Inherited`, so a suite hierarchy declares the gate once on its
+base. Resolution order: `INQUISITOR_LLM_IT` env var → `inquisitor.harness.llm.enabled`
+config parameter → disabled.
 
 The demo's `local` profile starts a Postgres Testcontainer automatically
 (`postgres:17-alpine`, reuse enabled) and runs Flyway migrations — no manual

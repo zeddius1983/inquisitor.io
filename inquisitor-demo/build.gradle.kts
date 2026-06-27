@@ -16,10 +16,12 @@ dependencies {
     testCompileOnly(libs.lombok)
     testAnnotationProcessor(libs.lombok)
     // Standalone harness (ScenarioTests) and the ergonomic JUnit layer
-    // (ScenarioSuiteTest); the junit-starter brings the harness autoconfig too,
-    // but both paths are kept explicit since both are under test here.
+    // (PositiveScenarioSuite subclasses); the junit-starter brings the harness autoconfig
+    // too, but both paths are kept explicit since both are under test here.
     testImplementation(project(":inquisitor-harness-starter"))
     testImplementation(project(":inquisitor-harness-junit-starter"))
+    // Optional OpenAPI discovery, exercised by IntentScenarioSuiteTest.
+    testImplementation(project(":inquisitor-harness-openapi-starter"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

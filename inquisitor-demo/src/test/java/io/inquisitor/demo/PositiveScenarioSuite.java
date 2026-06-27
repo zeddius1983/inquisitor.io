@@ -16,32 +16,39 @@
 
 package io.inquisitor.demo;
 
-import io.inquisitor.harness.junit.Harness;
+import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
- * Runs the markdown scenarios through the ergonomic harness JUnit layer: each
+ * The positive scenario suite, run through the ergonomic harness JUnit layer. Each
  * {@link Scenario @Scenario} method is one scenario (its markdown resolved from the
- * method name under {@code classpath:scenarios/}), and every {@code ## Step} is
- * reported as its own sub-test. The app's HTTP target is registered automatically by
- * {@link Harness @Harness} — no per-scenario boilerplate.
+ * method name) and every {@code ## Step} is reported as its own sub-test.
  *
- * <p>This is the consumer-facing counterpart to {@link ScenarioTests}, which drives
- * the same scenarios via the standalone harness contract. Both are gated on the
- * local LLM; run with {@code INQUISITOR_LLM_IT=true}.
+ * <p>The same set of scenarios is authored in two engineering styles — see
+ * {@code scenarios/positive/explicit} (structured, prescriptive) and
+ * {@code scenarios/positive/cucumber} (Gherkin Given/When/Then). This base holds the
+ * scenario methods once; each concrete subclass binds them to one style bucket via
+ * {@link io.inquisitor.harness.junit.Harness#scenarioDir()}, so we can compare how a
+ * model copes with the two writing styles over identical scenarios.
+ *
+ * <p>Gated on the LLM; run with {@code INQUISITOR_LLM_IT=true}. The gate lives on this
+ * base via {@link RequiresLlm @RequiresLlm} ({@code @Inherited}), so the concrete
+ * subclasses inherit it — a plain {@code @EnabledIfEnvironmentVariable} here would
+ * <em>not</em> gate them.
  */
-@Harness
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@EnabledIfEnvironmentVariable(named = "INQUISITOR_LLM_IT", matches = "true")
-class ScenarioSuiteTest {
+@RequiresLlm
+abstract class PositiveScenarioSuite {
 
     @Scenario
     void accountNotFound() {}
 
     @Scenario
     void openAccountAndDeposit() {}
+
+    @Scenario
+    void openAccountsBulk() {}
 
     @Scenario
     void transferBetweenAccounts() {}

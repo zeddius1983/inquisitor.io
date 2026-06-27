@@ -19,4 +19,7 @@ dependencies {
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
+
+    // Assertions for the @RequiresLlm gate test (version from the Spring Boot BOM).
+    testImplementation("org.assertj:assertj-core")
 }

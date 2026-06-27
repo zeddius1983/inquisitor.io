@@ -20,6 +20,8 @@ include(
     "inquisitor-harness-starter",
     "inquisitor-harness-junit",
     "inquisitor-harness-junit-starter",
+    "inquisitor-harness-openapi",
+    "inquisitor-harness-openapi-starter",
     "inquisitor-mock",
     "inquisitor-mock-starter",
     "inquisitor-demo-db-starter",

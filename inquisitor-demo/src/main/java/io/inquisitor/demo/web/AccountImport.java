@@ -32,8 +32,12 @@ public interface AccountImport {
 
     record CsvPair(String owner, String currency) {
         static CsvPair from(String line) {
-            String[] fields = line.strip().split(",",-1);
-            return new CsvPair(fields[0].strip(), fields[1].strip());
+            String[] fields = line.strip().split(",", -1);
+            String owner = fields[0].strip();
+            // A row may omit the currency column entirely (e.g. "Carol"), not just leave
+            // the cell blank ("Carol,"); treat both as a blank currency -> defaultCurrency.
+            String currency = fields.length > 1 ? fields[1].strip() : "";
+            return new CsvPair(owner, currency);
         }
     }
 

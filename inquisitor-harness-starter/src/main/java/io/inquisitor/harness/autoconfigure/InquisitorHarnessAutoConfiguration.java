@@ -35,6 +35,7 @@ import io.inquisitor.harness.tool.HttpTargetRegistry;
 import io.inquisitor.harness.tool.SqlTool;
 import lombok.val;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -129,7 +130,8 @@ public class InquisitorHarnessAutoConfiguration {
             HttpRequestTool httpRequestTool,
             SqlTool sqlTool,
             ObjectProvider<ToolCallback> toolCallbacks,
-            ObjectProvider<ToolCallbackProvider> toolCallbackProviders) {
+            ObjectProvider<ToolCallbackProvider> toolCallbackProviders,
+            ObjectProvider<Advisor> advisors) {
 
         // Spring AI's unified defaultTools(Object...) accepts tool objects, ToolCallbacks,
         // and ToolCallbackProviders alike, so built-ins and user-supplied tools go together.
@@ -137,13 +139,19 @@ public class InquisitorHarnessAutoConfiguration {
         toolCallbacks.orderedStream().forEach(tools::add);
         toolCallbackProviders.orderedStream().forEach(tools::add);
 
+        // Built-in advisors first, then any contributed by the context (e.g. the optional
+        // OpenAPI-discovery plugin's OpenApiAdvisor), in Advisor#getOrder() order. With no
+        // extra advisor beans this is identical to the chat-memory + logging defaults.
+        val advisorList = new ArrayList<Advisor>(List.of(
+                MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                // Logs each request/response (incl. tool-call round-trips) at DEBUG
+                // under org.springframework.ai — silent unless that logger is enabled.
+                new SimpleLoggerAdvisor()));
+        advisors.orderedStream().forEach(advisorList::add);
+
         return ChatClient.builder(chatModel)
                 .defaultSystem(HarnessSystemPrompt.TEXT)
-                .defaultAdvisors(
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                        // Logs each request/response (incl. tool-call round-trips) at DEBUG
-                        // under org.springframework.ai — silent unless that logger is enabled.
-                        new SimpleLoggerAdvisor())
+                .defaultAdvisors(advisorList.toArray(Advisor[]::new))
                 .defaultTools(tools.toArray())
                 .build();
     }
