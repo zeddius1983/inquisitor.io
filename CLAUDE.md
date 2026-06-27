@@ -123,11 +123,15 @@ reports one sub-test per step) and re-exported by
 `inquisitor-harness-junit-starter`. The demo exercises both surfaces: the gated
 `ScenarioTests` (standalone, JUnit-free contract) and the `@Harness`/`@Scenario`
 suite (`PositiveScenarioSuite`, bound to a style bucket by each subclass —
-`ExplicitScenarioSuiteTest`, `CucumberScenarioSuiteTest`).
+`ExplicitScenarioSuiteTest`, `CucumberScenarioSuiteTest`; `IntentScenarioSuiteTest`
+for the natural-language bucket). Oracle calibration runs through `FaultDetectionTests`
+(see below).
 
-Demo scenarios live under `src/test/resources/scenarios/` split by purpose then
-authoring style: `positive/{explicit,cucumber}/` (same scenarios written
-prescriptively vs. in Gherkin Given/When/Then, to gauge how a model copes with
-different engineering styles) and `negative/{explicit,cucumber}/` (reserved for
-oracle-calibration fixtures — see `tasks/task-07-negative-scenarios.md`). See
-[docs/roadmap.md](docs/roadmap.md).
+Demo scenarios live under `src/test/resources/scenarios/`, split by authoring style:
+`explicit/` (prescriptive: fenced requests + bulleted asserts), `cucumber/` (Gherkin
+Given/When/Then), and `intent/` (natural-language only), to gauge how a model copes
+with different engineering styles. The same scenarios double as fault-detection
+fixtures: `FaultDetectionTests` runs them against a deliberately buggy build — a
+`@Primary` `AccountServiceRouter` that switches in `BuggyAccountServiceImpl` for an
+enabled `Bug` — and asserts the oracle reports the failure (mutation testing; see
+`tasks/task-07-fault-detection.md`). See [docs/roadmap.md](docs/roadmap.md).

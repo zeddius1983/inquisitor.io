@@ -12,9 +12,12 @@ import call and rubber-stamps the step; `GLM-4.7-Flash` (reasoning off) fabricat
 responses for whole scenarios. This task turns "the model might rubber-stamp" from
 a caveat in the README into a measured number.
 
-> Status: **planned — awaiting review.** No code yet. (Supersedes two earlier
-> drafts: the original "false-expectation" fixtures, then a profile-swapped buggy
-> service. See *Why mutation* and *Why a router* below.)
+> Status: **Phase 1 implemented** and green on the local model — the router
+> (`AccountService` interface + `AccountServiceImpl` + `BuggyAccountServiceImpl` +
+> `@Primary AccountServiceRouter`), `FaultDetectionTests`, and the flattened scenario
+> tree are in. **Phase 2** (fault detection through the `@Harness` layer) is still
+> planned. (Supersedes two earlier drafts: the original "false-expectation" fixtures,
+> then a profile-swapped buggy service. See *Why mutation* and *Why a router* below.)
 
 ## The core principle: correct test, buggy system
 
