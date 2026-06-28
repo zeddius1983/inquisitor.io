@@ -22,7 +22,6 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import io.inquisitor.harness.executor.ScenarioEvaluation;
@@ -75,10 +74,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         // sequentially, so each invocation advances the same conversation in order.
         val state = new ScenarioState(executor.start(scenario), expect);
 
-        val steps = scenario.steps();
-        val last = steps.size() - 1;
-        return IntStream.range(0, steps.size())
-                .mapToObj(i -> (TestTemplateInvocationContext) new StepInvocationContext(steps.get(i), state, i == last));
+        return scenario.steps().stream().map(step -> new StepInvocationContext(step, state));
     }
 
     private static String resolveLocation(ExtensionContext context) {
@@ -123,8 +119,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         }
     }
 
-    private record StepInvocationContext(Step step, ScenarioState state, boolean last)
-            implements TestTemplateInvocationContext {
+    private record StepInvocationContext(Step step, ScenarioState state) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
@@ -133,12 +128,12 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
         @Override
         public List<Extension> getAdditionalExtensions() {
-            return List.of(new StepExecution(state, last));
+            return List.of(new StepExecution(state));
         }
     }
 
     /** Executes the next step before the (empty) test body, failing or skipping accordingly. */
-    private record StepExecution(ScenarioState state, boolean last) implements BeforeTestExecutionCallback {
+    private record StepExecution(ScenarioState state) implements BeforeTestExecutionCallback {
 
         @Override
         public void beforeTestExecution(ExtensionContext context) {
@@ -155,8 +150,9 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                     state.done = true;
                     return;
                 }
-                if (last) {
-                    // Every step passed: the oracle never caught the seeded fault.
+                // This step passed; once it was the last one, the oracle never caught the fault.
+                // (Safe to read hasNext() here: the step passed, so the evaluation is not failed.)
+                if (!state.evaluation.hasNext()) {
                     state.done = true;
                     throw new AssertionError("Expected this scenario to FAIL, but every step passed — "
                             + "the oracle did not catch the fault.\n" + describe(result));
