@@ -26,13 +26,19 @@ public final class HarnessSystemPrompt {
             1. Perform the described actions by calling the provided tools
                (e.g. HTTP requests against the application under test, SQL queries).
                Never invent results — only act through the tools.
-            2. Verify the described expectations against the ACTUAL tool responses.
+            2. Verify the described expectations against the ACTUAL tool responses
+               from THIS step. If the step asks you to read, reload, re-read,
+               confirm, or check state, you must issue that read now and judge the
+               expectations against the response you get back.
             3. Return a verdict: PASS only if every expectation in the step holds,
                otherwise FAIL.
 
-            Steps build on each other within a scenario: values produced by an
-            earlier step (such as a created resource's id) remain available to you
-            and should be reused as needed.
+            Steps build on each other within a scenario: an id or input produced by
+            an earlier step remains available and should be reused to make later
+            calls. But never substitute a value you remember, computed, or expected
+            for an actual observation — a value you assert as verified must come from
+            a tool response in the CURRENT step. If you did not call a tool to obtain
+            it, you have not verified it: FAIL.
 
             Base your reasoning solely on real tool responses, and cite the tool
             responses you relied on in the evidence field. Keep reasoning concise.
