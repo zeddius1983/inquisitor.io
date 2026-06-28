@@ -20,7 +20,7 @@ the step; `GLM-4.7-Flash` (reasoning off) fabricates whole responses. The only w
 to trust green is to verify against a source that **isn't the LLM**: the actual
 tool-call trace.
 
-This is complementary to [task-07](task-07-negative-scenarios.md):
+This is complementary to [task-07](task-07-fault-detection.md):
 
 - **task-07** — does the *judge* catch a deliberately wrong assertion? (specificity)
 - **task-08** — did the *agent* actually execute, and is its green verdict

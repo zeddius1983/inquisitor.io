@@ -18,7 +18,7 @@ This is explicitly a **nice-to-have plugin, not a core feature.** It must:
 > the `OpenApiAdvisor`, the two `OpenApiSpecProvider`s, and the autoconfiguration; the
 > core ChatClient now collects `Advisor` beans. The demo serves a static
 > `openapi.yaml` at `/v3/api-docs.yaml` and exercises it via `IntentScenarioSuiteTest`
-> (`scenarios/positive/intent/`). Resolved decisions are recorded in
+> (`scenarios/intent/`). Resolved decisions are recorded in
 > [docs/decisions.md](../docs/decisions.md); the design notes below are kept for
 > context. Remaining `[DECIDE]`/follow-up items: advisor ordering (settled to a
 > provisional `HIGHEST_PRECEDENCE + 100`), the `@ApiSpec` annotation, and the
@@ -26,7 +26,7 @@ This is explicitly a **nice-to-have plugin, not a core feature.** It must:
 
 ## Why
 
-Today scenarios spell out endpoints and payloads (see `scenarios/positive/explicit`)
+Today scenarios spell out endpoints and payloads (see `scenarios/explicit`)
 because the model has no API description — guessing paths is unreliable (see
 [[project_openapi_discovery]]). Handing it the spec turns "guess the API" into "read
 the API," which makes an `intent` bucket a fair test instead of a coin flip, and
@@ -209,7 +209,7 @@ historically tracked Boot 3 / Framework 6, so this is the main unknown.
 - **Token / context cost** — raw spec re-sent every turn; fine for the demo, scales
   badly → size-gated digest follow-up.
 - **Added non-determinism** — letting the model pick endpoints widens variance; ties
-  directly to oracle calibration ([task-07](task-07-negative-scenarios.md)) and the
+  directly to oracle calibration ([task-07](task-07-fault-detection.md)) and the
   benchmark trace ([task-08](task-08-benchmark-task.md) can assert the *right* endpoint
   was hit).
 - **Spec leaves the building** — the spec is sent to the (possibly remote) LLM; worth

@@ -172,7 +172,7 @@ When enabled, an `OpenApiAdvisor` fetches the spec (lazily, from the running app
 prompt. It's an explicit opt-in, so if the spec can't be obtained the run **fails
 fast** rather than silently proceeding without it. The module is fully optional —
 remove the dependency and the harness behaves exactly as before. The demo's
-`IntentScenarioSuiteTest` (scenarios under `scenarios/positive/intent/`) shows it in
+`IntentScenarioSuiteTest` (scenarios under `scenarios/intent/`) shows it in
 action.
 
 > The spec is sent to the model. With a remote model, treat a large or sensitive API

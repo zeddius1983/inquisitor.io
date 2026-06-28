@@ -159,15 +159,49 @@ see [roadmap.md](roadmap.md); for stable repo context see
 
 ## Scenario layout & authoring styles
 
-- **Scenarios split by purpose then authoring style:**
-  `positive/{explicit,cucumber,intent}` and `negative/{explicit,cucumber}`. The same
-  scenarios are written in different engineering voices — `explicit` (prescriptive:
+- **Scenarios split by authoring style:** `scenarios/{explicit,cucumber,intent}`. The
+  same scenarios are written in different engineering voices — `explicit` (prescriptive:
   fenced requests + bulleted asserts), `cucumber` (Gherkin Given/When/Then), and
   `intent` (pure natural-language intent, no endpoints) — so we can measure how a
   model copes with each. The ergonomic suite is an abstract `PositiveScenarioSuite`
   bound to a bucket by each subclass (`ExplicitScenarioSuiteTest`,
   `CucumberScenarioSuiteTest`); `intent` runs via `IntentScenarioSuiteTest`, which
-  needs OpenAPI discovery. `negative/*` is reserved for oracle-calibration fixtures.
+  needs OpenAPI discovery.
+- **No `positive/`/`negative/` split — fault scenarios reuse the positive ones.** The
+  tree was originally `positive/*` vs a reserved `negative/*`. Once oracle calibration
+  moved to *mutation testing* (correct scenarios run against a buggy build — see *Fault
+  detection* below), a "negative" scenario became byte-identical to a positive one, so a
+  separate folder was pure duplication. The tree was flattened to the style buckets and
+  `negative/` removed.
+
+## Fault detection (oracle calibration)
+
+- **Mutation testing, not false-expectation fixtures.** To measure that the oracle
+  catches wrong answers (*specificity*), we run *correct* scenarios against a
+  deliberately buggy build and treat a `FAIL` as the success condition — rather than
+  feeding the model a self-contradictory scenario (deposit 100, assert 50). A false
+  expectation puts the anomaly in the *instructions*, which an instruction-following
+  model can smell and "helpfully" rationalise (a PASS is then ambiguous); a seeded bug
+  puts the anomaly in the *system* — the real situation an oracle faces (good tests,
+  buggy code) — leaving no escape hatch.
+- **A runtime fault router, not Spring profiles.** `AccountServiceRouter` (`@Primary`)
+  routes each call to the clean `AccountServiceImpl` or the defective
+  `BuggyAccountServiceImpl` by which `Bug` is enabled (`enableBug`/`disableBug`/
+  `disableAllBugs`) — a strategy switch behind a facade. Profiles would cost a fresh
+  Spring context per mutant set and can't switch mid-suite; the router lives in one
+  context and flips per test. It's `@Primary` and always present (no
+  `@TestConfiguration`/`@Import`); with no bug enabled it routes to clean, so `bootRun`
+  and the positive suites behave identically.
+- **`BuggyAccountServiceImpl implements AccountService` — it does not extend the clean
+  impl.** Extending it would make it an `AccountServiceImpl` too, so the router's
+  `@Autowired AccountServiceImpl` would be ambiguous; instead it delegates every
+  non-buggy operation to the clean bean and overrides only the defective ones.
+- **Standalone contract first; `@Harness` is Phase 2.** `FaultDetectionTests` enables a
+  bug, runs an existing positive scenario, and asserts the failure lands at the step the
+  bug manifests at. The ergonomic `@Harness` path is deferred because the `@Scenario`
+  template asserts each step *passes* — fault detection there also needs expected-failure
+  verdicts (`@Scenario(expect = FAIL)`) plus a `@EnableBug` method annotation, where the
+  standalone contract needs neither. See `tasks/task-07-fault-detection.md`.
 
 ## OpenAPI discovery (optional plugin)
 

@@ -55,6 +55,21 @@ Common commands:
 ./gradlew :inquisitor-demo:bootRun    # run the demo app (local profile)
 ```
 
+## Releasing
+
+Versions are pre-1.0 semver: bump the **minor** for new features (additive public
+API), the **patch** for fixes. The version lives in `gradle.properties`; bump it on
+`main`, then push a `vX.Y.Z` tag — that triggers `.github/workflows/release.yml`,
+which publishes the library modules + BOM to Maven Central. Then write the GitHub
+release notes.
+
+**Release notes cover the published public API only.** `inquisitor-demo` exists
+purely to showcase the harness, so demo-app changes (new endpoints, scenarios, test
+wiring) do **not** belong in release notes — describe only what a consumer pulls in:
+the harness, JUnit, starter, and OpenAPI modules. Scope each note to what actually
+landed between tags (`git log vPREV..vNEW`); don't re-list a feature that shipped in
+an earlier tag.
+
 ## Running the demo
 
 The `local` profile is active by default. The `inquisitor-demo-db-starter`
@@ -108,11 +123,15 @@ reports one sub-test per step) and re-exported by
 `inquisitor-harness-junit-starter`. The demo exercises both surfaces: the gated
 `ScenarioTests` (standalone, JUnit-free contract) and the `@Harness`/`@Scenario`
 suite (`PositiveScenarioSuite`, bound to a style bucket by each subclass —
-`ExplicitScenarioSuiteTest`, `CucumberScenarioSuiteTest`).
+`ExplicitScenarioSuiteTest`, `CucumberScenarioSuiteTest`; `IntentScenarioSuiteTest`
+for the natural-language bucket). Oracle calibration runs through `FaultDetectionTests`
+(see below).
 
-Demo scenarios live under `src/test/resources/scenarios/` split by purpose then
-authoring style: `positive/{explicit,cucumber}/` (same scenarios written
-prescriptively vs. in Gherkin Given/When/Then, to gauge how a model copes with
-different engineering styles) and `negative/{explicit,cucumber}/` (reserved for
-oracle-calibration fixtures — see `tasks/task-07-negative-scenarios.md`). See
-[docs/roadmap.md](docs/roadmap.md).
+Demo scenarios live under `src/test/resources/scenarios/`, split by authoring style:
+`explicit/` (prescriptive: fenced requests + bulleted asserts), `cucumber/` (Gherkin
+Given/When/Then), and `intent/` (natural-language only), to gauge how a model copes
+with different engineering styles. The same scenarios double as fault-detection
+fixtures: `FaultDetectionTests` runs them against a deliberately buggy build — a
+`@Primary` `AccountServiceRouter` that switches in `BuggyAccountServiceImpl` for an
+enabled `Bug` — and asserts the oracle reports the failure (mutation testing; see
+`tasks/task-07-fault-detection.md`). See [docs/roadmap.md](docs/roadmap.md).

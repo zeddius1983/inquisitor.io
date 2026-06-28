@@ -22,5 +22,5 @@ import io.inquisitor.harness.junit.Harness;
  * Runs the positive suite against the <em>explicit</em> style bucket — scenarios
  * written prescriptively, with fenced requests and bulleted expectations.
  */
-@Harness(scenarioDir = "classpath:scenarios/positive/explicit/")
+@Harness(scenarioDir = "classpath:scenarios/explicit/")
 class ExplicitScenarioSuiteTest extends PositiveScenarioSuite {}
