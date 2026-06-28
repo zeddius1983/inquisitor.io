@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import io.inquisitor.harness.executor.ScenarioEvaluation;
@@ -66,11 +67,18 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         val executor = applicationContext.getBean(ScenarioExecutor.class);
 
         val scenario = load(applicationContext, parser, resolveLocation(context));
+        val expect = AnnotationSupport.findAnnotation(
+                        context.getRequiredTestMethod(), io.inquisitor.harness.junit.Scenario.class)
+                .map(io.inquisitor.harness.junit.Scenario::expect)
+                .orElse(Expect.PASS);
         // One evaluation shared by every step invocation of this method; they execute
         // sequentially, so each invocation advances the same conversation in order.
-        val state = new ScenarioState(executor.start(scenario));
+        val state = new ScenarioState(executor.start(scenario), expect);
 
-        return scenario.steps().stream().map(step -> new StepInvocationContext(step, state));
+        val steps = scenario.steps();
+        val last = steps.size() - 1;
+        return IntStream.range(0, steps.size())
+                .mapToObj(i -> (TestTemplateInvocationContext) new StepInvocationContext(steps.get(i), state, i == last));
     }
 
     private static String resolveLocation(ExtensionContext context) {
@@ -105,14 +113,18 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
     /** Mutable per-scenario state shared across the step invocations. */
     private static final class ScenarioState {
         private final ScenarioEvaluation evaluation;
-        private boolean failed;
+        private final Expect expect;
+        /** Set once no further steps should run: a step failed (PASS), or the expected failure landed (FAIL). */
+        private boolean done;
 
-        ScenarioState(ScenarioEvaluation evaluation) {
+        ScenarioState(ScenarioEvaluation evaluation, Expect expect) {
             this.evaluation = evaluation;
+            this.expect = expect;
         }
     }
 
-    private record StepInvocationContext(Step step, ScenarioState state) implements TestTemplateInvocationContext {
+    private record StepInvocationContext(Step step, ScenarioState state, boolean last)
+            implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
@@ -121,21 +133,39 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
         @Override
         public List<Extension> getAdditionalExtensions() {
-            return List.of(new StepExecution(state));
+            return List.of(new StepExecution(state, last));
         }
     }
 
     /** Executes the next step before the (empty) test body, failing or skipping accordingly. */
-    private record StepExecution(ScenarioState state) implements BeforeTestExecutionCallback {
+    private record StepExecution(ScenarioState state, boolean last) implements BeforeTestExecutionCallback {
 
         @Override
         public void beforeTestExecution(ExtensionContext context) {
-            if (state.failed) {
-                throw new TestAbortedException("skipped: an earlier step in this scenario failed");
+            if (state.done) {
+                throw new TestAbortedException(state.expect == Expect.FAIL
+                        ? "skipped: the scenario already failed as expected at an earlier step"
+                        : "skipped: an earlier step in this scenario failed");
             }
             val result = state.evaluation.next();
+
+            if (state.expect == Expect.FAIL) {
+                if (!result.passed()) {
+                    // The expected failure landed — this step is the success; stop here.
+                    state.done = true;
+                    return;
+                }
+                if (last) {
+                    // Every step passed: the oracle never caught the seeded fault.
+                    state.done = true;
+                    throw new AssertionError("Expected this scenario to FAIL, but every step passed — "
+                            + "the oracle did not catch the fault.\n" + describe(result));
+                }
+                return;
+            }
+
             if (!result.passed()) {
-                state.failed = true;
+                state.done = true;
                 throw new AssertionError(describe(result));
             }
         }

@@ -37,6 +37,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * the method name: camelCase becomes kebab-case plus {@code .md}, resolved against
  * the class's {@link Harness#scenarioDir()} (e.g. {@code transferBetweenAccounts()}
  * → {@code classpath:scenarios/transfer-between-accounts.md}).
+ *
+ * <p>{@link #expect()} is normally {@link Expect#PASS}. Set it to {@link Expect#FAIL}
+ * for fault detection: the scenario is then expected to fail at some step (a failing
+ * step is the success condition), which is how a correct scenario run against a
+ * deliberately defective build asserts the oracle caught the fault.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -46,4 +51,7 @@ public @interface Scenario {
 
     /** Explicit classpath location of the scenario markdown; derived from the method name when blank. */
     String value() default "";
+
+    /** Whether the scenario is expected to pass (default) or to fail at some step. */
+    Expect expect() default Expect.PASS;
 }

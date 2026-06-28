@@ -131,7 +131,11 @@ Demo scenarios live under `src/test/resources/scenarios/`, split by authoring st
 `explicit/` (prescriptive: fenced requests + bulleted asserts), `cucumber/` (Gherkin
 Given/When/Then), and `intent/` (natural-language only), to gauge how a model copes
 with different engineering styles. The same scenarios double as fault-detection
-fixtures: `FaultDetectionTests` runs them against a deliberately buggy build — a
-`@Primary` `AccountServiceRouter` that switches in `BuggyAccountServiceImpl` for an
-enabled `Bug` — and asserts the oracle reports the failure (mutation testing; see
-`tasks/task-07-fault-detection.md`). See [docs/roadmap.md](docs/roadmap.md).
+fixtures: they run against a deliberately buggy build — a `@Primary`
+`AccountServiceRouter` that switches in `BuggyAccountServiceImpl` for an enabled
+`Bug` — and the oracle is expected to report the failure (mutation testing). Two
+suites do this: the standalone `FaultDetectionTests` (asserts the failure lands at
+the exact step) and the ergonomic `FaultDetectionSuiteTest` (`@Harness` layer, via
+`@Scenario(expect = FAIL)` + the demo's `@EnableBug`; asserts the scenario fails
+somewhere). See `tasks/task-07-fault-detection.md` and
+[docs/roadmap.md](docs/roadmap.md).
