@@ -12,7 +12,6 @@ spring:
         # Flattened properties; the nested chat.options.* form is deprecated
         # for removal in Spring AI 2.0.0.
         model: ${OPENAI_MODEL:gemma-4-31B-it-QAT-Q4_0}
-        temperature: 0.0
   # Force ANSI colour: the forked Gradle test JVM's stdout is piped (not a TTY),
   # so the default DETECT mode would otherwise render the logs uncoloured.
   output:
