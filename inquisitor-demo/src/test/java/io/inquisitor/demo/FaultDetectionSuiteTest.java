@@ -18,6 +18,7 @@ package io.inquisitor.demo;
 
 import static io.inquisitor.harness.junit.Expect.FAIL;
 
+import io.inquisitor.demo.junit.EnableBug;
 import io.inquisitor.demo.service.Bug;
 import io.inquisitor.harness.junit.Harness;
 import io.inquisitor.harness.junit.RequiresLlm;

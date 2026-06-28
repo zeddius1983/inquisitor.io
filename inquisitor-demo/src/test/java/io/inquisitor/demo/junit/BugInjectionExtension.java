@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo;
+package io.inquisitor.demo.junit;
 
 import java.util.Optional;
 
