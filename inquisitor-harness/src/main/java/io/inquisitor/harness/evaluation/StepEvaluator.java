@@ -32,13 +32,13 @@ import org.springframework.ai.evaluation.Evaluator;
  * <p>It audits the actor's claim ({@link EvaluationRequest#getResponseContent()}) against
  * the <em>real</em> tool-call trace ({@link EvaluationRequest#getDataList()} — never the
  * conversation), using a separate judge model, and classifies the result as a
- * {@link Credibility} category mapped to a 0.0–1.0 score.
+ * {@link EvaluationCategory} category mapped to a 0.0–1.0 score.
  *
  * <p>The trace is the sole ground truth and is treated as complete, so a claimed action
  * absent from it is caught as fabrication. The judge runs with no tools; it rules on the
  * trace alone.
  */
-public class CredibilityEvaluator implements Evaluator {
+public class StepEvaluator implements Evaluator {
 
     /**
      * Built by string substitution rather than a {@code PromptTemplate} on purpose: the
@@ -87,7 +87,7 @@ public class CredibilityEvaluator implements Evaluator {
 
     private final ChatClient judge;
 
-    public CredibilityEvaluator(ChatClient judge) {
+    public StepEvaluator(ChatClient judge) {
         this.judge = judge;
     }
 
@@ -96,7 +96,7 @@ public class CredibilityEvaluator implements Evaluator {
         val verdict = judge.prompt()
                 .user(buildPrompt(request))
                 .call()
-                .entity(CredibilityVerdict.class);
+                .entity(StepEvaluationResult.class);
 
         if (verdict == null || verdict.category() == null) {
             return new EvaluationResponse(false, 0.0f, "The evaluator returned no verdict.", Map.of());
@@ -104,7 +104,7 @@ public class CredibilityEvaluator implements Evaluator {
         val category = verdict.category();
         val feedback = verdict.findings().isEmpty() ? "" : String.join("; ", verdict.findings());
         return new EvaluationResponse(
-                category == Credibility.GROUNDED,
+                category == EvaluationCategory.GROUNDED,
                 (float) category.score(),
                 feedback,
                 Map.of("category", category.name()));

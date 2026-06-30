@@ -19,8 +19,8 @@ package io.inquisitor.harness.autoconfigure;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import io.inquisitor.harness.evaluation.CredibilityEvaluationStepRunner;
-import io.inquisitor.harness.evaluation.CredibilityRecorder;
+import io.inquisitor.harness.evaluation.EvaluationStepRunner;
+import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
 import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.executor.StepRunner;
@@ -40,7 +40,7 @@ class InquisitorEvaluationAutoConfigurationTest {
     @Test
     void evaluationIsOffByDefault() {
         runner.run(context -> {
-            assertThat(context).doesNotHaveBean(CredibilityRecorder.class);
+            assertThat(context).doesNotHaveBean(StepEvaluationRecorder.class);
             assertThat(context).doesNotHaveBean(Evaluator.class);
             assertThat(context.getBean(StepRunner.class)).isInstanceOf(LlmStepRunner.class);
             assertThat(context).hasSingleBean(ScenarioExecutor.class);
@@ -48,17 +48,17 @@ class InquisitorEvaluationAutoConfigurationTest {
     }
 
     @Test
-    void wrapsTheRunnerWithCredibilityEvaluationWhenEnabled() {
+    void wrapsTheRunnerWithEvaluationWhenEnabled() {
         runner.withPropertyValues(
                         "inquisitor.harness.evaluation.enabled=true",
                         "inquisitor.harness.evaluation.model=judge-model",
                         "inquisitor.harness.evaluation.base-url=http://localhost:9999",
                         "inquisitor.harness.evaluation.api-key=test-key")
                 .run(context -> {
-                    assertThat(context).hasSingleBean(CredibilityRecorder.class);
+                    assertThat(context).hasSingleBean(StepEvaluationRecorder.class);
                     assertThat(context).hasSingleBean(Evaluator.class);
                     // The @Primary wrapper is what the executor resolves.
-                    assertThat(context.getBean(StepRunner.class)).isInstanceOf(CredibilityEvaluationStepRunner.class);
+                    assertThat(context.getBean(StepRunner.class)).isInstanceOf(EvaluationStepRunner.class);
                     assertThat(context).hasSingleBean(ScenarioExecutor.class);
                 });
     }

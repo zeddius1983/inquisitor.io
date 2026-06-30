@@ -21,7 +21,7 @@ package io.inquisitor.harness.evaluation;
  * the credibility evaluator. A discrete classification (rather than a free-form number)
  * keeps a weaker judge model stable; the score mapping stays under our control.
  */
-public enum Credibility {
+public enum EvaluationCategory {
 
     /** Every action and value the verdict relies on is present in, and consistent with, the trace. */
     GROUNDED(1.0),
@@ -37,7 +37,7 @@ public enum Credibility {
 
     private final double score;
 
-    Credibility(double score) {
+    EvaluationCategory(double score) {
         this.score = score;
     }
 

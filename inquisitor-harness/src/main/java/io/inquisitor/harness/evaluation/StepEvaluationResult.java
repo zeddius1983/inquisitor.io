@@ -16,23 +16,20 @@
 
 package io.inquisitor.harness.evaluation;
 
+import java.util.List;
+
 import org.jspecify.annotations.Nullable;
 
 /**
- * One step's recorded credibility result, for the report.
+ * The judge model's structured answer: an {@link EvaluationCategory} and short findings
+ * explaining it. Mapped from the judge's JSON response via structured output.
  *
- * @param scenario  the scenario name
- * @param stepIndex the 1-based step position
- * @param stepTitle the step heading
- * @param score     the 0.0–1.0 credibility score
- * @param category  the {@link Credibility} category name, or {@code null} if unavailable
- * @param feedback  the judge's findings, joined
+ * @param category the classification; {@code null} if the model failed to produce one
+ * @param findings one short note per issue found (the claim, and what the trace shows)
  */
-public record StepCredibility(
-        String scenario,
-        int stepIndex,
-        String stepTitle,
-        double score,
-        @Nullable String category,
-        String feedback) {
+public record StepEvaluationResult(@Nullable EvaluationCategory category, List<String> findings) {
+
+    public StepEvaluationResult {
+        findings = findings == null ? List.of() : List.copyOf(findings);
+    }
 }

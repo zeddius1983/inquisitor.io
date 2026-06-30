@@ -40,7 +40,7 @@ import org.springframework.ai.evaluation.Evaluator;
 /**
  * The decorator is transparent to the verdict and grounds the judge on the real trace.
  */
-class CredibilityEvaluationStepRunnerTest {
+class EvaluationStepRunnerTest {
 
     private static final Scenario SCENARIO =
             new Scenario("Deposit", "desc", List.of(new Step(1, "Open", "open and deposit 100")), "s.md");
@@ -58,8 +58,8 @@ class CredibilityEvaluationStepRunnerTest {
             captured.set(request);
             return new EvaluationResponse(true, 1.0f, "grounded", Map.of("category", "GROUNDED"));
         };
-        val recorder = new CredibilityRecorder();
-        val runner = new CredibilityEvaluationStepRunner(delegate, evaluator, recorder);
+        val recorder = new StepEvaluationRecorder();
+        val runner = new EvaluationStepRunner(delegate, evaluator, recorder);
 
         val run = runner.run(StepRequest.of("conv-1", SCENARIO, SCENARIO.steps().get(0)));
 
@@ -92,7 +92,7 @@ class CredibilityEvaluationStepRunnerTest {
             captured.set(request);
             return new EvaluationResponse(false, 0.2f, "no calls", Map.of("category", "UNSUPPORTED"));
         };
-        val runner = new CredibilityEvaluationStepRunner(delegate, evaluator, new CredibilityRecorder());
+        val runner = new EvaluationStepRunner(delegate, evaluator, new StepEvaluationRecorder());
 
         runner.run(StepRequest.of("conv-2", SCENARIO, SCENARIO.steps().get(0)));
 

@@ -39,13 +39,13 @@ import org.springframework.ai.evaluation.Evaluator;
  * only observes — so enabling evaluation never changes whether a step passes.
  */
 @Slf4j
-public class CredibilityEvaluationStepRunner implements StepRunner {
+public class EvaluationStepRunner implements StepRunner {
 
     private final StepRunner delegate;
     private final Evaluator evaluator;
-    private final CredibilityRecorder recorder;
+    private final StepEvaluationRecorder recorder;
 
-    public CredibilityEvaluationStepRunner(StepRunner delegate, Evaluator evaluator, CredibilityRecorder recorder) {
+    public EvaluationStepRunner(StepRunner delegate, Evaluator evaluator, StepEvaluationRecorder recorder) {
         this.delegate = delegate;
         this.evaluator = evaluator;
         this.recorder = recorder;

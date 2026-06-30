@@ -74,14 +74,14 @@ public record InquisitorHarnessProperties(
     }
 
     /**
-     * Credibility-evaluation settings. When {@code enabled}, the harness wraps the actor
-     * runner so a separate judge model scores each verdict against the real tool trace.
+     * Step-evaluation settings. When {@code enabled}, the harness wraps the actor runner
+     * so a separate judge model scores each verdict against the real tool trace.
      *
      * <p>The judge should be a <em>different</em> model from the actor — a self-judge
      * shares its own failure modes. {@code baseUrl}/{@code apiKey} default to the actor
      * model's when omitted, in which case only {@code model} differs.
      *
-     * @param enabled whether to run credibility evaluation
+     * @param enabled whether to run step evaluation
      * @param model   the judge model name; required when {@code enabled}
      * @param baseUrl the judge model's OpenAI-compatible base URL, or {@code null} to reuse the actor's
      * @param apiKey  the judge model's API key, or {@code null} to reuse the actor's

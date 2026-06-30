@@ -27,14 +27,14 @@ import lombok.val;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.evaluation.EvaluationResponse;
 
-class CredibilityRecorderTest {
+class StepEvaluationRecorderTest {
 
     private static final Scenario SCENARIO =
             new Scenario("Transfer", "desc", List.of(new Step(1, "t", "i")), "s.md");
 
     @Test
     void recordsScoreCategoryAndFeedback() {
-        val recorder = new CredibilityRecorder();
+        val recorder = new StepEvaluationRecorder();
 
         recorder.record(SCENARIO, new Step(1, "Open", "open it"),
                 new EvaluationResponse(true, 1.0f, "all grounded", Map.of("category", "GROUNDED")));
@@ -51,7 +51,7 @@ class CredibilityRecorderTest {
 
     @Test
     void overallScoreIsTheMean() {
-        val recorder = new CredibilityRecorder();
+        val recorder = new StepEvaluationRecorder();
         recorder.record(SCENARIO, new Step(1, "a", "i"),
                 new EvaluationResponse(true, 1.0f, "", Map.of()));
         recorder.record(SCENARIO, new Step(2, "b", "i"),
@@ -62,12 +62,12 @@ class CredibilityRecorderTest {
 
     @Test
     void overallScoreEmptyWithNoRecords() {
-        assertThat(new CredibilityRecorder().overallScore()).isEmpty();
+        assertThat(new StepEvaluationRecorder().overallScore()).isEmpty();
     }
 
     @Test
     void categoryNullWhenAbsentFromMetadata() {
-        val recorder = new CredibilityRecorder();
+        val recorder = new StepEvaluationRecorder();
         recorder.record(SCENARIO, new Step(1, "a", "i"),
                 new EvaluationResponse(false, 0.0f, "no verdict", Map.of()));
 

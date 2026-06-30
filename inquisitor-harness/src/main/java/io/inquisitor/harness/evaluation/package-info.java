@@ -15,9 +15,10 @@
  */
 
 /**
- * Credibility evaluation: a second, independent LLM judges whether a step's verdict is
+ * Step evaluation: a second, independent LLM judges whether a step's verdict is
  * <em>earned</em> by auditing the actor's claim against the real tool-call trace, rather
- * than trusting the actor's own verdict. See {@code tasks/task-08-evaluation.md}.
+ * than trusting the actor's own verdict, producing a per-step credibility score. See
+ * {@code tasks/task-08-evaluation.md}.
  */
 @NullMarked
 package io.inquisitor.harness.evaluation;

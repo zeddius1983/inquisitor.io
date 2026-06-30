@@ -29,9 +29,9 @@ import org.springframework.ai.evaluation.EvaluationResponse;
  * Collects per-step credibility scores across a run for the report. The only state
  * shared across steps/scenarios; thread-safe so parallel scenarios can record freely.
  */
-public class CredibilityRecorder {
+public class StepEvaluationRecorder {
 
-    private final List<StepCredibility> records = new CopyOnWriteArrayList<>();
+    private final List<StepEvaluationRecord> records = new CopyOnWriteArrayList<>();
 
     /** Records the evaluator's result for one step. */
     public void record(Scenario scenario, Step step, EvaluationResponse response) {
@@ -39,19 +39,19 @@ public class CredibilityRecorder {
         val category = metadata != null && metadata.get("category") != null
                 ? String.valueOf(metadata.get("category"))
                 : null;
-        records.add(new StepCredibility(
+        records.add(new StepEvaluationRecord(
                 scenario.name(), step.index(), step.title(),
                 response.getScore(), category, response.getFeedback()));
     }
 
     /** Every recorded step result, in record order. */
-    public List<StepCredibility> records() {
+    public List<StepEvaluationRecord> records() {
         return List.copyOf(records);
     }
 
     /** The mean credibility score across all recorded steps, or empty if none. */
     public OptionalDouble overallScore() {
-        return records.stream().mapToDouble(StepCredibility::score).average();
+        return records.stream().mapToDouble(StepEvaluationRecord::score).average();
     }
 
     public void clear() {

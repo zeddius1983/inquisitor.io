@@ -17,9 +17,9 @@
 package io.inquisitor.harness.autoconfigure;
 
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
-import io.inquisitor.harness.evaluation.CredibilityEvaluationStepRunner;
-import io.inquisitor.harness.evaluation.CredibilityEvaluator;
-import io.inquisitor.harness.evaluation.CredibilityRecorder;
+import io.inquisitor.harness.evaluation.EvaluationStepRunner;
+import io.inquisitor.harness.evaluation.StepEvaluator;
+import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
 import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.StepRunner;
 import lombok.val;
@@ -40,8 +40,8 @@ import org.springframework.util.Assert;
 
 /**
  * Wires credibility evaluation when {@code inquisitor.harness.evaluation.enabled=true}: a
- * separate judge model, the {@link CredibilityEvaluator}, a {@link CredibilityRecorder},
- * and a {@link CredibilityEvaluationStepRunner} that wraps the actor {@link LlmStepRunner}
+ * separate judge model, the {@link StepEvaluator}, a {@link StepEvaluationRecorder},
+ * and a {@link EvaluationStepRunner} that wraps the actor {@link LlmStepRunner}
  * (made {@code @Primary} so the executor uses it). When disabled, none of this loads and
  * the executor uses the plain {@link LlmStepRunner}.
  *
@@ -58,13 +58,13 @@ public class InquisitorEvaluationAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    CredibilityRecorder inquisitorCredibilityRecorder() {
-        return new CredibilityRecorder();
+    StepEvaluationRecorder inquisitorStepEvaluationRecorder() {
+        return new StepEvaluationRecorder();
     }
 
     @Bean
     @ConditionalOnMissingBean
-    Evaluator inquisitorCredibilityEvaluator(InquisitorHarnessProperties properties, Environment environment) {
+    Evaluator inquisitorStepEvaluator(InquisitorHarnessProperties properties, Environment environment) {
         val evaluation = properties.evaluation();
         val baseUrl = evaluation.baseUrl() != null
                 ? evaluation.baseUrl()
@@ -89,14 +89,14 @@ public class InquisitorEvaluationAutoConfiguration {
                 .build();
         // A bare judge: no harness system prompt, no chat memory, no tools — it rules on
         // the trace it is given, nothing else.
-        return new CredibilityEvaluator(ChatClient.builder(judgeModel).build());
+        return new StepEvaluator(ChatClient.builder(judgeModel).build());
     }
 
     @Bean
     @Primary
     @ConditionalOnBean(LlmStepRunner.class)
-    StepRunner inquisitorCredibilityStepRunner(
-            LlmStepRunner llmStepRunner, Evaluator evaluator, CredibilityRecorder recorder) {
-        return new CredibilityEvaluationStepRunner(llmStepRunner, evaluator, recorder);
+    StepRunner inquisitorEvaluationStepRunner(
+            LlmStepRunner llmStepRunner, Evaluator evaluator, StepEvaluationRecorder recorder) {
+        return new EvaluationStepRunner(llmStepRunner, evaluator, recorder);
     }
 }
