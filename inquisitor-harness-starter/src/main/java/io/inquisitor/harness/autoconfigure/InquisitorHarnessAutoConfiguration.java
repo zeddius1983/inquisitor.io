@@ -23,10 +23,10 @@ import javax.sql.DataSource;
 
 import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
-import io.inquisitor.harness.executor.ChatClientStepEvaluator;
 import io.inquisitor.harness.executor.HarnessSystemPrompt;
+import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.ScenarioExecutor;
-import io.inquisitor.harness.executor.StepEvaluator;
+import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.parser.ScenarioParser;
 import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
@@ -159,15 +159,15 @@ public class InquisitorHarnessAutoConfiguration {
     @Bean
     @ConditionalOnBean(ChatClient.class)
     @ConditionalOnMissingBean
-    StepEvaluator inquisitorStepEvaluator(ChatClient chatClient) {
-        return new ChatClientStepEvaluator(chatClient);
+    StepRunner inquisitorStepRunner(ChatClient chatClient) {
+        return new LlmStepRunner(chatClient);
     }
 
     @Bean
-    @ConditionalOnBean(StepEvaluator.class)
+    @ConditionalOnBean(StepRunner.class)
     @ConditionalOnMissingBean
-    ScenarioExecutor inquisitorScenarioExecutor(StepEvaluator stepEvaluator) {
-        return new ScenarioExecutor(stepEvaluator);
+    ScenarioExecutor inquisitorScenarioExecutor(StepRunner stepRunner) {
+        return new ScenarioExecutor(stepRunner);
     }
 
     private static DataSource toDataSource(InquisitorHarnessProperties.Datasource properties) {

@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Deterministic tests of the executor's orchestration, using a scripted
- * {@link StepEvaluator} — no LLM involved.
+ * {@link StepRunner} — no LLM involved.
  */
 class ScenarioExecutorTest {
 
@@ -106,8 +106,8 @@ class ScenarioExecutorTest {
         assertThat(evaluation.result().results()).hasSize(2);
     }
 
-    /** A {@link StepEvaluator} that returns scripted outcomes and records calls. */
-    private static final class ScriptedEvaluator implements StepEvaluator {
+    /** A {@link StepRunner} that returns scripted outcomes and records calls. */
+    private static final class ScriptedEvaluator implements StepRunner {
 
         final List<Step> evaluated = new ArrayList<>();
         final Set<String> conversationIds = new LinkedHashSet<>();
@@ -118,10 +118,12 @@ class ScenarioExecutorTest {
         }
 
         @Override
-        public StepVerdict evaluate(String conversationId, Scenario scenario, Step step) {
-            evaluated.add(step);
-            conversationIds.add(conversationId);
-            return new StepVerdict(script.apply(step), "scripted", List.of("evidence"));
+        public StepRun run(StepRequest request) {
+            evaluated.add(request.step());
+            conversationIds.add(request.conversationId());
+            return new StepRun(
+                    new StepVerdict(script.apply(request.step()), "scripted", List.of("evidence")),
+                    List.of());
         }
     }
 }

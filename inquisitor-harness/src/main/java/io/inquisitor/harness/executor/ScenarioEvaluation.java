@@ -43,7 +43,7 @@ import lombok.val;
 @Slf4j
 public class ScenarioEvaluation {
 
-    private final StepEvaluator evaluator;
+    private final StepRunner runner;
     private final Scenario scenario;
     private final String conversationId = UUID.randomUUID().toString();
     private final List<StepResult> results = new ArrayList<>();
@@ -51,8 +51,8 @@ public class ScenarioEvaluation {
     private int cursor = 0;
     private boolean failed = false;
 
-    ScenarioEvaluation(StepEvaluator evaluator, Scenario scenario) {
-        this.evaluator = evaluator;
+    ScenarioEvaluation(StepRunner runner, Scenario scenario) {
+        this.runner = runner;
         this.scenario = scenario;
     }
 
@@ -71,7 +71,7 @@ public class ScenarioEvaluation {
         val step = scenario.steps().get(cursor);
         log.debug("[{}] step {}/{} — evaluating: {}", scenario.name(), number, total, step.title());
         val startedNanos = System.nanoTime();
-        val verdict = evaluator.evaluate(conversationId, scenario, step);
+        val verdict = runner.run(StepRequest.of(conversationId, scenario, step)).verdict();
         val result = new StepResult(step, verdict, Duration.ofNanos(System.nanoTime() - startedNanos));
         results.add(result);
         cursor++;

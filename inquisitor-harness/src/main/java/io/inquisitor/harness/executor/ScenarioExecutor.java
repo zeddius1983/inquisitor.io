@@ -21,7 +21,7 @@ import io.inquisitor.harness.model.ScenarioResult;
 import lombok.val;
 
 /**
- * Evaluates {@link Scenario scenarios} step by step over a {@link StepEvaluator}.
+ * Evaluates {@link Scenario scenarios} step by step over a {@link StepRunner}.
  *
  * <p>Use {@link #evaluate(Scenario)} to run a whole scenario, or
  * {@link #start(Scenario)} to drive it one step at a time (e.g. to report each
@@ -30,10 +30,10 @@ import lombok.val;
  */
 public class ScenarioExecutor {
 
-    private final StepEvaluator evaluator;
+    private final StepRunner runner;
 
-    public ScenarioExecutor(StepEvaluator evaluator) {
-        this.evaluator = evaluator;
+    public ScenarioExecutor(StepRunner runner) {
+        this.runner = runner;
     }
 
     /** Evaluates every step, stopping at the first failure. */
@@ -47,6 +47,6 @@ public class ScenarioExecutor {
 
     /** Begins a step-at-a-time evaluation over a fresh conversation. */
     public ScenarioEvaluation start(Scenario scenario) {
-        return new ScenarioEvaluation(evaluator, scenario);
+        return new ScenarioEvaluation(runner, scenario);
     }
 }

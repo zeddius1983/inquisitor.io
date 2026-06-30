@@ -38,15 +38,15 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
 /**
- * Exercises {@link ChatClientStepEvaluator} against the real local model with
- * <em>stub</em> tools (canned HTTP responses), validating that the model does
- * tool-calling + structured output and that state threads across steps.
+ * Exercises {@link LlmStepRunner} against the real local model with <em>stub</em>
+ * tools (canned HTTP responses), validating that the model does tool-calling +
+ * structured output and that state threads across steps.
  *
  * <p>Gated: set {@code INQUISITOR_LLM_IT=true} with a local OpenAI-compatible
  * server running at {@code http://127.0.0.1:8000} to run it.
  */
 @EnabledIfEnvironmentVariable(named = "INQUISITOR_LLM_IT", matches = "true")
-class ChatClientStepEvaluatorIT {
+class LlmStepRunnerIT {
 
     private static final String BASE_URL = "http://127.0.0.1:8000";
     private static final String MODEL = "gemma-4-31B-it-QAT-Q4_0";
@@ -88,7 +88,7 @@ class ChatClientStepEvaluatorIT {
     }
 
     private static @NonNull ScenarioResult getScenarioResult(ChatClient chatClient) {
-        val executor = new ScenarioExecutor(new ChatClientStepEvaluator(chatClient));
+        val executor = new ScenarioExecutor(new LlmStepRunner(chatClient));
 
         val scenario = new Scenario(
                 "Order lifecycle",

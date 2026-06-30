@@ -115,8 +115,8 @@ Three project agents escalate by scope: `junior-developer` (well-scoped tasks),
 
 `inquisitor-harness` is implemented: `model/` (Scenario, Step, verdict records),
 `parser/` (flexmark markdown → `Scenario`), `tool/` (`HttpRequestTool`, `SqlTool`
-+ named registries), `executor/` (`ScenarioExecutor`, `ChatClientStepEvaluator`,
-system prompt). `inquisitor-harness-starter` autoconfigures it. The ergonomic
++ named registries), `executor/` (`ScenarioExecutor`, the `StepRunner` seam +
+`LlmStepRunner`, system prompt). `inquisitor-harness-starter` autoconfigures it. The ergonomic
 JUnit layer is implemented in `inquisitor-harness-junit` (`@Harness` on the test
 class + one `@Scenario` method per scenario; `@Scenario` is a `@TestTemplate` that
 reports one sub-test per step) and re-exported by
