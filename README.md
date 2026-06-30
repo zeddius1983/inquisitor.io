@@ -73,19 +73,6 @@ plain CI build (see [Building](#building)).
 > - **Don't gate critical CI on it blindly.** Review failures — a red step may be
 >   a real regression, model flakiness, or an ambiguous scenario.
 
-> [!TIP]
-> **Prefer a non-thinking model for evaluation.** Scenario steps are mostly
-> mechanical (call an endpoint, assert a status, check a row), and Inquisitor
-> relies on tool calls plus a final structured verdict. Reasoning ("thinking")
-> models add a trace that reintroduces variance — the model can talk itself out
-> of a correct call or re-decide a verdict — and on OpenAI-compatible servers the
-> thinking output can leak into the response body and mangle tool-call arguments.
-> For reproducible verdicts, a strong instruction-tuned **non-reasoning** model is
-> usually the more reliable test oracle. If you see flaky results, disable
-> thinking if your model supports it (e.g. `reasoning_effort` /
-> `chat_template_kwargs` for a self-hosted server) or switch to the non-thinking
-> variant before blaming the scenario.
-
 ## Modules
 
 | Module | Role |

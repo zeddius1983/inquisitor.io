@@ -12,12 +12,14 @@ import call and rubber-stamps the step; `GLM-4.7-Flash` (reasoning off) fabricat
 responses for whole scenarios. This task turns "the model might rubber-stamp" from
 a caveat in the README into a measured number.
 
-> Status: **Phase 1 implemented** and green on the local model — the router
-> (`AccountService` interface + `AccountServiceImpl` + `BuggyAccountServiceImpl` +
-> `@Primary AccountServiceRouter`), `FaultDetectionTests`, and the flattened scenario
-> tree are in. **Phase 2** (fault detection through the `@Harness` layer) is still
-> planned. (Supersedes two earlier drafts: the original "false-expectation" fixtures,
-> then a profile-swapped buggy service. See *Why mutation* and *Why a router* below.)
+> Status: **Phase 1 & 2 implemented** and green on the local model. Phase 1 — the
+> router (`AccountService` interface + `AccountServiceImpl` + `BuggyAccountServiceImpl`
+> + `@Primary AccountServiceRouter`), the standalone `FaultDetectionTests`, and the
+> flattened scenario tree. Phase 2 — fault detection through the ergonomic `@Harness`
+> layer: `@Scenario(expect = FAIL)` (harness-junit) + `@EnableBug` (demo) driving
+> `FaultDetectionSuiteTest`. (Supersedes two earlier drafts: the original
+> "false-expectation" fixtures, then a profile-swapped buggy service. See *Why
+> mutation* and *Why a router* below.)
 
 ## The core principle: correct test, buggy system
 
@@ -68,7 +70,7 @@ Therefore:
 - **Flatten** `scenarios/positive/{explicit,cucumber,intent}` →
   `scenarios/{explicit,cucumber,intent}` (the `positive/` qualifier is now
   redundant). Update each suite's `scenarioDir`: `ScenarioTests` (standalone),
-  `PositiveScenarioSuite` subclasses (`ExplicitScenarioSuiteTest`,
+  `ScenarioSuite` subclasses (`ExplicitScenarioSuiteTest`,
   `CucumberScenarioSuiteTest`), and `IntentScenarioSuiteTest`. Mechanical.
 - The "this scenario should fail under bug X at step Y" knowledge lives in the
   **fault-detection test code**, not in any markdown.
@@ -76,8 +78,8 @@ Therefore:
 ## Design
 
 Implemented in two phases: **Phase 1** — the router + standalone `FaultDetectionTests`
-+ the scenario-tree flatten (this task's core, build first). **Phase 2** — fault
-detection through the ergonomic `@Harness` layer (deferred; see below).
++ the scenario-tree flatten (this task's core). **Phase 2** — fault detection through
+the ergonomic `@Harness` layer (`@Scenario(expect = FAIL)` + `@EnableBug`; see below).
 
 ### The fault router
 
@@ -184,24 +186,48 @@ These map onto the old gross / off-by-one / subtle-field shapes — gross
 rubber-stamping, numeric discrimination, and a single quiet field a skimming model
 misses.
 
-### Phase 2 — fault detection through the `@Harness` layer (deferred)
+### Phase 2 — fault detection through the `@Harness` layer (implemented)
 
-JUnit *can* toggle a bug per test method — you key on a **method annotation**, not
-the test name:
+The ergonomic layer needs **two** new pieces where the standalone contract needs
+zero — which is why Phase 1 shipped on the standalone contract alone. Both are now in:
 
-- `@EnableBug(Bug.DEPOSIT_NOT_PERSISTED)` on a `@Scenario` method.
-- An extension implementing `BeforeEachCallback`/`AfterEachCallback`:
-  `beforeEach(ExtensionContext)` reads the annotation off `getRequiredTestMethod()`,
-  pulls the router via `SpringExtension.getApplicationContext(ctx).getBean(...)`, and
-  calls `enableBug`; `afterEach` calls `disableAllBugs()`.
+1. **`@Scenario(expect = FAIL)`** (core, `inquisitor-harness-junit`). The `@Scenario`
+   template asserts each step *passes*; fault detection needs the inverse. A new
+   `Expect { PASS, FAIL }` enum and `expect()` attribute on `@Scenario` flip the
+   `ScenarioTemplateProvider`'s per-step verdict handling: in `FAIL` mode a failing
+   step is the success (reported green, the rest skipped), and if *every* step passes
+   the test fails — "the oracle did not catch the fault." `PASS` (the default) is
+   unchanged, so existing suites are untouched.
+2. **`@EnableBug(Bug)`** (demo, `src/test`). A method annotation that carries
+   `@ExtendWith(BugInjectionExtension.class)` as a meta-annotation, so annotating a
+   method is all it takes. The extension implements `BeforeEachCallback`/
+   `AfterEachCallback`: it reads the bug off the test method, pulls the router via
+   `SpringExtension.getApplicationContext(ctx).getBean(AccountServiceRouter.class)`,
+   and brackets each step invocation with `enableBug` / `disableAllBugs` (a `@Scenario`
+   is a `@TestTemplate`, so before/after-each fire per step — the bug stays active for
+   the whole scenario and resets when done).
 
-This is deferred to Phase 2, because the `@Scenario` template asserts each step
-*passes*; using it for fault detection also needs expected-failure verdicts
-(`@Scenario(expect = FAIL)`), which touches the core template provider. So the
-ergonomic layer needs **two** new pieces (`@EnableBug` + expected-fail) where the
-standalone contract needs **zero** — which is why Phase 1 ships on the standalone
-contract alone, and `@EnableBug` waits until fault scenarios are wanted in the
-`@Harness` suite.
+`FaultDetectionSuiteTest` is the result — the Phase 2 counterpart to the standalone
+`FaultDetectionTests`:
+
+```java
+@Harness(scenarioDir = "classpath:scenarios/explicit/")
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+@RequiresLlm
+class FaultDetectionSuiteTest {
+
+    @EnableBug(Bug.DEPOSIT_NOT_PERSISTED)
+    @Scenario(expect = FAIL)
+    void openAccountAndDeposit() {}
+    // …
+}
+```
+
+**Granularity trade-off.** The ergonomic layer asserts only that the scenario fails
+*somewhere* (the template reports a green sub-test per passing step and turns the
+expected failure green). The standalone `FaultDetectionTests` keeps the stricter
+assertion that the failure lands at the *exact* step the bug manifests at — so both
+suites stay, coarse-but-ergonomic alongside precise-but-manual.
 
 ## Optional: detection-rate metric for the model table
 
@@ -222,21 +248,22 @@ them as calibration. Strong models (the 31B; reasoning-on configs) should be sta
 ## Out of scope (possible follow-ups)
 
 - A larger bug catalogue (one per service method).
-- Renaming `PositiveScenarioSuite` now that there's no negative counterpart — leave
-  it; "positive" still contrasts with fault detection.
 - Automating the detection-rate metric into a report.
 
-## Verification (when implemented)
+## Verification
 
-1. `./gradlew build` green; the gated suite self-skips without a model. The positive
+1. `./gradlew build` green; the gated suites self-skip without a model. The positive
    suites still pass against the flattened `scenarios/{explicit,cucumber,intent}`
-   paths and never touch the router.
-2. `INQUISITOR_LLM_IT=true ./gradlew :inquisitor-demo:test --tests *FaultDetectionTests`
-   with the local model: every case fails at the expected step (i.e. the model caught
-   each seeded bug) on a strong config (31B, or reasoning-on).
+   paths and never touch the router. ✅
+2. With the local model (gemma-4-31B), both suites caught all three seeded bugs:
+   - `INQUISITOR_LLM_IT=true ./gradlew :inquisitor-demo:test --tests '*FaultDetectionTests'`
+     — every case fails at the expected step. ✅
+   - `INQUISITOR_LLM_IT=true ./gradlew :inquisitor-demo:test --tests '*FaultDetectionSuiteTest'`
+     — 10 step sub-tests, 0 failures (each scenario's expected failure landed green,
+     downstream steps skipped). ✅
 3. Mutants are real by construction: the *same* scenario files pass in the positive
    suites (no bug) and fail here (bug enabled), so the contrast itself proves the
-   failure comes from the seeded bug, not a bad scenario.
+   failure comes from the seeded bug, not a bad scenario. ✅
 4. Optionally run across the benchmarked models to populate a detection-rate column.
 
 ## Docs to update

@@ -136,7 +136,7 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **Standalone `ScenarioTests` kept alongside the JUnit suites.** The demo
   exercises both paths: `ScenarioTests` asserts on `ScenarioResult` via the
   JUnit-free contract (compatibility), while the `@Harness`/`@Scenario` layer is run
-  by `PositiveScenarioSuite` subclasses. Both are gated with `@RequiresLlm`.
+  by `ScenarioSuite` subclasses. Both are gated with `@RequiresLlm`.
 - **LLM gating is a separate `@RequiresLlm`, not folded into `@Harness`.** `@Harness`
   stays a pure capability marker; gating is an opt-in companion annotation. Baking the
   gate into `@Harness` would couple the published API to one CI convention and, worse,
@@ -163,7 +163,7 @@ see [roadmap.md](roadmap.md); for stable repo context see
   same scenarios are written in different engineering voices — `explicit` (prescriptive:
   fenced requests + bulleted asserts), `cucumber` (Gherkin Given/When/Then), and
   `intent` (pure natural-language intent, no endpoints) — so we can measure how a
-  model copes with each. The ergonomic suite is an abstract `PositiveScenarioSuite`
+  model copes with each. The ergonomic suite is an abstract `ScenarioSuite`
   bound to a bucket by each subclass (`ExplicitScenarioSuiteTest`,
   `CucumberScenarioSuiteTest`); `intent` runs via `IntentScenarioSuiteTest`, which
   needs OpenAPI discovery.
@@ -196,12 +196,26 @@ see [roadmap.md](roadmap.md); for stable repo context see
   impl.** Extending it would make it an `AccountServiceImpl` too, so the router's
   `@Autowired AccountServiceImpl` would be ambiguous; instead it delegates every
   non-buggy operation to the clean bean and overrides only the defective ones.
-- **Standalone contract first; `@Harness` is Phase 2.** `FaultDetectionTests` enables a
-  bug, runs an existing positive scenario, and asserts the failure lands at the step the
-  bug manifests at. The ergonomic `@Harness` path is deferred because the `@Scenario`
-  template asserts each step *passes* — fault detection there also needs expected-failure
-  verdicts (`@Scenario(expect = FAIL)`) plus a `@EnableBug` method annotation, where the
-  standalone contract needs neither. See `tasks/task-07-fault-detection.md`.
+- **Two suites, coarse-vs-precise.** `FaultDetectionTests` (Phase 1, standalone) enables a
+  bug, runs an existing positive scenario, and asserts the failure lands at the *exact*
+  step the bug manifests at. `FaultDetectionSuiteTest` (Phase 2) brings fault detection to
+  the ergonomic `@Harness` layer; it asserts only that the scenario fails *somewhere*, the
+  natural granularity of a per-step `@TestTemplate`. Both stay — precise-but-manual beside
+  ergonomic-but-coarse. See `tasks/task-07-fault-detection.md`.
+- **`@Scenario(expect = FAIL)` inverts the template, not the oracle.** The Phase 2
+  ergonomic path needs the `@Scenario` template — which normally asserts every step
+  *passes* — to instead treat a failing step as success. Rather than a second template or a
+  bespoke fault annotation, an `Expect { PASS, FAIL }` enum + `expect()` attribute flips
+  the `ScenarioTemplateProvider`'s verdict handling: in `FAIL` mode a failing step is the
+  green success (rest skipped) and an all-pass run fails the test. `PASS` is the default, so
+  every existing suite is untouched, and the oracle itself is unchanged — only the harness's
+  interpretation of its verdict differs.
+- **`@EnableBug` carries its own extension; the toggle brackets each step.** Bug selection
+  is a demo concern, so `@EnableBug(Bug)` lives in the demo's `src/test` and meta-annotates
+  `@ExtendWith(BugInjectionExtension.class)` — annotating a method is all it takes, no
+  class-level wiring. Because a `@Scenario` is a `@TestTemplate`, the extension's
+  before/after-each fire per step invocation, so it (re-)enables the bug before every step
+  and clears it after: active for the whole scenario, reset once done.
 
 ## OpenAPI discovery (optional plugin)
 

@@ -21,7 +21,7 @@ import io.inquisitor.harness.junit.Scenario;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
- * The positive scenario suite, run through the ergonomic harness JUnit layer. Each
+ * The shared scenario suite, run through the ergonomic harness JUnit layer. Each
  * {@link Scenario @Scenario} method is one scenario (its markdown resolved from the
  * method name) and every {@code ## Step} is reported as its own sub-test.
  *
@@ -39,7 +39,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @RequiresLlm
-abstract class PositiveScenarioSuite {
+abstract class ScenarioSuite {
 
     @Scenario
     void accountNotFound() {}

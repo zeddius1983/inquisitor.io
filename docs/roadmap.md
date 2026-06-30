@@ -19,7 +19,7 @@ The authoritative status is git history + this table.
 | 05b | `inquisitor-harness-junit` + `-junit-starter` (`@Harness`/`@Scenario` ergonomic layer) | ✅ done |
 | —  | Scenario style buckets (`explicit`/`cucumber`/`intent`); flattened (no `positive`/`negative` split) | ✅ done |
 | 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
-| 07 | Fault detection (oracle calibration) — runtime fault router + `FaultDetectionTests` | ✅ Phase 1 done · Phase 2 (`@Harness`) planned (`tasks/task-07`) |
+| 07 | Fault detection (oracle calibration) — runtime fault router + standalone & `@Harness` suites | ✅ Phase 1 & 2 done (`tasks/task-07`) |
 | 08 | `benchmark` Gradle task (trustworthy-green) | 📝 planned (`tasks/task-08`) |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
@@ -40,11 +40,12 @@ The authoritative status is git history + this table.
   scenarios can be written as natural-language **intent** with no endpoints (see the
   `scenarios/intent` bucket + `IntentScenarioSuiteTest`). The demo serves a
   static `openapi.yaml` at `/v3/api-docs.yaml`; real consumers can use springdoc.
-- **Fault detection Phase 1 is in** (task-07): oracle calibration via mutation testing —
-  `FaultDetectionTests` runs correct scenarios against a deliberately buggy build (a
-  `@Primary` `AccountServiceRouter` switching in `BuggyAccountServiceImpl` per enabled
-  `Bug`) and asserts the model reports the failure. Phase 2 (running fault detection
-  through the `@Harness` layer via `@EnableBug` + `@Scenario(expect = FAIL)`) is planned.
+- **Fault detection is in** (task-07): oracle calibration via mutation testing — correct
+  scenarios run against a deliberately buggy build (a `@Primary` `AccountServiceRouter`
+  switching in `BuggyAccountServiceImpl` per enabled `Bug`), with the model expected to
+  report the failure. Phase 1 is the standalone `FaultDetectionTests`; Phase 2 brings it
+  to the ergonomic `@Harness` layer via `@Scenario(expect = FAIL)` (core) + `@EnableBug`
+  (demo), exercised by `FaultDetectionSuiteTest`.
 - The **`benchmark`** task (task-08) is planned — see `tasks/`.
 - **OpenAPI context-size optimisation** (task-10) is planned: size-gated modes in the
   openapi plugin instead of injecting the whole raw spec every round-trip — a
