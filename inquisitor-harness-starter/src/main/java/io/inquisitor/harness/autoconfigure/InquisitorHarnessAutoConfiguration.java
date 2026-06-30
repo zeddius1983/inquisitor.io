@@ -32,6 +32,7 @@ import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
 import io.inquisitor.harness.tool.HttpTarget;
 import io.inquisitor.harness.tool.HttpTargetRegistry;
+import io.inquisitor.harness.tool.RecordingToolCallback;
 import io.inquisitor.harness.tool.SqlTool;
 import lombok.val;
 import org.springframework.ai.chat.client.ChatClient;
@@ -41,6 +42,7 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.ObjectProvider;
@@ -131,12 +133,25 @@ public class InquisitorHarnessAutoConfiguration {
             SqlTool sqlTool,
             ObjectProvider<ToolCallback> toolCallbacks,
             ObjectProvider<ToolCallbackProvider> toolCallbackProviders,
-            ObjectProvider<Advisor> advisors) {
+            ObjectProvider<Advisor> advisors,
+            InquisitorHarnessProperties properties) {
 
         // Spring AI's unified defaultTools(Object...) accepts tool objects, ToolCallbacks,
         // and ToolCallbackProviders alike, so built-ins and user-supplied tools go together.
-        val tools = new ArrayList<>(List.of(httpRequestTool, sqlTool));
-        toolCallbacks.orderedStream().forEach(tools::add);
+        // With credibility evaluation on, the callable tools are wrapped to record each call
+        // (the ledger the judge audits against); a normal run uses the raw tools, unwrapped.
+        val record = properties.evaluation().enabled();
+        val tools = new ArrayList<>();
+        if (record) {
+            for (val callback : ToolCallbacks.from(httpRequestTool, sqlTool)) {
+                tools.add(new RecordingToolCallback(callback));
+            }
+            toolCallbacks.orderedStream().forEach(callback -> tools.add(new RecordingToolCallback(callback)));
+        } else {
+            tools.add(httpRequestTool);
+            tools.add(sqlTool);
+            toolCallbacks.orderedStream().forEach(tools::add);
+        }
         toolCallbackProviders.orderedStream().forEach(tools::add);
 
         // Built-in advisors first, then any contributed by the context (e.g. the optional
@@ -156,10 +171,12 @@ public class InquisitorHarnessAutoConfiguration {
                 .build();
     }
 
+    // Concrete type so the evaluation autoconfiguration can inject and wrap it. It is a
+    // StepRunner, so it satisfies the executor below unless a @Primary wrapper is present.
     @Bean
     @ConditionalOnBean(ChatClient.class)
     @ConditionalOnMissingBean
-    StepRunner inquisitorStepRunner(ChatClient chatClient) {
+    LlmStepRunner inquisitorLlmStepRunner(ChatClient chatClient) {
         return new LlmStepRunner(chatClient);
     }
 

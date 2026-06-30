@@ -1,1 +1,2 @@
 io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration
+io.inquisitor.harness.autoconfigure.InquisitorEvaluationAutoConfiguration
