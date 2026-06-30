@@ -70,7 +70,7 @@ Therefore:
 - **Flatten** `scenarios/positive/{explicit,cucumber,intent}` →
   `scenarios/{explicit,cucumber,intent}` (the `positive/` qualifier is now
   redundant). Update each suite's `scenarioDir`: `ScenarioTests` (standalone),
-  `PositiveScenarioSuite` subclasses (`ExplicitScenarioSuiteTest`,
+  `ScenarioSuite` subclasses (`ExplicitScenarioSuiteTest`,
   `CucumberScenarioSuiteTest`), and `IntentScenarioSuiteTest`. Mechanical.
 - The "this scenario should fail under bug X at step Y" knowledge lives in the
   **fault-detection test code**, not in any markdown.
@@ -248,8 +248,6 @@ them as calibration. Strong models (the 31B; reasoning-on configs) should be sta
 ## Out of scope (possible follow-ups)
 
 - A larger bug catalogue (one per service method).
-- Renaming `PositiveScenarioSuite` now that there's no negative counterpart — leave
-  it; "positive" still contrasts with fault detection.
 - Automating the detection-rate metric into a report.
 
 ## Verification

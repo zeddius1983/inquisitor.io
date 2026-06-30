@@ -136,7 +136,7 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **Standalone `ScenarioTests` kept alongside the JUnit suites.** The demo
   exercises both paths: `ScenarioTests` asserts on `ScenarioResult` via the
   JUnit-free contract (compatibility), while the `@Harness`/`@Scenario` layer is run
-  by `PositiveScenarioSuite` subclasses. Both are gated with `@RequiresLlm`.
+  by `ScenarioSuite` subclasses. Both are gated with `@RequiresLlm`.
 - **LLM gating is a separate `@RequiresLlm`, not folded into `@Harness`.** `@Harness`
   stays a pure capability marker; gating is an opt-in companion annotation. Baking the
   gate into `@Harness` would couple the published API to one CI convention and, worse,
@@ -163,7 +163,7 @@ see [roadmap.md](roadmap.md); for stable repo context see
   same scenarios are written in different engineering voices — `explicit` (prescriptive:
   fenced requests + bulleted asserts), `cucumber` (Gherkin Given/When/Then), and
   `intent` (pure natural-language intent, no endpoints) — so we can measure how a
-  model copes with each. The ergonomic suite is an abstract `PositiveScenarioSuite`
+  model copes with each. The ergonomic suite is an abstract `ScenarioSuite`
   bound to a bucket by each subclass (`ExplicitScenarioSuiteTest`,
   `CucumberScenarioSuiteTest`); `intent` runs via `IntentScenarioSuiteTest`, which
   needs OpenAPI discovery.

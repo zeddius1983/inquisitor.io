@@ -122,7 +122,7 @@ class + one `@Scenario` method per scenario; `@Scenario` is a `@TestTemplate` th
 reports one sub-test per step) and re-exported by
 `inquisitor-harness-junit-starter`. The demo exercises both surfaces: the gated
 `ScenarioTests` (standalone, JUnit-free contract) and the `@Harness`/`@Scenario`
-suite (`PositiveScenarioSuite`, bound to a style bucket by each subclass —
+suite (`ScenarioSuite`, bound to a style bucket by each subclass —
 `ExplicitScenarioSuiteTest`, `CucumberScenarioSuiteTest`; `IntentScenarioSuiteTest`
 for the natural-language bucket). Oracle calibration runs through `FaultDetectionTests`
 (see below).

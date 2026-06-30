@@ -20,7 +20,7 @@ import io.inquisitor.harness.junit.Harness;
 import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
 
 /**
- * Runs the positive suite against the <em>cucumber</em> style bucket — the same
+ * Runs the shared suite against the <em>cucumber</em> style bucket — the same
  * scenarios written in Gherkin {@code Given}/{@code When}/{@code Then} form.
  *
  * <p>OpenAPI discovery is enabled here via {@link EnableOpenApiDiscovery}: the Gherkin
@@ -32,4 +32,4 @@ import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
  */
 @Harness(scenarioDir = "classpath:scenarios/cucumber/")
 @EnableOpenApiDiscovery
-class CucumberScenarioSuiteTest extends PositiveScenarioSuite {}
+class CucumberScenarioSuiteTest extends ScenarioSuite {}
