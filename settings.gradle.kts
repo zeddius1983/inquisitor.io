@@ -22,6 +22,8 @@ include(
     "inquisitor-harness-junit-starter",
     "inquisitor-harness-openapi",
     "inquisitor-harness-openapi-starter",
+    "inquisitor-harness-evaluation",
+    "inquisitor-harness-evaluation-starter",
     "inquisitor-mock",
     "inquisitor-mock-starter",
     "inquisitor-demo-db-starter",

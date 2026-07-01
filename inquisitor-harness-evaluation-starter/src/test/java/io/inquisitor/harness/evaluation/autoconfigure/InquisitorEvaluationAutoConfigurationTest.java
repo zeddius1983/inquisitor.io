@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.autoconfigure;
+package io.inquisitor.harness.evaluation.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
 import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
 import io.inquisitor.harness.executor.LlmStepRunner;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.tool;
+package io.inquisitor.harness.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.inquisitor.harness.model.ToolCallRecord;
+import io.inquisitor.harness.tool.TraceKeys;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;

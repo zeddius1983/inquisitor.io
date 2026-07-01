@@ -32,7 +32,6 @@ import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
 import io.inquisitor.harness.tool.HttpTarget;
 import io.inquisitor.harness.tool.HttpTargetRegistry;
-import io.inquisitor.harness.tool.RecordingToolCallback;
 import io.inquisitor.harness.tool.SqlTool;
 import lombok.val;
 import org.springframework.ai.chat.client.ChatClient;
@@ -117,6 +116,22 @@ public class InquisitorHarnessAutoConfiguration {
         return new SqlTool(registry);
     }
 
+    // The built-in tools are exposed as individual ToolCallback beans (each tool has one
+    // @Tool method) so the optional evaluation starter can decorate them — a
+    // BeanPostProcessor wrapping each ToolCallback to record its calls — without the core
+    // depending on evaluation. The ChatClient below aggregates all ToolCallback beans.
+    @Bean
+    @ConditionalOnMissingBean(name = "inquisitorHttpRequestToolCallback")
+    ToolCallback inquisitorHttpRequestToolCallback(HttpRequestTool httpRequestTool) {
+        return ToolCallbacks.from(httpRequestTool)[0];
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "inquisitorSqlToolCallback")
+    ToolCallback inquisitorSqlToolCallback(SqlTool sqlTool) {
+        return ToolCallbacks.from(sqlTool)[0];
+    }
+
     @Bean
     @ConditionalOnMissingBean
     ScenarioParser inquisitorScenarioParser() {
@@ -129,29 +144,17 @@ public class InquisitorHarnessAutoConfiguration {
     ChatClient inquisitorChatClient(
             ChatModel chatModel,
             ChatMemory chatMemory,
-            HttpRequestTool httpRequestTool,
-            SqlTool sqlTool,
             ObjectProvider<ToolCallback> toolCallbacks,
             ObjectProvider<ToolCallbackProvider> toolCallbackProviders,
-            ObjectProvider<Advisor> advisors,
-            InquisitorHarnessProperties properties) {
+            ObjectProvider<Advisor> advisors) {
 
-        // Spring AI's unified defaultTools(Object...) accepts tool objects, ToolCallbacks,
-        // and ToolCallbackProviders alike, so built-ins and user-supplied tools go together.
-        // With credibility evaluation on, the callable tools are wrapped to record each call
-        // (the ledger the judge audits against); a normal run uses the raw tools, unwrapped.
-        val record = properties.evaluation().enabled();
+        // Every tool the model may call, as ToolCallbacks: the built-in HTTP/SQL adapters,
+        // any user-supplied ToolCallback beans, and any ToolCallbackProvider beans (e.g.
+        // MCP). Spring AI's unified defaultTools(Object...) takes callbacks and providers
+        // alike. When the evaluation starter is active it has already decorated each
+        // ToolCallback bean to record calls; the core is unaware of that here.
         val tools = new ArrayList<>();
-        if (record) {
-            for (val callback : ToolCallbacks.from(httpRequestTool, sqlTool)) {
-                tools.add(new RecordingToolCallback(callback));
-            }
-            toolCallbacks.orderedStream().forEach(callback -> tools.add(new RecordingToolCallback(callback)));
-        } else {
-            tools.add(httpRequestTool);
-            tools.add(sqlTool);
-            toolCallbacks.orderedStream().forEach(tools::add);
-        }
+        toolCallbacks.orderedStream().forEach(tools::add);
         toolCallbackProviders.orderedStream().forEach(tools::add);
 
         // Built-in advisors first, then any contributed by the context (e.g. the optional

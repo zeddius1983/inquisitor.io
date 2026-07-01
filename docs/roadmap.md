@@ -51,8 +51,11 @@ The authoritative status is git history + this table.
   against the real tool-call trace (captured via `ToolContext`), producing a per-suite
   **credibility %** (`100% passed / 85% credible`). **Core has landed**: the `StepRunner`
   seam (`LlmStepRunner` + `EvaluationStepRunner`), the `ToolCallRecord` ledger,
-  the `StepEvaluator`/`StepEvaluationRecorder`, and autoconfig gated on
-  `inquisitor.harness.evaluation.enabled` (off by default). **Pending**: the
+  the `StepEvaluator`/`StepEvaluationRecorder`, all now extracted into optional
+  `inquisitor-harness-evaluation` / `-starter` modules (like OpenAPI) and gated on
+  `inquisitor.harness.evaluation.enabled` (off by default). The core keeps only the
+  trace seam (`TraceKeys`/`ToolCallRecord`/`StepRun`); the starter decorates the
+  harness's `ToolCallback` beans via a `BeanPostProcessor`. **Pending**: the
   `harness:evaluate` Gradle task and the JSON + Markdown report. See
   `tasks/task-08-evaluation.md`.
 - **OpenAPI context-size optimisation** (task-10) is planned: size-gated modes in the

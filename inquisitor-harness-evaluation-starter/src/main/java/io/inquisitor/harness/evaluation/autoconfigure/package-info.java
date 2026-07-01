@@ -14,20 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.tool;
+@NullMarked
+package io.inquisitor.harness.evaluation.autoconfigure;
 
-/**
- * Keys for data passed to tools out-of-band through Spring AI's {@code ToolContext}.
- */
-public final class TraceKeys {
-
-    /**
-     * Holds the per-call {@code List<ToolCallRecord>} ledger that a recording tool
-     * callback appends to. Absent unless the runner installs it (a fresh list per step);
-     * populated only when the optional evaluation module decorates the tools.
-     */
-    public static final String LEDGER = "inquisitor.toolCallLedger";
-
-    private TraceKeys() {
-    }
-}
+import org.jspecify.annotations.NullMarked;
