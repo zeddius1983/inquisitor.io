@@ -8,8 +8,10 @@ tool-call trace. It records a per-step credibility score, aggregates a suite-lev
 
 > 100% of steps passed — but credibility is only **85%**.
 
-> Status: **planned — awaiting review.** No code yet. Open design decisions are
-> marked **[DECIDE]**.
+> Status: **in progress.** The core and the optional-module split have landed on
+> `feature/evaluation`; the `harness:evaluate` Gradle task and the report are the
+> remaining work (Phase C). Design decisions once marked **[DECIDE]** are resolved
+> inline below.
 
 ## Why
 
@@ -81,6 +83,16 @@ gate** — same alignment as task-07. The deterministic gates below stay cheap a
   (still-unbuilt) detection-% column.
 
 ## Design
+
+**Module layout.** Evaluation ships as two optional modules mirroring the OpenAPI
+plugin: **`inquisitor-harness-evaluation`** (the judge — `StepEvaluator`,
+`EvaluationCategory`, `StepEvaluationResult`/`Record`, `StepEvaluationRecorder`,
+`EvaluationStepRunner` — plus `RecordingToolCallback` and `EvaluationProperties`) and
+**`inquisitor-harness-evaluation-starter`** (`InquisitorEvaluationAutoConfiguration`). The
+harness core keeps only the trace *seam* — `StepRunner`/`StepRun`, `ToolCallRecord`, and
+`TraceKeys` (the `ToolContext` ledger key); `LlmStepRunner` threads the ledger
+unconditionally. The core references nothing in the evaluation modules, so dropping both
+leaves a working, unevaluated harness (the OpenAPI-grade removal bar).
 
 ### 1. Rename the step seam: `StepRunner` (frees "Evaluator" for scoring)
 
@@ -156,8 +168,10 @@ per-call `Map` the framework threads to every `ToolCallback.call(input, toolCont
 
 Per-call ledger instance ⇒ thread-safe under parallel tool execution *and* parallel
 scenarios — no ThreadLocal side-channel, no log parsing, no global bean for the trace.
-The wrapping is applied **only in the evaluation-enabled context**, so a normal run has
-zero wrapping and zero overhead.
+The wrapping lives in the optional evaluation starter — a `BeanPostProcessor` that
+decorates every `ToolCallback` bean with `RecordingToolCallback` when
+`inquisitor.harness.evaluation.enabled=true` — so the core knows nothing about it and a
+normal run has zero wrapping and zero overhead.
 
 **Why not `ToolCallingAdvisor`?** It *relocates* tool execution into the advisor chain so
 you can *control* it (retry, approve, short-circuit, mutate). We only want to *observe*.
@@ -311,10 +325,11 @@ over the steps. A run can be 100% passed / 85% credible — that gap is the head
 
 ### 6. Gradle surface — `harness:evaluate` (demo task first, plugin second)
 
-The real mechanism lives in the **starter**, not the plugin: a flag
-(`inquisitor.harness.evaluation.enabled=true`) that the junit-starter autoconfig reads to
-**wrap the actor `LlmStepRunner` with `EvaluationStepRunner`** and apply the
-`RecordingToolCallback` wrapping. The Gradle task is sugar on top: it sets the flag + the
+The real mechanism lives in the optional **`inquisitor-harness-evaluation-starter`**, not
+the Gradle plugin: a flag (`inquisitor.harness.evaluation.enabled=true`) gates its
+autoconfig, which **decorates each `ToolCallback` bean with `RecordingToolCallback`** (a
+`BeanPostProcessor`) and **wraps the actor `LlmStepRunner` with `EvaluationStepRunner`** (a
+`@Primary StepRunner`). The Gradle task is sugar on top: it sets the flag + the
 evaluator-model env, runs the existing JUnit suite, then renders the report.
 
 ```bash
@@ -379,6 +394,8 @@ add later as an opt-in second pass that populates a detection-% column — out o
 
 - `docs/roadmap.md` (task row), `docs/decisions.md` (why a second-LLM credibility check
   grounded on the real trace; `ToolContext` capture over ThreadLocal / `ToolCallingAdvisor`;
-  the `StepRunner` rename; evaluator-model independence), `README.md` (generated
+  the `StepRunner` rename; evaluator-model independence; the optional-module split with the
+  core keeping only the trace seam and the starter decorating `ToolCallback` beans via a
+  `BeanPostProcessor`), `README.md` (generated
   verified-models table with the credibility column; `harness:evaluate` usage),
   `CLAUDE.md` (build commands + the `StepRunner` rename), this file (status → implemented).
