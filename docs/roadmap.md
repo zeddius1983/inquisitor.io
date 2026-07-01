@@ -20,7 +20,7 @@ The authoritative status is git history + this table.
 | —  | Scenario style buckets (`explicit`/`cucumber`/`intent`); flattened (no `positive`/`negative` split) | ✅ done |
 | 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
 | 07 | Fault detection (oracle calibration) — runtime fault router + standalone & `@Harness` suites | ✅ Phase 1 & 2 done (`tasks/task-07`) |
-| 08 | `benchmark` Gradle task (trustworthy-green) | 📝 planned (`tasks/task-08`) |
+| 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); Gradle task + report pending (`tasks/task-08`) |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
@@ -46,7 +46,18 @@ The authoritative status is git history + this table.
   report the failure. Phase 1 is the standalone `FaultDetectionTests`; Phase 2 brings it
   to the ergonomic `@Harness` layer via `@Scenario(expect = FAIL)` (core) + `@EnableBug`
   (demo), exercised by `FaultDetectionSuiteTest`.
-- The **`benchmark`** task (task-08) is planned — see `tasks/`.
+- **Step evaluation** (task-08) is in progress: a `harness:evaluate` mode that scores
+  how *earned* each green verdict is — a second, independent LLM judges the actor's claim
+  against the real tool-call trace (captured via `ToolContext`), producing a per-suite
+  **evaluation score** (`100% passed / 85% score`). **Core has landed**: the `StepRunner`
+  seam (`LlmStepRunner` + `EvaluationStepRunner`), the `ToolCallRecord` ledger,
+  the `StepEvaluator`/`StepEvaluationRecorder`, all now extracted into optional
+  `inquisitor-harness-evaluation` / `-starter` modules (like OpenAPI) and gated on
+  `inquisitor.harness.evaluation.enabled` (off by default). The core keeps only the
+  trace seam (`TraceKeys`/`ToolCallRecord`/`StepRun`); the starter decorates the
+  harness's `ToolCallback` beans via a `BeanPostProcessor`. **Pending**: the
+  `harness:evaluate` Gradle task and the JSON + Markdown report. See
+  `tasks/task-08-evaluation.md`.
 - **OpenAPI context-size optimisation** (task-10) is planned: size-gated modes in the
   openapi plugin instead of injecting the whole raw spec every round-trip — a
   **deterministic digest** (compact operation signatures + a type dictionary, rendered

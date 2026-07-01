@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
-import io.inquisitor.harness.executor.ScenarioEvaluation;
+import io.inquisitor.harness.executor.ScenarioExecution;
 import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.Step;
@@ -45,7 +45,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 /**
  * Drives a {@link io.inquisitor.harness.junit.Scenario @Scenario} method as a JUnit
  * {@code @TestTemplate}: it parses the scenario markdown and emits one invocation
- * (sub-test) per {@code ## Step}, all sharing a single {@link ScenarioEvaluation} so
+ * (sub-test) per {@code ## Step}, all sharing a single {@link ScenarioExecution} so
  * an id created in step 1 flows on via chat memory. Evaluation is fail-fast — once a
  * step fails, the remaining steps are reported as skipped.
  */
@@ -70,7 +70,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                         context.getRequiredTestMethod(), io.inquisitor.harness.junit.Scenario.class)
                 .map(io.inquisitor.harness.junit.Scenario::expect)
                 .orElse(Expect.PASS);
-        // One evaluation shared by every step invocation of this method; they execute
+        // One execution shared by every step invocation of this method; they run
         // sequentially, so each invocation advances the same conversation in order.
         val state = new ScenarioState(executor.start(scenario), expect);
 
@@ -108,13 +108,13 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
     /** Mutable per-scenario state shared across the step invocations. */
     private static final class ScenarioState {
-        private final ScenarioEvaluation evaluation;
+        private final ScenarioExecution execution;
         private final Expect expect;
         /** Set once no further steps should run: a step failed (PASS), or the expected failure landed (FAIL). */
         private boolean done;
 
-        ScenarioState(ScenarioEvaluation evaluation, Expect expect) {
-            this.evaluation = evaluation;
+        ScenarioState(ScenarioExecution execution, Expect expect) {
+            this.execution = execution;
             this.expect = expect;
         }
     }
@@ -142,7 +142,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                         ? "skipped: the scenario already failed as expected at an earlier step"
                         : "skipped: an earlier step in this scenario failed");
             }
-            val result = state.evaluation.next();
+            val result = state.execution.next();
 
             if (state.expect == Expect.FAIL) {
                 if (!result.passed()) {
@@ -151,8 +151,8 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                     return;
                 }
                 // This step passed; once it was the last one, the oracle never caught the fault.
-                // (Safe to read hasNext() here: the step passed, so the evaluation is not failed.)
-                if (!state.evaluation.hasNext()) {
+                // (Safe to read hasNext() here: the step passed, so the execution is not failed.)
+                if (!state.execution.hasNext()) {
                     state.done = true;
                     throw new AssertionError("Expected this scenario to FAIL, but every step passed — "
                             + "the oracle did not catch the fault.\n" + describe(result));

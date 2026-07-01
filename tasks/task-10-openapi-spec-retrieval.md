@@ -172,8 +172,8 @@ entirely (the model drives lookups).
 - **More inference, fewer tokens (mode A)** — TOC + lookup tool trades context size for
   extra tool round-trips; net win only when the spec is large. Hence size-gating.
 - **Added non-determinism** — narrowing what the model sees changes its choices; ties to
-  oracle calibration ([task-07](task-07-fault-detection.md)) and the benchmark trace
-  ([task-08](task-08-benchmark-task.md), which can assert the right endpoint was hit).
+  oracle calibration ([task-07](task-07-fault-detection.md)) and the evaluation trace
+  ([task-08](task-08-evaluation.md), which can assert the right endpoint was hit).
 
 ## Out of scope (possible follow-ups)
 

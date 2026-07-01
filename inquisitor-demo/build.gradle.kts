@@ -22,6 +22,9 @@ dependencies {
     testImplementation(project(":inquisitor-harness-junit-starter"))
     // Optional OpenAPI discovery, exercised by IntentScenarioSuiteTest.
     testImplementation(project(":inquisitor-harness-openapi-starter"))
+    // Optional step evaluation (LLM-as-judge), exercised by ScenarioTests when
+    // INQUISITOR_EVAL=true. Inert otherwise (autoconfig gated on the enabled flag).
+    testImplementation(project(":inquisitor-harness-evaluation-starter"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

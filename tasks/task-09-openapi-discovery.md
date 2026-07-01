@@ -210,7 +210,7 @@ historically tracked Boot 3 / Framework 6, so this is the main unknown.
   badly → size-gated digest follow-up.
 - **Added non-determinism** — letting the model pick endpoints widens variance; ties
   directly to oracle calibration ([task-07](task-07-fault-detection.md)) and the
-  benchmark trace ([task-08](task-08-benchmark-task.md) can assert the *right* endpoint
+  evaluation trace ([task-08](task-08-evaluation.md) can assert the *right* endpoint
   was hit).
 - **Spec leaves the building** — the spec is sent to the (possibly remote) LLM; worth
   a README note for consumers with sensitive/large APIs.
