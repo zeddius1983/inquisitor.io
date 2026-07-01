@@ -18,27 +18,12 @@ package io.inquisitor.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-
 import io.inquisitor.demo.service.AccountServiceRouter;
 import io.inquisitor.demo.service.Bug;
-import io.inquisitor.harness.HarnessDefaults;
-import io.inquisitor.harness.executor.ScenarioExecutor;
-import io.inquisitor.harness.junit.RequiresLlm;
-import io.inquisitor.harness.model.ScenarioResult;
-import io.inquisitor.harness.parser.ScenarioParser;
-import io.inquisitor.harness.tool.HttpTarget;
-import io.inquisitor.harness.tool.HttpTargetRegistry;
 import lombok.val;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.core.io.ClassPathResource;
 
 /**
  * Oracle calibration via mutation testing: runs the <em>correct</em> positive
@@ -47,33 +32,18 @@ import org.springframework.core.io.ClassPathResource;
  * success condition — it proves the oracle catches a real defect instead of
  * rubber-stamping it. See {@code tasks/task-07-fault-detection.md}.
  *
+ * <p>The harness plumbing (target registration, parsing, and the optional evaluation
+ * read-out) is shared with {@link ScenarioTests} through {@link AbstractScenarioTests};
+ * this class only adds the bug injection and the fault-detection assertions.
+ *
  * <p>Bugs are injected through the {@code @Primary} {@link AccountServiceRouter},
  * enabled per test and reset in {@link #clearBugs()}. Like the rest of the LLM suite
  * this is gated: run with {@code INQUISITOR_LLM_IT=true}.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@RequiresLlm
-class FaultDetectionTests {
-
-    @Autowired
-    private ScenarioExecutor executor;
-
-    @Autowired
-    private ScenarioParser parser;
-
-    @Autowired
-    private HttpTargetRegistry httpTargetRegistry;
+class FaultDetectionTests extends AbstractScenarioTests {
 
     @Autowired
     private AccountServiceRouter router;
-
-    @LocalServerPort
-    private int port;
-
-    @BeforeEach
-    void registerApplicationTarget() {
-        httpTargetRegistry.register(HarnessDefaults.APPLICATION, HttpTarget.of("http://localhost:" + port));
-    }
 
     @AfterEach
     void clearBugs() {
@@ -101,9 +71,12 @@ class FaultDetectionTests {
     private void runExpectingFailureAt(Bug bug, String classpathLocation, String expectedStepTitleFragment) {
         router.enableBug(bug);
 
-        val resource = new ClassPathResource(classpathLocation);
-        val scenario = parser.parse(read(resource), resource.getFilename());
+        val scenario = parse(classpathLocation);
+        val recordedBefore = recordedCount();
         val result = executor.execute(scenario);
+        // The suite drives the same scenario under different bugs, so tag the read-out
+        // with the seeded bug to keep the two open-account runs distinct.
+        reportEvaluation("scenario '" + scenario.name() + "' under " + bug, recordedBefore);
 
         // The model must NOT have passed everything — that would be a false positive
         // (it failed to notice the seeded bug).
@@ -117,26 +90,5 @@ class FaultDetectionTests {
         assertThat(failure.get().step().title())
                 .withFailMessage(() -> "Scenario failed at the wrong step:\n" + describe(result))
                 .containsIgnoringCase(expectedStepTitleFragment);
-    }
-
-    private static String read(ClassPathResource resource) {
-        try {
-            return resource.getContentAsString(StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not read scenario " + resource.getPath(), e);
-        }
-    }
-
-    private static String describe(ScenarioResult result) {
-        val message = new StringBuilder("Scenario '").append(result.scenario().name()).append("' result:\n");
-        for (val step : result.results()) {
-            val verdict = step.verdict();
-            message.append("  [").append(verdict.outcome()).append("] ")
-                    .append(step.step().title()).append(" — ").append(verdict.reasoning()).append('\n');
-            if (!step.passed() && !verdict.evidence().isEmpty()) {
-                message.append("      evidence: ").append(verdict.evidence()).append('\n');
-            }
-        }
-        return message.toString();
     }
 }
