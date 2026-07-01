@@ -50,8 +50,8 @@ The authoritative status is git history + this table.
   how *earned* each green verdict is — a second, independent LLM judges the actor's claim
   against the real tool-call trace (captured via `ToolContext`), producing a per-suite
   **credibility %** (`100% passed / 85% credible`). **Core has landed**: the `StepRunner`
-  seam (`LlmStepRunner` + `CredibilityEvaluationStepRunner`), the `ToolCallRecord` ledger,
-  the `CredibilityEvaluator`/`CredibilityRecorder`, and autoconfig gated on
+  seam (`LlmStepRunner` + `EvaluationStepRunner`), the `ToolCallRecord` ledger,
+  the `StepEvaluator`/`StepEvaluationRecorder`, and autoconfig gated on
   `inquisitor.harness.evaluation.enabled` (off by default). **Pending**: the
   `harness:evaluate` Gradle task and the JSON + Markdown report. See
   `tasks/task-08-evaluation.md`.

@@ -68,7 +68,7 @@ gate** — same alignment as task-07. The deterministic gates below stay cheap a
 
 ## Goals
 
-- A `CredibilityEvaluationStepRunner` decorator that, after each step, scores the
+- A `EvaluationStepRunner` decorator that, after each step, scores the
   actor's verdict against the real tool trace using a Spring AI `Evaluator` backed by a
   separate model, and records the score.
 - Tool-call capture as typed `ToolCallRecord`s, scoped per step, with **no change to the
@@ -91,7 +91,7 @@ once scoring enters. Rename the *driving* seam so "Evaluator" means *scoring onl
 |-------|---------|
 | `StepEvaluator` (interface) | **`StepRunner`** |
 | `ChatClientStepEvaluator` | **`LlmStepRunner`** |
-| — | **`CredibilityEvaluationStepRunner`** (decorator) |
+| — | **`EvaluationStepRunner`** (decorator) |
 
 The runner returns the verdict **plus the trace it produced**, so the decorator reads
 the trace straight off the return value — no global state:
@@ -171,7 +171,7 @@ per-call report detail. A bare string is lossy.
 
 ### 3. The credibility evaluator (Spring AI `Evaluator`, grounded on the real trace)
 
-`CredibilityEvaluationStepRunner` is a transparent decorator: it returns the actor's
+`EvaluationStepRunner` is a transparent decorator: it returns the actor's
 verdict untouched and only records a score on the side.
 
 ```java
@@ -298,7 +298,7 @@ over the steps. A run can be 100% passed / 85% credible — that gap is the head
 
 ### 5. Recorder + report
 
-- **`CredibilityRecorder`** — a shared output sink (concurrent, keyed by scenario × step)
+- **`StepEvaluationRecorder`** — a shared output sink (concurrent, keyed by scenario × step)
   collecting `(score, feedback)`; the only cross-step shared state. Aggregates to a
   suite-level credibility %.
 - **Console summary** + a written artifact in **both** formats: JSON as the artifact of
@@ -313,7 +313,7 @@ over the steps. A run can be 100% passed / 85% credible — that gap is the head
 
 The real mechanism lives in the **starter**, not the plugin: a flag
 (`inquisitor.harness.evaluation.enabled=true`) that the junit-starter autoconfig reads to
-**wrap the actor `LlmStepRunner` with `CredibilityEvaluationStepRunner`** and apply the
+**wrap the actor `LlmStepRunner` with `EvaluationStepRunner`** and apply the
 `RecordingToolCallback` wrapping. The Gradle task is sugar on top: it sets the flag + the
 evaluator-model env, runs the existing JUnit suite, then renders the report.
 
