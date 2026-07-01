@@ -24,7 +24,7 @@ import java.time.Duration;
  * (it really called the tools it claims, and the results match what they returned).
  *
  * <p>Captured structurally rather than by parsing log lines, so it stays stable for
- * the credibility evaluator and the report. Rendered to text only at the boundary
+ * the evaluator and the report. Rendered to text only at the boundary
  * where it is shown to the judge.
  *
  * @param toolName  the invoked tool's name (e.g. {@code httpRequest}, {@code sqlQuery})

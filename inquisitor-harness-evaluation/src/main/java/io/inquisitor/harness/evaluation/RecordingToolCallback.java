@@ -30,7 +30,7 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
 
 /**
  * Wraps a {@link ToolCallback} to append a {@link ToolCallRecord} for every invocation,
- * giving the credibility evaluator an out-of-band trace of what the model actually did.
+ * giving the evaluator an out-of-band trace of what the model actually did.
  *
  * <p>The ledger is found in the {@code ToolContext} under {@link TraceKeys#LEDGER}; the
  * runner installs a fresh one per step. If no ledger is present (a normal, non-evaluated

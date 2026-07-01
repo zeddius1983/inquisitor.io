@@ -19,12 +19,12 @@ package io.inquisitor.harness.evaluation;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One step's recorded credibility result, for the report.
+ * One step's recorded evaluation result, for the report.
  *
  * @param scenario  the scenario name
  * @param stepIndex the 1-based step position
  * @param stepTitle the step heading
- * @param score     the 0.0–1.0 credibility score
+ * @param score     the 0.0–1.0 score
  * @param category  the {@link EvaluationCategory} name, or {@code null} if unavailable
  * @param feedback  the judge's findings, joined
  */

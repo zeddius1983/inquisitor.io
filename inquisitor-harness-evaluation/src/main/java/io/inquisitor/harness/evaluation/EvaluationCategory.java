@@ -18,7 +18,7 @@ package io.inquisitor.harness.evaluation;
 
 /**
  * How well a step's verdict is supported by the actual tool-call trace, as judged by
- * the credibility evaluator. A discrete classification (rather than a free-form number)
+ * the evaluator. A discrete classification (rather than a free-form number)
  * keeps a weaker judge model stable; the score mapping stays under our control.
  */
 public enum EvaluationCategory {
@@ -41,7 +41,7 @@ public enum EvaluationCategory {
         this.score = score;
     }
 
-    /** The 0.0–1.0 credibility score this category maps to. */
+    /** The 0.0–1.0 score this category maps to. */
     public double score() {
         return score;
     }

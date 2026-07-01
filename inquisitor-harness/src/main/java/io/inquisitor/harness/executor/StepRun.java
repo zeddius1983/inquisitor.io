@@ -26,7 +26,7 @@ import io.inquisitor.harness.model.ToolCallRecord;
  * tool calls it made while producing that verdict.
  *
  * <p>Surfacing the trace through the return value lets a decorating {@link StepRunner}
- * read it directly — with no thread-locals or shared state — to score how credible the
+ * read it directly — with no thread-locals or shared state — to score how well-grounded the
  * verdict is. The trace is empty unless tool-call capture is wired (only the
  * evaluation context wraps the tools to record).
  *

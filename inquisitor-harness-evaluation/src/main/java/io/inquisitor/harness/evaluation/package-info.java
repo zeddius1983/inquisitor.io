@@ -17,7 +17,7 @@
 /**
  * Step evaluation: a second, independent LLM judges whether a step's verdict is
  * <em>earned</em> by auditing the actor's claim against the real tool-call trace, rather
- * than trusting the actor's own verdict, producing a per-step credibility score. See
+ * than trusting the actor's own verdict, producing a per-step score. See
  * {@code tasks/task-08-evaluation.md}.
  */
 @NullMarked

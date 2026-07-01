@@ -1,12 +1,12 @@
-# Task 08 — Credibility evaluation (`harness:evaluate`) — trustworthy-green + model report
+# Task 08 — Step evaluation (`harness:evaluate`) — trustworthy-green + model report
 
 A harness mode that runs the demo scenarios against a configured model and scores
-how **credible** each step's PASS is — not by trusting the LLM's own verdict, but by
+how **well-grounded** each step's PASS is — not by trusting the LLM's own verdict, but by
 having a **second, independent LLM judge** the actor's claim against the *actual*
-tool-call trace. It records a per-step credibility score, aggregates a suite-level
-**credibility %**, and emits a report. The headline it can finally say honestly:
+tool-call trace. It records a per-step score, aggregates a suite-level
+**evaluation score**, and emits a report. The headline it can finally say honestly:
 
-> 100% of steps passed — but credibility is only **85%**.
+> 100% of steps passed — but the evaluation score is only **85%**.
 
 > Status: **in progress.** The core and the optional-module split have landed on
 > `feature/evaluation`; the `harness:evaluate` Gradle task and the report are the
@@ -38,7 +38,7 @@ They share one piece of infrastructure — a structured record of every tool cal
 **built once and reused by both**.
 
 Bonus payoff: this populates the README "Verified models" table (model ×
-quantization × reasoning → passed %, **credibility %**, duration — plus a future
+quantization × reasoning → passed %, **evaluation score**, duration — plus a future
 detection-% column) with *measured* data, and is a real consumer feature: score *your*
 model choice against *your* scenarios before trusting it.
 
@@ -65,7 +65,7 @@ both trust-critical:
    failure modes and will rubber-stamp its own fabrication — document a self-judge as
    the weakest configuration.
 
-The credibility score is **non-deterministic** and read as **calibration, not a hard
+The evaluation score is **non-deterministic** and read as **calibration, not a hard
 gate** — same alignment as task-07. The deterministic gates below stay cheap and free.
 
 ## Goals
@@ -76,7 +76,7 @@ gate** — same alignment as task-07. The deterministic gates below stay cheap a
 - Tool-call capture as typed `ToolCallRecord`s, scoped per step, with **no change to the
   harness's public behaviour** (capture is additive and only wired when evaluation is on).
 - Deterministic gates kept alongside the score (no skipped steps; all verdicts PASS).
-- A suite-level **credibility %** plus per-step detail, emitted as a report.
+- A suite-level **evaluation score** plus per-step detail, emitted as a report.
 - Delivered as a Gradle **`harness` task group** with an **`evaluate`** task; the
   consumer-facing shape (prototype in the demo build first, extract to a plugin).
 - Reuse the same tool-call ledger that task-07's fault suite can later use for a
@@ -183,7 +183,7 @@ gate, or tool-layer fault injection).
 nothing, renders trivially to the transcript the judge sees, and stays reusable for
 per-call report detail. A bare string is lossy.
 
-### 3. The credibility evaluator (Spring AI `Evaluator`, grounded on the real trace)
+### 3. The evaluator (Spring AI `Evaluator`, grounded on the real trace)
 
 `EvaluationStepRunner` is a transparent decorator: it returns the actor's
 verdict untouched and only records a score on the side.
@@ -235,7 +235,7 @@ far more reliable and keeps the numeric mapping under our control:
 | `UNSUPPORTED` | PASS/FAIL asserted with no tool result that entails it (e.g. "balance correct" with no read) | 0.2 |
 | `CONTRADICTED` | the trace contradicts a cited value/action, or claims an action that never happened | 0.0 |
 
-Suite credibility % = mean of the per-step scores.
+Suite evaluation score = mean of the per-step scores.
 
 ```
 You are a test-trace auditor. A test agent performed ONE step against an
@@ -307,19 +307,19 @@ Two checks need no LLM — keep them as hard gates beside the score:
 1. **No skipped steps** — `result.results().size() == scenario.steps().size()`.
 2. **All verdicts PASS** — every `StepVerdict.outcome() == PASS` (positive suite).
 
-"Truly passed" = both gates hold; **credibility %** = the evaluator's aggregate score
-over the steps. A run can be 100% passed / 85% credible — that gap is the headline.
+"Truly passed" = both gates hold; **evaluation score** = the evaluator's aggregate score
+over the steps. A run can be 100% passed / 85% score — that gap is the headline.
 
 ### 5. Recorder + report
 
 - **`StepEvaluationRecorder`** — a shared output sink (concurrent, keyed by scenario × step)
   collecting `(score, feedback)`; the only cross-step shared state. Aggregates to a
-  suite-level credibility %.
+  suite-level evaluation score.
 - **Console summary** + a written artifact in **both** formats: JSON as the artifact of
   record, Markdown rendered from it so the README "Verified models" table is *generated*,
   not hand-pasted.
 - Columns: model, quantization, reasoning, **passed %** (deterministic gates),
-  **credibility %** (evaluator aggregate), **duration**, plus per-step detail (score,
+  **evaluation score** (evaluator aggregate), **duration**, plus per-step detail (score,
   feedback, tool calls, per-step timing). A **detection %** column is left for the future
   (task-07's deferred metric).
 
@@ -354,7 +354,7 @@ evaluator-model env, runs the existing JUnit suite, then renders the report.
 
 - **A judge can rubber-stamp too** — mitigated only by grounding on the real trace *and*
   using a different/stronger evaluator model. A self-judge is the weakest config; say so.
-- **Non-determinism** — credibility scores vary run to run; read as calibration, keep the
+- **Non-determinism** — evaluation scores vary run to run; read as calibration, keep the
   `INQUISITOR_LLM_IT` gate, don't wire into a hard CI gate. Consider N repeats for a
   stability number.
 - **Cost** — evaluation doubles LLM calls per step (act + judge), though the judge is a
@@ -367,7 +367,7 @@ evaluator-model env, runs the existing JUnit suite, then renders the report.
 - A published Gradle plugin for consumers to evaluate their own suites (the v2 once the
   demo task proves the shape).
 - A hard inline required-call gate via `ToolCallingAdvisor` (control, not just observe).
-- CI integration / credibility trend tracking across commits.
+- CI integration / score trend tracking across commits.
 
 ## Relationship to task-07
 
@@ -381,10 +381,10 @@ add later as an opt-in second pass that populates a detection-% column — out o
 1. `./gradlew build` unaffected — evaluation is off by default; the gated runner self-skips
    without a model; a normal run does no tool wrapping.
 2. `:inquisitor-demo:evaluate -Pmodel=<31B> -Preasoning=off` with a *separate* evaluator
-   model → all scenarios pass the deterministic gates and score high credibility; report
+   model → all scenarios pass the deterministic gates and score high; report
    shows per-step scores + full tool-call detail.
 3. Re-run against `gemma-4-12B -Preasoning=off` → the grounded evaluator **drops the
-   credibility score** on the import scenario (claims an import the trace doesn't contain)
+   evaluation score** on the import scenario (claims an import the trace doesn't contain)
    even though the actor's verdict claimed PASS — i.e. it surfaces the false positive we
    already know exists.
 4. The multi-config `benchmark.yml` run regenerates the README "Verified models" table
@@ -392,10 +392,10 @@ add later as an opt-in second pass that populates a detection-% column — out o
 
 ## Docs to update
 
-- `docs/roadmap.md` (task row), `docs/decisions.md` (why a second-LLM credibility check
+- `docs/roadmap.md` (task row), `docs/decisions.md` (why a second-LLM evaluation
   grounded on the real trace; `ToolContext` capture over ThreadLocal / `ToolCallingAdvisor`;
   the `StepRunner` rename; evaluator-model independence; the optional-module split with the
   core keeping only the trace seam and the starter decorating `ToolCallback` beans via a
   `BeanPostProcessor`), `README.md` (generated
-  verified-models table with the credibility column; `harness:evaluate` usage),
+  verified-models table with the score column; `harness:evaluate` usage),
   `CLAUDE.md` (build commands + the `StepRunner` rename), this file (status → implemented).

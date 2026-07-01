@@ -22,7 +22,7 @@ package io.inquisitor.harness.executor;
  *
  * <p>This is the seam between {@link ScenarioExecutor}'s orchestration (deterministic
  * and unit-testable) and the non-deterministic LLM call. The production implementation
- * is {@link LlmStepRunner}; a decorating runner can wrap it to score how credible each
+ * is {@link LlmStepRunner}; a decorating runner can wrap it to score how well-grounded each
  * verdict is; tests substitute a fake.
  *
  * <p>All steps of one scenario are run with the same {@code conversationId} so the

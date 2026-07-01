@@ -26,7 +26,7 @@ import lombok.val;
 import org.springframework.ai.evaluation.EvaluationResponse;
 
 /**
- * Collects per-step credibility scores across a run for the report. The only state
+ * Collects per-step scores across a run for the report. The only state
  * shared across steps/scenarios; thread-safe so parallel scenarios can record freely.
  */
 public class StepEvaluationRecorder {
@@ -49,7 +49,7 @@ public class StepEvaluationRecorder {
         return List.copyOf(records);
     }
 
-    /** The mean credibility score across all recorded steps, or empty if none. */
+    /** The mean score across all recorded steps, or empty if none. */
     public OptionalDouble overallScore() {
         return records.stream().mapToDouble(StepEvaluationRecord::score).average();
     }

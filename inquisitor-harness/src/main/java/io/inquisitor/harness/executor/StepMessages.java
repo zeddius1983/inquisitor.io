@@ -23,7 +23,7 @@ import lombok.val;
 /**
  * Renders the user message sent to the model for a step. Extracted so the message is
  * built once and reused — both as the prompt for the actor and as the {@code userText}
- * a credibility evaluator audits.
+ * the evaluator audits.
  *
  * <p>The scenario description is prepended only on the first step; later steps rely on
  * chat memory to carry the context forward.

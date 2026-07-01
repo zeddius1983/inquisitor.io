@@ -31,7 +31,7 @@ import org.springframework.ai.evaluation.EvaluationRequest;
 import org.springframework.ai.evaluation.Evaluator;
 
 /**
- * A {@link StepRunner} decorator that scores how credible each step's verdict is.
+ * A {@link StepRunner} decorator that scores how well-grounded each step's verdict is.
  *
  * <p>It runs the delegate, then has an {@link Evaluator} audit the verdict against the
  * real tool-call trace from the {@link StepRun} and records the score. The decorator is
@@ -62,7 +62,7 @@ public class EvaluationStepRunner implements StepRunner {
                 new EvaluationRequest(request.userMessage(), context, renderVerdict(run.verdict())));
         recorder.record(request.scenario(), request.step(), evaluation);
 
-        log.debug("[{}] step {} credibility {} ({})",
+        log.debug("[{}] step {} score {} ({})",
                 request.scenario().name(), request.step().index(),
                 evaluation.getScore(),
                 evaluation.getMetadata() == null ? null : evaluation.getMetadata().get("category"));

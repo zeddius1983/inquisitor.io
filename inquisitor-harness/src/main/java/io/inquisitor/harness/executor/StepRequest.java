@@ -25,7 +25,7 @@ import io.inquisitor.harness.model.Step;
  * the originating scenario/step for context.
  *
  * <p>The message is built once (by {@link StepMessages}) so a decorating runner can
- * reuse it — e.g. as the {@code userText} of a credibility evaluation — without
+ * reuse it — e.g. as the {@code userText} of a step evaluation — without
  * rebuilding it.
  */
 public record StepRequest(String conversationId, String userMessage, Scenario scenario, Step step) {
