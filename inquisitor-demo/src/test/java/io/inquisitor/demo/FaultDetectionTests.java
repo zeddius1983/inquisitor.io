@@ -103,7 +103,7 @@ class FaultDetectionTests {
 
         val resource = new ClassPathResource(classpathLocation);
         val scenario = parser.parse(read(resource), resource.getFilename());
-        val result = executor.evaluate(scenario);
+        val result = executor.execute(scenario);
 
         // The model must NOT have passed everything — that would be a false positive
         // (it failed to notice the seeded bug).

@@ -18,6 +18,7 @@ package io.inquisitor.harness.executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -53,7 +54,7 @@ class ScenarioExecutorTest {
         var evaluator = new ScriptedEvaluator(ignored -> Outcome.PASS);
         var executor = new ScenarioExecutor(evaluator);
 
-        ScenarioResult result = executor.evaluate(threeSteps());
+        ScenarioResult result = executor.execute(threeSteps());
 
         assertThat(result.passed()).isTrue();
         assertThat(result.results()).hasSize(3);
@@ -66,7 +67,7 @@ class ScenarioExecutorTest {
         var evaluator = new ScriptedEvaluator(step -> step.index() == 2 ? Outcome.FAIL : Outcome.PASS);
         var executor = new ScenarioExecutor(evaluator);
 
-        ScenarioResult result = executor.evaluate(threeSteps());
+        ScenarioResult result = executor.execute(threeSteps());
 
         assertThat(result.passed()).isFalse();
         assertThat(result.results()).hasSize(2);
@@ -79,7 +80,7 @@ class ScenarioExecutorTest {
     @Test
     void allStepsShareOneConversationId() {
         var evaluator = new ScriptedEvaluator(ignored -> Outcome.PASS);
-        new ScenarioExecutor(evaluator).evaluate(threeSteps());
+        new ScenarioExecutor(evaluator).execute(threeSteps());
 
         assertThat(evaluator.conversationIds).hasSize(1);
     }
@@ -87,7 +88,7 @@ class ScenarioExecutorTest {
     @Test
     void singleStepScenarioPasses() {
         var scenario = new Scenario("Ping", "", List.of(new Step(1, "Ping", "ping it")), null);
-        var result = new ScenarioExecutor(new ScriptedEvaluator(ignored -> Outcome.PASS)).evaluate(scenario);
+        var result = new ScenarioExecutor(new ScriptedEvaluator(ignored -> Outcome.PASS)).execute(scenario);
 
         assertThat(result.passed()).isTrue();
         assertThat(result.results()).hasSize(1);
@@ -123,7 +124,7 @@ class ScenarioExecutorTest {
             conversationIds.add(request.conversationId());
             return new StepRun(
                     new StepVerdict(script.apply(request.step()), "scripted", List.of("evidence")),
-                    List.of());
+                    List.of(), Duration.ZERO);
         }
     }
 }

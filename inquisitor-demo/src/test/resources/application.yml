@@ -18,6 +18,18 @@ spring:
     ansi:
       enabled: always
 
+inquisitor:
+  harness:
+    evaluation:
+      # Optional step evaluation (LLM-as-judge). Off by default; opt in with
+      # INQUISITOR_EVAL=true to score each verdict against the real tool trace.
+      enabled: ${INQUISITOR_EVAL:false}
+      # A genuinely separate judge on its own local server (the strong config — a
+      # different model/family from the actor, not a self-judge). The api-key falls
+      # back to spring.ai.openai.api-key when unset.
+      base-url: ${INQUISITOR_EVAL_BASE_URL:http://127.0.0.1:8001}
+      model: ${INQUISITOR_EVAL_MODEL:Qwen3.6-35B-A3B-Q8_0}
+
 logging:
   level:
     # Trace each harness tool call (inputs and outputs) during scenario runs.

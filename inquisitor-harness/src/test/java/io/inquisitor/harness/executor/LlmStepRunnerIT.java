@@ -104,7 +104,7 @@ class LlmStepRunnerIT {
                                 "Load the deleted order again via GET /orders/{id}. Verify that nothing is returned.")),
                 "order-lifecycle.md");
 
-        return executor.evaluate(scenario);
+        return executor.execute(scenario);
     }
 
     /** Canned HTTP tool — simulates an order resource without a real server. */

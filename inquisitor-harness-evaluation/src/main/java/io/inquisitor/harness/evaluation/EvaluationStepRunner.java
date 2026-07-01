@@ -55,17 +55,22 @@ public class EvaluationStepRunner implements StepRunner {
     public StepRun run(StepRequest request) {
         val run = delegate.run(request);
 
+        val scenario = request.scenario();
+        val step = request.step();
+        log.debug("[{}] step {}/{} - EVALUATE: {}",
+                scenario.name(), step.index(), scenario.steps().size(), step.title());
+
         val context = run.toolCalls().isEmpty()
                 ? List.<Document>of()
                 : List.of(new Document(renderTrace(run.toolCalls())));
         val evaluation = evaluator.evaluate(
                 new EvaluationRequest(request.userMessage(), context, renderVerdict(run.verdict())));
-        recorder.record(request.scenario(), request.step(), evaluation);
+        recorder.record(scenario, step, evaluation);
 
-        log.debug("[{}] step {} score {} ({})",
-                request.scenario().name(), request.step().index(),
-                evaluation.getScore(),
-                evaluation.getMetadata() == null ? null : evaluation.getMetadata().get("category"));
+        val category = evaluation.getMetadata() == null ? null : evaluation.getMetadata().get("category");
+        log.debug("[{}] step {}/{} - {}: score {}",
+                scenario.name(), step.index(), scenario.steps().size(),
+                category, evaluation.getScore());
         return run;
     }
 

@@ -21,12 +21,12 @@ import io.inquisitor.harness.model.ScenarioResult;
 import lombok.val;
 
 /**
- * Evaluates {@link Scenario scenarios} step by step over a {@link StepRunner}.
+ * Executes {@link Scenario scenarios} step by step over a {@link StepRunner}.
  *
- * <p>Use {@link #evaluate(Scenario)} to run a whole scenario, or
+ * <p>Use {@link #execute(Scenario)} to run a whole scenario, or
  * {@link #start(Scenario)} to drive it one step at a time (e.g. to report each
  * step as its own JUnit test). Both share the same fail-fast semantics via
- * {@link ScenarioEvaluation}.
+ * {@link ScenarioExecution}.
  */
 public class ScenarioExecutor {
 
@@ -36,17 +36,17 @@ public class ScenarioExecutor {
         this.runner = runner;
     }
 
-    /** Evaluates every step, stopping at the first failure. */
-    public ScenarioResult evaluate(Scenario scenario) {
-        val evaluation = start(scenario);
-        while (evaluation.hasNext()) {
-            evaluation.next();
+    /** Executes every step, stopping at the first failure. */
+    public ScenarioResult execute(Scenario scenario) {
+        val execution = start(scenario);
+        while (execution.hasNext()) {
+            execution.next();
         }
-        return evaluation.result();
+        return execution.result();
     }
 
-    /** Begins a step-at-a-time evaluation over a fresh conversation. */
-    public ScenarioEvaluation start(Scenario scenario) {
-        return new ScenarioEvaluation(runner, scenario);
+    /** Begins a step-at-a-time execution over a fresh conversation. */
+    public ScenarioExecution start(Scenario scenario) {
+        return new ScenarioExecution(runner, scenario);
     }
 }

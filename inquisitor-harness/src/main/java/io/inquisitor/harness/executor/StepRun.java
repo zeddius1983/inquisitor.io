@@ -16,14 +16,15 @@
 
 package io.inquisitor.harness.executor;
 
+import java.time.Duration;
 import java.util.List;
 
 import io.inquisitor.harness.model.StepVerdict;
 import io.inquisitor.harness.model.ToolCallRecord;
 
 /**
- * The outcome of running one step: the model's {@link StepVerdict} plus the trace of
- * tool calls it made while producing that verdict.
+ * The outcome of running one step: the model's {@link StepVerdict}, the trace of tool
+ * calls it made while producing that verdict, and how long the actor took.
  *
  * <p>Surfacing the trace through the return value lets a decorating {@link StepRunner}
  * read it directly — with no thread-locals or shared state — to score how well-grounded the
@@ -32,8 +33,10 @@ import io.inquisitor.harness.model.ToolCallRecord;
  *
  * @param verdict   the LLM's structured judgement for the step
  * @param toolCalls the tool invocations made during the step, in call order
+ * @param elapsed   wall-clock time the actor took to produce the verdict; measured by the
+ *                  runner so it excludes any downstream evaluation
  */
-public record StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls) {
+public record StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls, Duration elapsed) {
 
     public StepRun {
         toolCalls = List.copyOf(toolCalls);

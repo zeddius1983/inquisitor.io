@@ -51,7 +51,7 @@ class EvaluationStepRunnerTest {
         val toolCalls = List.of(
                 new ToolCallRecord("httpRequest", "{\"path\":\"/accounts\"}", "HTTP 201", 0, Duration.ofMillis(3)),
                 new ToolCallRecord("sqlQuery", "SELECT balance", "1 row(s): [{balance=100}]", 1, Duration.ofMillis(2)));
-        val delegate = (StepRunner) request -> new StepRun(verdict, toolCalls);
+        val delegate = (StepRunner) request -> new StepRun(verdict, toolCalls, Duration.ZERO);
 
         val captured = new AtomicReference<EvaluationRequest>();
         val evaluator = (Evaluator) request -> {
@@ -86,7 +86,7 @@ class EvaluationStepRunnerTest {
     @Test
     void passesEmptyContextWhenNoToolCalls() {
         val verdict = new StepVerdict(Outcome.PASS, "looks fine", List.of());
-        val delegate = (StepRunner) request -> new StepRun(verdict, List.of());
+        val delegate = (StepRunner) request -> new StepRun(verdict, List.of(), Duration.ZERO);
         val captured = new AtomicReference<EvaluationRequest>();
         val evaluator = (Evaluator) request -> {
             captured.set(request);
