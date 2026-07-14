@@ -57,7 +57,22 @@ The authoritative status is git history + this table.
   trace seam (`TraceKeys`/`ToolCallRecord`/`StepRun`); the starter decorates the
   harness's `ToolCallback` beans via a `BeanPostProcessor`. **Pending**: the
   `harness:evaluate` Gradle task and the JSON + Markdown report. See
-  `tasks/task-08-evaluation.md`.
+  `tasks/task-08-evaluation.md`. **Later idea — evaluation as an opt-in gate**:
+  today the score is calibration-only (an actor-PASS judged `CONTRADICTED` still
+  reports green in JUnit); two complementary opt-in gates are on the table.
+  (a) A coarse `inquisitor.harness.evaluation.fail-under=1.0` threshold (for the
+  standalone suites / the future `evaluate` Gradle task) that turns an ungrounded
+  PASS into a real failure. (b) A per-scenario **`@Grounded`** annotation for the
+  `@Harness` layer: shipped *by the evaluation module* with its own JUnit
+  extension reading the `StepEvaluationRecorder`, so `inquisitor-harness-junit`
+  stays ignorant of evaluation (no new core seam, dependency arrow stays
+  evaluation → junit); the step whose PASS the judge rejects fails with the
+  judge's findings as the message. Must fail loudly if evaluation is off. Both
+  deliberately deferred until after the C2 report — surface the score first,
+  gate on it second, since it makes a non-deterministic judge a hard gate — and
+  **need a fresh design review when picked up** (open: `@Grounded` on class vs
+  method, interplay with `expect = FAIL`, how the extension maps recorder
+  entries back to step sub-tests).
 - **OpenAPI context-size optimisation** (task-10) is planned: size-gated modes in the
   openapi plugin instead of injecting the whole raw spec every round-trip — a
   **deterministic digest** (compact operation signatures + a type dictionary, rendered
