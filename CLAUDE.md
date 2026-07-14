@@ -24,7 +24,7 @@ Base package: `io.inquisitor`. Group: `io.inquisitor`.
 | `inquisitor-harness-junit-starter` | Autoconfiguration for the JUnit extension |
 | `inquisitor-harness-openapi` / `inquisitor-harness-openapi-starter` | Optional OpenAPI/Swagger discovery: an `OpenApiAdvisor` injects the app's spec into the system prompt. Off unless `inquisitor.harness.openapi.enabled=true`; removable without touching the core |
 | `inquisitor-harness-evaluation` / `inquisitor-harness-evaluation-starter` | Optional step evaluation (LLM-as-judge): a separate judge model scores each verdict against the real tool trace. Off unless `inquisitor.harness.evaluation.enabled=true`. The starter decorates the harness's `ToolCallback` beans (a `BeanPostProcessor` recording each call) and wraps the actor `StepRunner`; removable without touching the core (the trace seam — `TraceKeys`/`ToolCallRecord`/`StepRun` — lives in `inquisitor-harness`) |
-| `inquisitor-harness-gradle-plugin` | The `io.inquisitor.harness` Gradle plugin: an `evaluate` `Test`-type task that runs the `@Tag("inquisitor")` scenario tests with the LLM gate (`INQUISITOR_LLM_IT`) + LLM-as-judge evaluation (`INQUISITOR_EVAL`) switched on. Not wired into `check`; validated by a TestKit functional test; not yet published |
+| `inquisitor-harness-gradle-plugin` | The `io.inquisitor.harness` Gradle plugin: an `evaluate` `Test`-type task that runs the `@Tag("inquisitor")` scenario tests with the LLM gate (`INQUISITOR_LLM_IT`) + LLM-as-judge evaluation (`INQUISITOR_EVAL`) switched on. A standalone **included build** (`includeBuild` in `settings.gradle.kts`, so the demo resolves the plugin id like a real consumer; it can't use `buildSrc` conventions — the overlap is inlined). Not wired into `check`; its own `check` is hooked into the root `check` for CI; validated by a TestKit functional test; not yet published |
 | `inquisitor-mock` / `inquisitor-mock-starter` | Reserved (mock server); not yet implemented |
 | `inquisitor-demo-db-starter` | Zero-config local Postgres via Testcontainers + Flyway |
 | `inquisitor-demo` | Banking REST demo app + scenario tests; the reference consumer |
@@ -55,6 +55,7 @@ Common commands:
 ./gradlew check              # tests + verification
 ./gradlew :inquisitor-demo:test       # run the demo's scenario suite
 ./gradlew :inquisitor-demo:bootRun    # run the demo app (local profile)
+./gradlew :inquisitor-demo:evaluate   # tagged scenario suites with LLM gate + evaluation on
 ```
 
 ## Releasing

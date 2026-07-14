@@ -115,18 +115,30 @@ using `GradleRunner` + `withPluginClasspath()` against a generated temp project:
   task have landed (C1); reporting is the remaining work. (Full README usage +
   `docs/decisions.md` entries stay in C3.)
 
-## Follow-up step (before C2, not part of C1): `includeBuild` into the demo
+## Follow-up step (before C2, not part of C1): `includeBuild` into the demo — **done**
 
-A separate small change adds `includeBuild("inquisitor-harness-gradle-plugin")`
-(root `settings.gradle.kts`) so `inquisitor-demo` can apply
-`id("io.inquisitor.harness")` and `:inquisitor-demo:evaluate` works in-repo. Two
-things surface *there*, not in C1:
+`includeBuild("inquisitor-harness-gradle-plugin")` (root `settings.gradle.kts`) lets
+`inquisitor-demo` apply `id("io.inquisitor.harness")` and makes
+`:inquisitor-demo:evaluate` work in-repo. What it took:
 
-- the demo's **positive** scenario suites get `@Tag("inquisitor")`
-  (fault-detection suites deliberately excluded — a fault run *should* fail);
-- the demo's `tasks.withType<Test> { useJUnitPlatform() }` convention must not
-  clobber the plugin's `includeTags` (task-configuration ordering) — handle at
-  that step.
+- **The module converted from subproject to standalone included build** — a directory
+  can't be both, and plugin-id resolution requires an included build. Consequences:
+  its own `settings.gradle.kts` (sharing the root version catalog via
+  `from(files("../gradle/libs.versions.toml"))`), its own `gradle.properties`
+  (group/version — the root's isn't inherited), and the `inquisitor.java-conventions`
+  overlap inlined into its `build.gradle.kts` (`buildSrc` isn't visible to included
+  builds). Its `check` is hooked into the root `check` so `./gradlew build` / CI keep
+  running its functional tests (included builds are skipped by default).
+- The demo's **positive** scenario suites got `@Tag("inquisitor")`: on the
+  `ScenarioSuite` base (class-level tags are `@Inherited`-like — subclasses inherit
+  them, covering the three style buckets) and on the standalone `ScenarioTests`.
+  Fault-detection suites deliberately excluded — a fault run *should* fail.
+- The clobber worry resolved in our favour: the conventions'
+  `withType<Test> { useJUnitPlatform() }` action was registered *before* the plugin's
+  task, so it runs first and the plugin's `useJUnitPlatform(includeTags)` lands after
+  it on the same framework instance. Verified deterministically:
+  `:inquisitor-demo:evaluate --tests <untagged class>` fails with "no tests found" —
+  the tag filter is intersecting.
 
 ## Notes
 

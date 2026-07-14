@@ -21,7 +21,7 @@ The authoritative status is git history + this table.
 | 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
 | 07 | Fault detection (oracle calibration) — runtime fault router + standalone & `@Harness` suites | ✅ Phase 1 & 2 done (`tasks/task-07`) |
 | 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); report pending (`tasks/task-08`) |
-| 11 | `io.inquisitor.harness` Gradle plugin — `evaluate` task (task-08 Phase C1) | ✅ done — plugin + TestKit test (`tasks/task-11`); demo `includeBuild` wiring + report (C2) pending |
+| 11 | `io.inquisitor.harness` Gradle plugin — `evaluate` task (task-08 Phase C1) | ✅ done — plugin + TestKit test + demo `includeBuild` wiring (`:inquisitor-demo:evaluate`); report (C2) pending (`tasks/task-11`) |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
