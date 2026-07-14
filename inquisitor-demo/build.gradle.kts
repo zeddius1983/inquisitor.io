@@ -1,9 +1,10 @@
 plugins {
     id("inquisitor.spring-conventions")
     id("org.springframework.boot")
-    // Registers the `evaluate` task (harness group): runs the @Tag("inquisitor")
-    // suites with the LLM gate + LLM-as-judge evaluation on. Resolved from the
-    // included build — the demo consumes it exactly like a real consumer would.
+    // Registers the `evaluate` task (harness group): runs the @Scenario suites
+    // (auto-tagged "inquisitor" via the annotation) with the LLM gate + LLM-as-judge
+    // evaluation on. Resolved from the included build — the demo consumes it exactly
+    // like a real consumer would.
     id("io.inquisitor.harness")
 }
 

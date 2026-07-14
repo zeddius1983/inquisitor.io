@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.inquisitor.harness.executor.ScenarioExecutor;
 import lombok.val;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,10 +32,10 @@ import org.junit.jupiter.api.Test;
  * positive assertion that each scenario passes. Each test needs the local LLM, so it is
  * gated: run with {@code INQUISITOR_LLM_IT=true}.
  *
- * <p>Tagged {@code inquisitor} so the Gradle plugin's {@code evaluate} task selects it
- * alongside the {@code @Harness} suites (the fault-detection suites stay untagged).
+ * <p>Not part of the Gradle plugin's {@code evaluate} run: only {@code @Scenario}
+ * methods carry the {@code inquisitor} tag, and this class covers the same explicit
+ * bucket {@link ExplicitScenarioSuiteTest} already runs there.
  */
-@Tag("inquisitor")
 class ScenarioTests extends AbstractScenarioTests {
 
     @Test

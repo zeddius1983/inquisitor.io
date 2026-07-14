@@ -18,7 +18,6 @@ package io.inquisitor.demo;
 
 import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
-import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
@@ -37,14 +36,9 @@ import org.springframework.boot.test.context.SpringBootTest;
  * base via {@link RequiresLlm @RequiresLlm} ({@code @Inherited}), so the concrete
  * subclasses inherit it — a plain {@code @EnabledIfEnvironmentVariable} here would
  * <em>not</em> gate them.
- *
- * <p>Tagged {@code inquisitor} (inherited too) so the Gradle plugin's {@code evaluate}
- * task selects the concrete subclasses. The fault-detection suites are deliberately
- * untagged — a fault run <em>should</em> fail and would poison an evaluation run.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @RequiresLlm
-@Tag("inquisitor")
 abstract class ScenarioSuite {
 
     @Scenario

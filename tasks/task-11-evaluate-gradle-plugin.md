@@ -129,10 +129,22 @@ using `GradleRunner` + `withPluginClasspath()` against a generated temp project:
   overlap inlined into its `build.gradle.kts` (`buildSrc` isn't visible to included
   builds). Its `check` is hooked into the root `check` so `./gradlew build` / CI keep
   running its functional tests (included builds are skipped by default).
-- The demo's **positive** scenario suites got `@Tag("inquisitor")`: on the
-  `ScenarioSuite` base (class-level tags are `@Inherited`-like — subclasses inherit
-  them, covering the three style buckets) and on the standalone `ScenarioTests`.
-  Fault-detection suites deliberately excluded — a fault run *should* fail.
+- **No consumer-visible `@Tag`**: `@Scenario` itself is meta-annotated
+  `@Tag("inquisitor")` (JUnit supports tags on composed annotations), so *every*
+  `@Scenario` method is selectable by the `evaluate` task with zero annotation burden —
+  a test containing `@Scenario` is evaluation-ready by construction. Pinned by
+  `ScenarioTagDiscoveryTest` in `inquisitor-harness-junit` (launcher discovery with
+  `includeTags("inquisitor")` selects `@Scenario` methods — including
+  `expect = FAIL` — and not plain `@Test` methods). Consequences:
+  - the standalone `ScenarioTests` / `FaultDetectionTests` (plain `@Test` driving the
+    executor) are *not* part of `evaluate` — for the demo that also dedupes the
+    explicit bucket, which `ExplicitScenarioSuiteTest` already covers there;
+  - `FaultDetectionSuiteTest` (`@Scenario(expect = FAIL)`) **is** selected. Its JUnit
+    outcome is green either way (a failing step is the success condition), and the
+    judge scores verdict *groundedness*, not passed-ness — a correctly-detected fault
+    is a `GROUNDED` FAIL. The C2 report must therefore be **expectation-aware**: the
+    deterministic gate is "outcome matches `expect`" (not "all verdicts PASS"), which
+    also lays the ground for task-07's deferred detection-% metric.
 - The clobber worry resolved in our favour: the conventions'
   `withType<Test> { useJUnitPlatform() }` action was registered *before* the plugin's
   task, so it runs first and the plugin's `useJUnitPlatform(includeTags)` lands after

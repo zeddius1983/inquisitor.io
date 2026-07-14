@@ -21,6 +21,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -42,10 +43,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * for fault detection: the scenario is then expected to fail at some step (a failing
  * step is the success condition), which is how a correct scenario run against a
  * deliberately defective build asserts the oracle caught the fault.
+ *
+ * <p>Every {@code @Scenario} carries the meta-annotated JUnit tag {@code inquisitor},
+ * so scenario methods are selectable as a group with no annotation on the test class —
+ * that is how the Gradle plugin's {@code evaluate} task (default
+ * {@code includeTags("inquisitor")}) finds them.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @TestTemplate
+@Tag("inquisitor")
 @ExtendWith(ScenarioTemplateProvider.class)
 public @interface Scenario {
 
