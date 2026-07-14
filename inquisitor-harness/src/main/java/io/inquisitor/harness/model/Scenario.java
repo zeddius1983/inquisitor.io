@@ -24,16 +24,33 @@ import org.jspecify.annotations.Nullable;
  * A parsed test scenario: a name, optional shared context, and one or more
  * ordered {@link Step steps} executed over a single LLM conversation.
  *
- * @param name        the scenario title (from the markdown {@code # } heading)
- * @param description shared context shown before the first step; empty for a
- *                    single-step scenario
- * @param steps       the ordered, non-empty list of steps
- * @param source      where the scenario was loaded from (file name / URI), if known
+ * @param name            the scenario title (from the markdown {@code # } heading)
+ * @param description     shared context shown before the first step; empty for a
+ *                        single-step scenario
+ * @param steps           the ordered, non-empty list of steps
+ * @param source          where the scenario was loaded from (location / URI), if known
+ * @param expectedOutcome the outcome this run of the scenario is expected to produce.
+ *                        {@link Outcome#PASS} normally (the parser always produces it —
+ *                        markdown has no expectation syntax); {@link Outcome#FAIL} for a
+ *                        fault-detection run, where a failing step is the success
+ *                        condition (set by the JUnit layer from
+ *                        {@code @Scenario(expect = FAIL)})
  */
-public record Scenario(String name, String description, List<Step> steps, @Nullable String source) {
+public record Scenario(String name, String description, List<Step> steps, @Nullable String source,
+                       Outcome expectedOutcome) {
 
     public Scenario {
         steps = List.copyOf(steps);
+    }
+
+    /** A scenario expected to pass — the parser's and the ordinary run's default. */
+    public Scenario(String name, String description, List<Step> steps, @Nullable String source) {
+        this(name, description, steps, source, Outcome.PASS);
+    }
+
+    /** A copy of this scenario with the given expected outcome. */
+    public Scenario withExpectedOutcome(Outcome expected) {
+        return new Scenario(name, description, steps, source, expected);
     }
 
     /** Whether this scenario has more than one step. */

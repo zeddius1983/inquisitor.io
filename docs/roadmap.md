@@ -21,7 +21,8 @@ The authoritative status is git history + this table.
 | 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
 | 07 | Fault detection (oracle calibration) — runtime fault router + standalone & `@Harness` suites | ✅ Phase 1 & 2 done (`tasks/task-07`) |
 | 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); report pending (`tasks/task-08`) |
-| 11 | `io.inquisitor.harness` Gradle plugin — `evaluate` task (task-08 Phase C1) | ✅ done — plugin + TestKit test + demo `includeBuild` wiring (`:inquisitor-demo:evaluate`); report (C2) pending (`tasks/task-11`) |
+| 11 | `io.inquisitor.harness` Gradle plugin — `evaluate` task (task-08 Phase C1) | ✅ done — plugin + TestKit test + demo `includeBuild` wiring (`:inquisitor-demo:evaluate`) (`tasks/task-11`) |
+| 12 | Evaluation report (task-08 Phase C2) — JSON + Markdown artifacts, bucket-grouped, expectation-aware gate | ✅ done — session-listener flush + `evaluateReport` finalizer (`tasks/task-12`); C3 (README table, `benchmark.yml`, publishing) pending |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
@@ -57,8 +58,13 @@ The authoritative status is git history + this table.
   `inquisitor.harness.evaluation.enabled` (off by default). The core keeps only the
   trace seam (`TraceKeys`/`ToolCallRecord`/`StepRun`); the starter decorates the
   harness's `ToolCallback` beans via a `BeanPostProcessor`. The `io.inquisitor.harness`
-  Gradle plugin with the `evaluate` task has landed too (task-11, Phase C1).
-  **Pending**: the demo `includeBuild` wiring and the JSON + Markdown report (C2). See
+  Gradle plugin with the `evaluate` task has landed too (task-11, Phase C1), and so has
+  the report (task-12, Phase C2): the test JVM writes
+  `build/reports/inquisitor/evaluation.{json,md}` at JUnit-session close, grouped by
+  style bucket with an expectation-aware gate (fault suites count detected faults as
+  matches), and the plugin's `evaluateReport` finalizer echoes the headline even when
+  the run fails. **Pending (C3)**: the README verified-models table generated from
+  `evaluation.json`, `benchmark.yml` multi-config runs, publishing. See
   `tasks/task-08-evaluation.md`. **Later idea — evaluation as an opt-in gate**:
   today the score is calibration-only (an actor-PASS judged `CONTRADICTED` still
   reports green in JUnit); two complementary opt-in gates are on the table.

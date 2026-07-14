@@ -57,6 +57,14 @@ public class EvaluationStepRunner implements StepRunner {
 
         val scenario = request.scenario();
         val step = request.step();
+        if (run.synthetic()) {
+            // The harness fabricated this verdict (empty/unparseable model response) —
+            // there is no actor claim to audit, so judging it would only produce noise.
+            log.debug("[{}] step {}/{} - NOT_EVALUATED: harness-synthesized verdict",
+                    scenario.name(), step.index(), scenario.steps().size());
+            recorder.recordNotEvaluated(request, run);
+            return run;
+        }
         log.debug("[{}] step {}/{} - EVALUATE: {}",
                 scenario.name(), step.index(), scenario.steps().size(), step.title());
 
@@ -65,7 +73,7 @@ public class EvaluationStepRunner implements StepRunner {
                 : List.of(new Document(renderTrace(run.toolCalls())));
         val evaluation = evaluator.evaluate(
                 new EvaluationRequest(request.userMessage(), context, renderVerdict(run.verdict())));
-        recorder.record(scenario, step, evaluation);
+        recorder.record(request, run, evaluation);
 
         val category = evaluation.getMetadata() == null ? null : evaluation.getMetadata().get("category");
         log.debug("[{}] step {}/{} - {}: score {}",

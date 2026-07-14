@@ -16,7 +16,8 @@
 
 package io.inquisitor.harness.gradle;
 
-import java.util.List;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Set;
 
 import org.gradle.api.Plugin;
@@ -40,8 +41,14 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
     /** The name of the evaluation task this plugin registers. */
     public static final String EVALUATE_TASK_NAME = "evaluate";
 
-    /** System property carrying the report header label (rendered by the future report). */
+    /** System property carrying the report header label (rendered into the report). */
     public static final String REPORT_HEADER_PROPERTY = "inquisitor.report.header";
+
+    /** The name of the report-echoing finalizer task. */
+    public static final String EVALUATE_REPORT_TASK_NAME = "evaluateReport";
+
+    /** System property telling the test JVM where to write the report artifacts. */
+    public static final String REPORT_DIR_PROPERTY = "inquisitor.report.dir";
 
     @Override
     public void apply(Project project) {
@@ -49,13 +56,24 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
         extension.getTags().convention(Set.of("inquisitor"));
 
         project.getPlugins().withType(JavaPlugin.class,
-                javaPlugin -> registerEvaluateTask(project, extension));
+                javaPlugin -> registerEvaluateTasks(project, extension));
     }
 
-    private void registerEvaluateTask(Project project, InquisitorHarnessExtension extension) {
+    private void registerEvaluateTasks(Project project, InquisitorHarnessExtension extension) {
         var testSourceSet = project.getExtensions().getByType(SourceSetContainer.class)
                 .getByName(SourceSet.TEST_SOURCE_SET_NAME);
         var header = project.getProviders().gradleProperty("header");
+        var reportDir = project.getLayout().getBuildDirectory().dir("reports/inquisitor");
+
+        var reportTask = project.getTasks().register(EVALUATE_REPORT_TASK_NAME,
+                EvaluationReportTask.class, task -> {
+                    task.setGroup(HARNESS_GROUP);
+                    task.setDescription("Prints the evaluation report written by the evaluate task.");
+                    task.getReportDir().convention(reportDir);
+                    // The report only exists when the evaluation modules ran in the test JVM.
+                    task.onlyIf("an evaluation report was written",
+                            t -> Files.exists(((EvaluationReportTask) t).getMarkdownReport()));
+                });
 
         project.getTasks().register(EVALUATE_TASK_NAME, Test.class, task -> {
             task.setGroup(HARNESS_GROUP);
@@ -66,9 +84,17 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
                     options.includeTags(extension.getTags().get().toArray(String[]::new)));
             task.environment("INQUISITOR_LLM_IT", "true");
             task.environment("INQUISITOR_EVAL", "true");
-            task.getJvmArgumentProviders().add(() -> header.isPresent()
-                    ? List.of("-D" + REPORT_HEADER_PROPERTY + "=" + header.get())
-                    : List.of());
+            task.getJvmArgumentProviders().add(() -> {
+                var arguments = new ArrayList<String>();
+                arguments.add("-D" + REPORT_DIR_PROPERTY + "="
+                        + reportDir.get().getAsFile().getAbsolutePath());
+                if (header.isPresent()) {
+                    arguments.add("-D" + REPORT_HEADER_PROPERTY + "=" + header.get());
+                }
+                return arguments;
+            });
+            // The report is echoed even — especially — when scenario tests fail.
+            task.finalizedBy(reportTask);
         });
     }
 }

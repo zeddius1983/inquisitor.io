@@ -74,6 +74,7 @@ class InquisitorHarnessPluginFunctionalTest {
                 import org.junit.jupiter.api.Test;
 
                 import static org.junit.jupiter.api.Assertions.assertEquals;
+                import static org.junit.jupiter.api.Assertions.assertTrue;
 
                 class ScenarioProbeTest {
 
@@ -82,6 +83,8 @@ class InquisitorHarnessPluginFunctionalTest {
                     void tagged() {
                         assertEquals("true", System.getenv("INQUISITOR_LLM_IT"));
                         assertEquals("true", System.getenv("INQUISITOR_EVAL"));
+                        assertTrue(System.getProperty("inquisitor.report.dir")
+                                .replace('\\\\', '/').endsWith("build/reports/inquisitor"));
                     }
 
                     @Test
@@ -96,10 +99,58 @@ class InquisitorHarnessPluginFunctionalTest {
         var result = runner("evaluate").build();
 
         assertEquals(TaskOutcome.SUCCESS, result.task(":evaluate").getOutcome());
+        assertEquals(TaskOutcome.SKIPPED, result.task(":evaluateReport").getOutcome(),
+                "no report was written, so the report task must skip");
         var results = testResults("evaluate");
         assertTrue(results.contains("name=\"tagged()\"") || results.contains("name=\"tagged\""),
                 "the tagged test must run under evaluate");
         assertFalse(results.contains("untagged"), "the untagged test must not run under evaluate");
+    }
+
+    @Test
+    void evaluateReportEchoesTheHeadlineEvenWhenTestsFail() throws IOException {
+        // Simulates the evaluation module's session listener (the real one needs a judge
+        // model): the tagged test writes the report artifacts, then fails.
+        write("src/test/java/ScenarioProbeTest.java", """
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+                import org.junit.jupiter.api.Tag;
+                import org.junit.jupiter.api.Test;
+
+                import static org.junit.jupiter.api.Assertions.fail;
+
+                class ScenarioProbeTest {
+
+                    @Test
+                    @Tag("inquisitor")
+                    void tagged() throws Exception {
+                        Path dir = Path.of(System.getProperty("inquisitor.report.dir"));
+                        Files.createDirectories(dir);
+                        Files.writeString(dir.resolve("evaluation.md"), \"""
+                                # Inquisitor evaluation report
+
+                                - Evaluation score: **93.8%** (80 steps evaluated)
+
+                                <!-- headline-end -->
+
+                                ## explicit
+                                (bucket detail that must not be echoed)
+                                \""");
+                        Files.writeString(dir.resolve("evaluation.json"), "{}");
+                        fail("a scenario failed - the report must still be echoed");
+                    }
+                }
+                """);
+
+        var result = runner("evaluate").buildAndFail();
+
+        assertEquals(TaskOutcome.FAILED, result.task(":evaluate").getOutcome());
+        assertEquals(TaskOutcome.SUCCESS, result.task(":evaluateReport").getOutcome(),
+                "the report task is a finalizer - it runs even when evaluate fails");
+        assertTrue(result.getOutput().contains("Evaluation score: **93.8%**"),
+                "the headline block must be echoed to the console");
+        assertFalse(result.getOutput().contains("(bucket detail that must not be echoed)"),
+                "only the headline (before the marker) is echoed");
     }
 
     @Test

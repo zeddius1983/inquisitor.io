@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 
 import io.inquisitor.harness.executor.ScenarioExecution;
 import io.inquisitor.harness.executor.ScenarioExecutor;
+import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.Step;
 import io.inquisitor.harness.model.StepResult;
@@ -65,11 +66,14 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         val parser = applicationContext.getBean(ScenarioParser.class);
         val executor = applicationContext.getBean(ScenarioExecutor.class);
 
-        val scenario = load(applicationContext, parser, resolveLocation(context));
         val expect = AnnotationSupport.findAnnotation(
                         context.getRequiredTestMethod(), io.inquisitor.harness.junit.Scenario.class)
                 .map(io.inquisitor.harness.junit.Scenario::expect)
                 .orElse(Expect.PASS);
+        val loaded = load(applicationContext, parser, resolveLocation(context));
+        // Carry the expectation into the model so downstream consumers (the evaluation
+        // report's expectation gate) see how this run defines success.
+        val scenario = expect == Expect.FAIL ? loaded.withExpectedOutcome(Outcome.FAIL) : loaded;
         // One execution shared by every step invocation of this method; they run
         // sequentially, so each invocation advances the same conversation in order.
         val state = new ScenarioState(executor.start(scenario), expect);
@@ -95,7 +99,9 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
     private static Scenario load(ApplicationContext applicationContext, ScenarioParser parser, String location) {
         val resource = applicationContext.getResource(location);
         try {
-            return parser.parse(resource.getContentAsString(StandardCharsets.UTF_8), resource.getFilename());
+            // The full location (not resource.getFilename()) so Scenario.source keeps the
+            // directory — the style bucket the evaluation report groups by.
+            return parser.parse(resource.getContentAsString(StandardCharsets.UTF_8), location);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read scenario " + location, e);
         }

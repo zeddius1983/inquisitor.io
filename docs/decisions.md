@@ -254,5 +254,45 @@ see [roadmap.md](roadmap.md); for stable repo context see
   taking on the springdoc-on-Boot-4 dependency risk. This still exercises the
   headline live-fetch path deterministically; real consumers plug in springdoc.
 
+## Evaluation report (task-08 C2)
+
+- **File handoff, the JaCoCo pattern.** The `evaluate` task is a Gradle `Test` task,
+  so the evaluation data lives in the forked test JVM and Gradle sees only test
+  outcomes — there is no channel back to the build but files. The test JVM writes
+  `evaluation.json` + `evaluation.md`; the plugin's `evaluateReport` task only echoes
+  the Markdown headline (no parsing, no Jackson in the plugin). Rendering lives next
+  to the data.
+- **One flush point: a JUnit `LauncherSessionListener`** (ServiceLoader-registered in
+  `inquisitor-harness-evaluation`), firing once after the whole test plan — pass or
+  fail. Recorder beans live in cached Spring contexts the listener can't see, so the
+  starter registers each recorder in a static `EvaluationReportSession` the listener
+  drains. Deliberately the only static state in the module; the alternative
+  (`@PreDestroy` flush per context) runs in JVM-shutdown-hook ordering and needs
+  read-modify-write file merging. The listener no-ops unless `inquisitor.report.dir`
+  is set (only the plugin's `evaluate` task sets it), so ordinary test runs write
+  nothing even with evaluation enabled.
+- **`finalizedBy`, never `doLast`, for the report echo.** A failing scenario run is
+  exactly when the report matters, and `doLast` never runs when the test action
+  throws; finalizers run regardless.
+- **Synthetic verdicts are not audited.** When the actor's response is empty or
+  unparseable, `LlmStepRunner` fabricates the FAIL (now marked `StepRun.synthetic`);
+  the first real run showed the judge "contradicting" such a verdict — technically
+  right, semantically noise, since there is no actor claim to audit. The evaluation
+  runner skips the judge and records `NOT_EVALUATED`, excluded from the mean score
+  but counted in the report (it is a run-health signal).
+- **The deterministic gate is "outcome matches expectation", not "all PASS".**
+  Fault-detection suites (`@Scenario(expect = FAIL)`) are part of `evaluate` runs and
+  a detected fault is a success; a fully-green fault run is a *missed detection*. The
+  expectation travels on the core model (`Scenario.expectedOutcome`, default PASS,
+  set by the JUnit layer) because the evaluation module can't see JUnit annotations.
+  This is also the groundwork for task-07's deferred detection-%.
+- **Report grouping: bucket = the parent directory of `Scenario.source`.** The suite
+  class name never reaches the evaluation layer (dependency arrow: junit → harness →
+  evaluation seam), and the buckets differ only by `@Harness(scenarioDir)` — which is
+  exactly what the source path encodes. The JUnit provider now passes the full
+  location (not the bare filename) as `source`. Records are split into scenario
+  *instances* by step-index resets, because the same file legitimately runs several
+  times in one JVM (positive suite + fault suite share the explicit bucket).
+
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.
