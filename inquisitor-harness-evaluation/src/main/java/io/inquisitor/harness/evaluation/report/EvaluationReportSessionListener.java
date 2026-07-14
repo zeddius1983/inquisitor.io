@@ -62,10 +62,9 @@ public class EvaluationReportSessionListener implements LauncherSessionListener 
             val generatedAt = Instant.now();
             val report = EvaluationReport.of(generatedAt, Duration.between(openedAt, generatedAt),
                     System.getProperty(HEADER_PROPERTY), EvaluationReportSession.runInfo(), records);
-            val files = new EvaluationReportWriter().write(report, Path.of(dir));
+            val files = EvaluationReportWriter.discover().write(report, Path.of(dir));
             // Println on purpose: this must reach the console even without a logger config.
-            System.out.println("Inquisitor evaluation report: " + files.markdown()
-                    + " (json: " + files.json() + ")");
+            System.out.println("Inquisitor evaluation report written: " + files);
         } catch (RuntimeException e) {
             // Never let report writing fail the JVM's orderly test shutdown.
             log.warn("Could not write the evaluation report", e);

@@ -286,6 +286,17 @@ see [roadmap.md](roadmap.md); for stable repo context see
   expectation travels on the core model (`Scenario.expectedOutcome`, default PASS,
   set by the JUnit layer) because the evaluation module can't see JUnit annotations.
   This is also the groundwork for task-07's deferred detection-%.
+- **Renderers are pluggable via `ServiceLoader`.** `EvaluationReportRenderer`
+  (`fileName()` + `render(report)`) is the format seam; the module contributes
+  `JsonReportRenderer` (artifact of record) and `MarkdownReportRenderer` through its
+  own `META-INF/services` entry, and any jar on the test classpath can contribute
+  more (HTML, XML, …) without touching this module. `ServiceLoader` over Spring beans
+  because the writing happens in the `LauncherSessionListener`, outside any context.
+  Rendering by `StringBuilder`, not a template engine, for now: Markdown is
+  newline-sensitive and the document is ~100 lines of logic; a logic-less engine
+  (JMustache — not Groovy, which drags in a whole language runtime as a consumer-test
+  dependency) becomes attractive if C3's formats grow, and would slot in behind the
+  renderer interface.
 - **Report grouping: bucket = the parent directory of `Scenario.source`.** The suite
   class name never reaches the evaluation layer (dependency arrow: junit → harness →
   evaluation seam), and the buckets differ only by `@Harness(scenarioDir)` — which is

@@ -71,14 +71,18 @@ class EvaluationReportWriterTest {
     }
 
     @Test
-    void writesJsonAndMarkdown() throws IOException {
-        val files = new EvaluationReportWriter().write(sampleReport(), dir.resolve("reports"));
+    void discoversBothBuiltInRenderersAndWritesOneFileEach() throws IOException {
+        val files = EvaluationReportWriter.discover().write(sampleReport(), dir.resolve("reports"));
 
-        assertThat(files.json()).exists();
-        assertThat(files.markdown()).exists();
+        assertThat(files).extracting(file -> file.getFileName().toString())
+                .containsExactlyInAnyOrder("evaluation.json", "evaluation.md");
+        for (val file : files) {
+            assertThat(file).exists();
+        }
 
         // the JSON round-trips and holds the full detail
-        val json = JsonMapper.builder().build().readTree(Files.readString(files.json()));
+        val json = JsonMapper.builder().build()
+                .readTree(Files.readString(dir.resolve("reports/evaluation.json")));
         assertThat(json.get("header").asString()).isEqualTo("gpt-oss-20b / reasoning off");
         assertThat(json.get("totals").get("stepsEvaluated").asInt()).isEqualTo(2);
         assertThat(json.get("buckets").get(0).get("name").asString()).isEqualTo("cucumber");
@@ -89,9 +93,9 @@ class EvaluationReportWriterTest {
 
     @Test
     void markdownHeadlineEndsAtTheMarkerAndCarriesTheAggregates() {
-        val markdown = new EvaluationReportWriter().renderMarkdown(sampleReport());
+        val markdown = new MarkdownReportRenderer().render(sampleReport());
 
-        val headline = markdown.substring(0, markdown.indexOf(EvaluationReportWriter.HEADLINE_END));
+        val headline = markdown.substring(0, markdown.indexOf(MarkdownReportRenderer.HEADLINE_END));
         assertThat(headline)
                 .contains("Header: gpt-oss-20b / reasoning off")
                 .contains("Actor: gpt-oss-20b @ http://127.0.0.1:8000")
@@ -105,7 +109,7 @@ class EvaluationReportWriterTest {
 
     @Test
     void findingsShowBothSidesOfANonGroundedStep() {
-        val markdown = new EvaluationReportWriter().renderMarkdown(sampleReport());
+        val markdown = new MarkdownReportRenderer().render(sampleReport());
 
         val findings = markdown.substring(markdown.indexOf("### Findings"));
         assertThat(findings)
