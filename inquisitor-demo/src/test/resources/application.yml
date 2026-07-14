@@ -5,13 +5,14 @@ spring:
   ai:
     openai:
       # Local OpenAI-compatible server (e.g. llama.cpp); the client appends /v1.
-      # Override per-environment via the standard OPENAI_* env vars.
-      base-url: ${OPENAI_BASE_URL:http://127.0.0.1:8000}
+      # Override per-environment via INQUISITOR_RUN_* (harness-specific, wins) or
+      # the standard OPENAI_* env vars (shared with other tooling).
+      base-url: ${INQUISITOR_RUN_BASE_URL:${OPENAI_BASE_URL:http://127.0.0.1:8000}}
       api-key: ${OPENAI_API_KEY:llama}
       chat:
         # Flattened properties; the nested chat.options.* form is deprecated
         # for removal in Spring AI 2.0.0.
-        model: ${OPENAI_MODEL:gemma-4-31B-it-QAT-Q4_0}
+        model: ${INQUISITOR_RUN_MODEL:${OPENAI_MODEL:gemma-4-31B-it-QAT-Q4_0}}
   # Force ANSI colour: the forked Gradle test JVM's stdout is piped (not a TTY),
   # so the default DETECT mode would otherwise render the logs uncoloured.
   output:
