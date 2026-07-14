@@ -20,7 +20,8 @@ The authoritative status is git history + this table.
 | —  | Scenario style buckets (`explicit`/`cucumber`/`intent`); flattened (no `positive`/`negative` split) | ✅ done |
 | 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
 | 07 | Fault detection (oracle calibration) — runtime fault router + standalone & `@Harness` suites | ✅ Phase 1 & 2 done (`tasks/task-07`) |
-| 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); Gradle task + report pending (`tasks/task-08`) |
+| 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); report pending (`tasks/task-08`) |
+| 11 | `io.inquisitor.harness` Gradle plugin — `evaluate` task (task-08 Phase C1) | ✅ done — plugin + TestKit test (`tasks/task-11`); demo `includeBuild` wiring + report (C2) pending |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
@@ -55,8 +56,9 @@ The authoritative status is git history + this table.
   `inquisitor-harness-evaluation` / `-starter` modules (like OpenAPI) and gated on
   `inquisitor.harness.evaluation.enabled` (off by default). The core keeps only the
   trace seam (`TraceKeys`/`ToolCallRecord`/`StepRun`); the starter decorates the
-  harness's `ToolCallback` beans via a `BeanPostProcessor`. **Pending**: the
-  `harness:evaluate` Gradle task and the JSON + Markdown report. See
+  harness's `ToolCallback` beans via a `BeanPostProcessor`. The `io.inquisitor.harness`
+  Gradle plugin with the `evaluate` task has landed too (task-11, Phase C1).
+  **Pending**: the demo `includeBuild` wiring and the JSON + Markdown report (C2). See
   `tasks/task-08-evaluation.md`. **Later idea — evaluation as an opt-in gate**:
   today the score is calibration-only (an actor-PASS judged `CONTRADICTED` still
   reports green in JUnit); two complementary opt-in gates are on the table.

@@ -24,6 +24,7 @@ include(
     "inquisitor-harness-openapi-starter",
     "inquisitor-harness-evaluation",
     "inquisitor-harness-evaluation-starter",
+    "inquisitor-harness-gradle-plugin",
     "inquisitor-mock",
     "inquisitor-mock-starter",
     "inquisitor-demo-db-starter",

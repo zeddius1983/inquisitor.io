@@ -11,7 +11,7 @@ sequencing. Reporting (C2), the README verified-models table + docs (C3), and
 C1's job is exactly: **the plugin exists and its `evaluate` task runs the tagged
 scenario tests with the gate + evaluation enabled.** No report is produced yet.
 
-> Status: **planned, not implemented.** To be implemented on a new feature branch.
+> Status: **implemented** on `feature/evaluate-gradle-plugin`.
 
 ## Decisions (locked during the task-08 Phase C discussion)
 
