@@ -18,56 +18,21 @@ package io.inquisitor.demo;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-
-import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.executor.ScenarioExecutor;
-import io.inquisitor.harness.junit.RequiresLlm;
-import io.inquisitor.harness.model.ScenarioResult;
-import io.inquisitor.harness.parser.ScenarioParser;
-import io.inquisitor.harness.tool.HttpTarget;
-import io.inquisitor.harness.tool.HttpTargetRegistry;
 import lombok.val;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.core.io.ClassPathResource;
 
 /**
  * Drives the markdown scenarios against the running demo app via the standalone
  * harness ({@link ScenarioExecutor}), asserting on the verdicts ourselves — one
  * ordinary JUnit test per scenario.
  *
- * <p>Each test needs the local LLM (an OpenAI-compatible server at
- * {@code http://127.0.0.1:8000}, see {@code src/test/resources/application.yml}),
- * so the class is gated: run with {@code INQUISITOR_LLM_IT=true}.
+ * <p>The shared harness plumbing (target registration, parsing, and the optional
+ * evaluation read-out) lives in {@link AbstractScenarioTests}; this class only adds the
+ * positive assertion that each scenario passes. Each test needs the local LLM, so it is
+ * gated: run with {@code INQUISITOR_LLM_IT=true}.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@RequiresLlm
-class ScenarioTests {
-
-    @Autowired
-    private ScenarioExecutor executor;
-
-    @Autowired
-    private ScenarioParser parser;
-
-    @Autowired
-    private HttpTargetRegistry httpTargetRegistry;
-
-    @LocalServerPort
-    private int port;
-
-    @BeforeEach
-    void registerApplicationTarget() {
-        // The app's HTTP target depends on the random port, so it is registered here
-        // rather than by the starter autoconfiguration. The datasource is auto-registered.
-        httpTargetRegistry.register(HarnessDefaults.APPLICATION, HttpTarget.of("http://localhost:" + port));
-    }
+class ScenarioTests extends AbstractScenarioTests {
 
     @Test
     void fetchingANonExistentAccountReturnsProblemDetail() {
@@ -105,30 +70,10 @@ class ScenarioTests {
     }
 
     private void runScenario(String classpathLocation) {
-        val resource = new ClassPathResource(classpathLocation);
-        val scenario = parser.parse(read(resource), resource.getFilename());
-        val result = executor.evaluate(scenario);
+        val scenario = parse(classpathLocation);
+        val recordedBefore = recordedCount();
+        val result = executor.execute(scenario);
+        reportEvaluation("scenario '" + scenario.name() + "'", recordedBefore);
         assertThat(result.passed()).withFailMessage(() -> describe(result)).isTrue();
-    }
-
-    private static String read(ClassPathResource resource) {
-        try {
-            return resource.getContentAsString(StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not read scenario " + resource.getPath(), e);
-        }
-    }
-
-    private static String describe(ScenarioResult result) {
-        val message = new StringBuilder("Scenario '").append(result.scenario().name()).append("' failed:\n");
-        for (val step : result.results()) {
-            val verdict = step.verdict();
-            message.append("  [").append(verdict.outcome()).append("] ")
-                    .append(step.step().title()).append(" — ").append(verdict.reasoning()).append('\n');
-            if (!step.passed() && !verdict.evidence().isEmpty()) {
-                message.append("      evidence: ").append(verdict.evidence()).append('\n');
-            }
-        }
-        return message.toString();
     }
 }

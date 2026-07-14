@@ -23,10 +23,10 @@ import javax.sql.DataSource;
 
 import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
-import io.inquisitor.harness.executor.ChatClientStepEvaluator;
 import io.inquisitor.harness.executor.HarnessSystemPrompt;
+import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.ScenarioExecutor;
-import io.inquisitor.harness.executor.StepEvaluator;
+import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.parser.ScenarioParser;
 import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
@@ -41,6 +41,7 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.ObjectProvider;
@@ -115,6 +116,22 @@ public class InquisitorHarnessAutoConfiguration {
         return new SqlTool(registry);
     }
 
+    // The built-in tools are exposed as individual ToolCallback beans (each tool has one
+    // @Tool method) so the optional evaluation starter can decorate them — a
+    // BeanPostProcessor wrapping each ToolCallback to record its calls — without the core
+    // depending on evaluation. The ChatClient below aggregates all ToolCallback beans.
+    @Bean
+    @ConditionalOnMissingBean(name = "inquisitorHttpRequestToolCallback")
+    ToolCallback inquisitorHttpRequestToolCallback(HttpRequestTool httpRequestTool) {
+        return ToolCallbacks.from(httpRequestTool)[0];
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "inquisitorSqlToolCallback")
+    ToolCallback inquisitorSqlToolCallback(SqlTool sqlTool) {
+        return ToolCallbacks.from(sqlTool)[0];
+    }
+
     @Bean
     @ConditionalOnMissingBean
     ScenarioParser inquisitorScenarioParser() {
@@ -127,15 +144,16 @@ public class InquisitorHarnessAutoConfiguration {
     ChatClient inquisitorChatClient(
             ChatModel chatModel,
             ChatMemory chatMemory,
-            HttpRequestTool httpRequestTool,
-            SqlTool sqlTool,
             ObjectProvider<ToolCallback> toolCallbacks,
             ObjectProvider<ToolCallbackProvider> toolCallbackProviders,
             ObjectProvider<Advisor> advisors) {
 
-        // Spring AI's unified defaultTools(Object...) accepts tool objects, ToolCallbacks,
-        // and ToolCallbackProviders alike, so built-ins and user-supplied tools go together.
-        val tools = new ArrayList<>(List.of(httpRequestTool, sqlTool));
+        // Every tool the model may call, as ToolCallbacks: the built-in HTTP/SQL adapters,
+        // any user-supplied ToolCallback beans, and any ToolCallbackProvider beans (e.g.
+        // MCP). Spring AI's unified defaultTools(Object...) takes callbacks and providers
+        // alike. When the evaluation starter is active it has already decorated each
+        // ToolCallback bean to record calls; the core is unaware of that here.
+        val tools = new ArrayList<>();
         toolCallbacks.orderedStream().forEach(tools::add);
         toolCallbackProviders.orderedStream().forEach(tools::add);
 
@@ -156,18 +174,20 @@ public class InquisitorHarnessAutoConfiguration {
                 .build();
     }
 
+    // Concrete type so the evaluation autoconfiguration can inject and wrap it. It is a
+    // StepRunner, so it satisfies the executor below unless a @Primary wrapper is present.
     @Bean
     @ConditionalOnBean(ChatClient.class)
     @ConditionalOnMissingBean
-    StepEvaluator inquisitorStepEvaluator(ChatClient chatClient) {
-        return new ChatClientStepEvaluator(chatClient);
+    LlmStepRunner inquisitorLlmStepRunner(ChatClient chatClient) {
+        return new LlmStepRunner(chatClient);
     }
 
     @Bean
-    @ConditionalOnBean(StepEvaluator.class)
+    @ConditionalOnBean(StepRunner.class)
     @ConditionalOnMissingBean
-    ScenarioExecutor inquisitorScenarioExecutor(StepEvaluator stepEvaluator) {
-        return new ScenarioExecutor(stepEvaluator);
+    ScenarioExecutor inquisitorScenarioExecutor(StepRunner stepRunner) {
+        return new ScenarioExecutor(stepRunner);
     }
 
     private static DataSource toDataSource(InquisitorHarnessProperties.Datasource properties) {

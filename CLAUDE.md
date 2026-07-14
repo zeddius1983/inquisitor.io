@@ -23,6 +23,7 @@ Base package: `io.inquisitor`. Group: `io.inquisitor`.
 | `inquisitor-harness-junit` | JUnit 5 extension that runs scenarios as tests |
 | `inquisitor-harness-junit-starter` | Autoconfiguration for the JUnit extension |
 | `inquisitor-harness-openapi` / `inquisitor-harness-openapi-starter` | Optional OpenAPI/Swagger discovery: an `OpenApiAdvisor` injects the app's spec into the system prompt. Off unless `inquisitor.harness.openapi.enabled=true`; removable without touching the core |
+| `inquisitor-harness-evaluation` / `inquisitor-harness-evaluation-starter` | Optional step evaluation (LLM-as-judge): a separate judge model scores each verdict against the real tool trace. Off unless `inquisitor.harness.evaluation.enabled=true`. The starter decorates the harness's `ToolCallback` beans (a `BeanPostProcessor` recording each call) and wraps the actor `StepRunner`; removable without touching the core (the trace seam — `TraceKeys`/`ToolCallRecord`/`StepRun` — lives in `inquisitor-harness`) |
 | `inquisitor-mock` / `inquisitor-mock-starter` | Reserved (mock server); not yet implemented |
 | `inquisitor-demo-db-starter` | Zero-config local Postgres via Testcontainers + Flyway |
 | `inquisitor-demo` | Banking REST demo app + scenario tests; the reference consumer |
@@ -115,8 +116,8 @@ Three project agents escalate by scope: `junior-developer` (well-scoped tasks),
 
 `inquisitor-harness` is implemented: `model/` (Scenario, Step, verdict records),
 `parser/` (flexmark markdown → `Scenario`), `tool/` (`HttpRequestTool`, `SqlTool`
-+ named registries), `executor/` (`ScenarioExecutor`, `ChatClientStepEvaluator`,
-system prompt). `inquisitor-harness-starter` autoconfigures it. The ergonomic
++ named registries), `executor/` (`ScenarioExecutor`, the `StepRunner` seam +
+`LlmStepRunner`, system prompt). `inquisitor-harness-starter` autoconfigures it. The ergonomic
 JUnit layer is implemented in `inquisitor-harness-junit` (`@Harness` on the test
 class + one `@Scenario` method per scenario; `@Scenario` is a `@TestTemplate` that
 reports one sub-test per step) and re-exported by

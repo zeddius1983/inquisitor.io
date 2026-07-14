@@ -18,6 +18,7 @@ package io.inquisitor.harness.executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,7 +34,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Deterministic tests of the executor's orchestration, using a scripted
- * {@link StepEvaluator} — no LLM involved.
+ * {@link StepRunner} — no LLM involved.
  */
 class ScenarioExecutorTest {
 
@@ -53,7 +54,7 @@ class ScenarioExecutorTest {
         var evaluator = new ScriptedEvaluator(ignored -> Outcome.PASS);
         var executor = new ScenarioExecutor(evaluator);
 
-        ScenarioResult result = executor.evaluate(threeSteps());
+        ScenarioResult result = executor.execute(threeSteps());
 
         assertThat(result.passed()).isTrue();
         assertThat(result.results()).hasSize(3);
@@ -66,7 +67,7 @@ class ScenarioExecutorTest {
         var evaluator = new ScriptedEvaluator(step -> step.index() == 2 ? Outcome.FAIL : Outcome.PASS);
         var executor = new ScenarioExecutor(evaluator);
 
-        ScenarioResult result = executor.evaluate(threeSteps());
+        ScenarioResult result = executor.execute(threeSteps());
 
         assertThat(result.passed()).isFalse();
         assertThat(result.results()).hasSize(2);
@@ -79,7 +80,7 @@ class ScenarioExecutorTest {
     @Test
     void allStepsShareOneConversationId() {
         var evaluator = new ScriptedEvaluator(ignored -> Outcome.PASS);
-        new ScenarioExecutor(evaluator).evaluate(threeSteps());
+        new ScenarioExecutor(evaluator).execute(threeSteps());
 
         assertThat(evaluator.conversationIds).hasSize(1);
     }
@@ -87,7 +88,7 @@ class ScenarioExecutorTest {
     @Test
     void singleStepScenarioPasses() {
         var scenario = new Scenario("Ping", "", List.of(new Step(1, "Ping", "ping it")), null);
-        var result = new ScenarioExecutor(new ScriptedEvaluator(ignored -> Outcome.PASS)).evaluate(scenario);
+        var result = new ScenarioExecutor(new ScriptedEvaluator(ignored -> Outcome.PASS)).execute(scenario);
 
         assertThat(result.passed()).isTrue();
         assertThat(result.results()).hasSize(1);
@@ -106,8 +107,8 @@ class ScenarioExecutorTest {
         assertThat(evaluation.result().results()).hasSize(2);
     }
 
-    /** A {@link StepEvaluator} that returns scripted outcomes and records calls. */
-    private static final class ScriptedEvaluator implements StepEvaluator {
+    /** A {@link StepRunner} that returns scripted outcomes and records calls. */
+    private static final class ScriptedEvaluator implements StepRunner {
 
         final List<Step> evaluated = new ArrayList<>();
         final Set<String> conversationIds = new LinkedHashSet<>();
@@ -118,10 +119,12 @@ class ScenarioExecutorTest {
         }
 
         @Override
-        public StepVerdict evaluate(String conversationId, Scenario scenario, Step step) {
-            evaluated.add(step);
-            conversationIds.add(conversationId);
-            return new StepVerdict(script.apply(step), "scripted", List.of("evidence"));
+        public StepRun run(StepRequest request) {
+            evaluated.add(request.step());
+            conversationIds.add(request.conversationId());
+            return new StepRun(
+                    new StepVerdict(script.apply(request.step()), "scripted", List.of("evidence")),
+                    List.of(), Duration.ZERO);
         }
     }
 }

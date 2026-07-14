@@ -1,6 +1,6 @@
 [versions]
 spring-boot      = "4.0.6"
-spring-ai        = "2.0.0-RC1"
+spring-ai        = "2.0.0"
 flexmark         = "0.64.8"
 junit-jupiter    = "5.12.2"
 dependency-mgmt  = "1.1.7"
