@@ -24,7 +24,7 @@ inquisitor:
     evaluation:
       # Optional step evaluation (LLM-as-judge). Off by default; opt in with
       # INQUISITOR_EVAL=true to score each verdict against the real tool trace.
-      enabled: ${INQUISITOR_EVAL:false}
+      enabled: ${INQUISITOR_EVAL:true}
       # A genuinely separate judge on its own local server (the strong config — a
       # different model/family from the actor, not a self-judge). The api-key falls
       # back to spring.ai.openai.api-key when unset.
