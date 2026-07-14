@@ -25,6 +25,7 @@ import java.util.Map;
 
 import io.inquisitor.harness.evaluation.StepEvaluationRecord;
 import io.inquisitor.harness.model.Outcome;
+import lombok.Builder;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 
@@ -45,6 +46,7 @@ import org.jspecify.annotations.Nullable;
  *   success and a fully-green run is a <em>missed detection</em>).</li>
  * </ul>
  */
+@Builder
 public record EvaluationReport(
         Instant generatedAt,
         long durationMillis,
@@ -54,6 +56,7 @@ public record EvaluationReport(
         List<Bucket> buckets) {
 
     /** Aggregate numbers for the whole run or one bucket. */
+    @Builder
     public record Totals(
             int scenarios,
             int scenariosMatched,
@@ -90,8 +93,14 @@ public record EvaluationReport(
                 .map(entry -> new Bucket(entry.getKey(), totalsOf(entry.getValue()), List.copyOf(entry.getValue())))
                 .toList();
 
-        return new EvaluationReport(generatedAt, duration.toMillis(), header, runInfo,
-                totalsOf(instances), buckets);
+        return EvaluationReport.builder()
+                .generatedAt(generatedAt)
+                .durationMillis(duration.toMillis())
+                .header(header)
+                .runInfo(runInfo)
+                .totals(totalsOf(instances))
+                .buckets(buckets)
+                .build();
     }
 
     private static List<ScenarioReport> splitIntoInstances(List<StepEvaluationRecord> records) {
@@ -137,14 +146,15 @@ public record EvaluationReport(
             val category = step.category() == null ? "(uncategorized)" : step.category();
             categories.merge(category, 1, Integer::sum);
         }
-        return new Totals(
-                scenarios.size(),
-                (int) scenarios.stream().filter(ScenarioReport::matched).count(),
-                steps.size(),
-                evaluated.size(),
-                steps.size() - evaluated.size(),
-                meanScore,
-                categories);
+        return Totals.builder()
+                .scenarios(scenarios.size())
+                .scenariosMatched((int) scenarios.stream().filter(ScenarioReport::matched).count())
+                .stepsRecorded(steps.size())
+                .stepsEvaluated(evaluated.size())
+                .stepsNotEvaluated(steps.size() - evaluated.size())
+                .meanScore(meanScore)
+                .categories(categories)
+                .build();
     }
 
     private static String bucketOf(@Nullable String source) {

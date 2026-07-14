@@ -19,6 +19,7 @@ package io.inquisitor.harness.evaluation;
 import java.util.List;
 
 import io.inquisitor.harness.model.Outcome;
+import lombok.Builder;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -45,6 +46,7 @@ import org.jspecify.annotations.Nullable;
  *                        harness-synthesized verdict the judge never saw
  * @param feedback        the judge's findings, joined
  */
+@Builder
 public record StepEvaluationRecord(
         String scenario,
         @Nullable String scenarioSource,

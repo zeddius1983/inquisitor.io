@@ -56,13 +56,22 @@ public class StepEvaluationRecorder {
         val scenario = request.scenario();
         val step = request.step();
         val verdict = run.verdict();
-        return new StepEvaluationRecord(
-                scenario.name(), scenario.source(), scenario.expectedOutcome(),
-                step.index(), scenario.steps().size(), step.title(),
-                verdict.outcome(), verdict.reasoning(), verdict.evidence(),
-                run.toolCalls().stream().map(ToolCallRecord::describe).toList(),
-                run.elapsed().toMillis(),
-                score, category, feedback);
+        return StepEvaluationRecord.builder()
+                .scenario(scenario.name())
+                .scenarioSource(scenario.source())
+                .expectedOutcome(scenario.expectedOutcome())
+                .stepIndex(step.index())
+                .stepCount(scenario.steps().size())
+                .stepTitle(step.title())
+                .outcome(verdict.outcome())
+                .reasoning(verdict.reasoning())
+                .evidence(verdict.evidence())
+                .toolCalls(run.toolCalls().stream().map(ToolCallRecord::describe).toList())
+                .elapsedMillis(run.elapsed().toMillis())
+                .score(score)
+                .category(category)
+                .feedback(feedback)
+                .build();
     }
 
     /** Every recorded step result, in record order. */

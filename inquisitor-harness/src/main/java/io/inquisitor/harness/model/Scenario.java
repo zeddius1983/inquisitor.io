@@ -18,6 +18,8 @@ package io.inquisitor.harness.model;
 
 import java.util.List;
 
+import lombok.Builder;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -36,6 +38,8 @@ import org.jspecify.annotations.Nullable;
  *                        condition (set by the JUnit layer from
  *                        {@code @Scenario(expect = FAIL)})
  */
+@Builder
+@With
 public record Scenario(String name, String description, List<Step> steps, @Nullable String source,
                        Outcome expectedOutcome) {
 
@@ -46,11 +50,6 @@ public record Scenario(String name, String description, List<Step> steps, @Nulla
     /** A scenario expected to pass — the parser's and the ordinary run's default. */
     public Scenario(String name, String description, List<Step> steps, @Nullable String source) {
         this(name, description, steps, source, Outcome.PASS);
-    }
-
-    /** A copy of this scenario with the given expected outcome. */
-    public Scenario withExpectedOutcome(Outcome expected) {
-        return new Scenario(name, description, steps, source, expected);
     }
 
     /** Whether this scenario has more than one step. */

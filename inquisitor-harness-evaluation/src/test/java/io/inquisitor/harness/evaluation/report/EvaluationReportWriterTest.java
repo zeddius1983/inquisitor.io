@@ -38,15 +38,31 @@ class EvaluationReportWriterTest {
     private Path dir;
 
     private static EvaluationReport sampleReport() {
-        val grounded = new StepEvaluationRecord("Transfer funds",
-                "classpath:scenarios/cucumber/transfer.md", Outcome.PASS, 1, 2, "Make the transfer",
-                Outcome.PASS, "transferred", List.of("HTTP 200"),
-                List.of("#0 httpRequest({}) -> HTTP 200"), 1200, 1.0, "GROUNDED", "");
-        val contradicted = new StepEvaluationRecord("Transfer funds",
-                "classpath:scenarios/cucumber/transfer.md", Outcome.PASS, 2, 2, "Check the balance",
-                Outcome.PASS, "balance matches", List.of("balance 100"),
-                List.of("#0 sqlQuery(SELECT) -> [{balance=50}]"), 800, 0.0, "CONTRADICTED",
-                "claims balance 100; the trace shows 50");
+        val grounded = StepEvaluationRecord.builder()
+                .scenario("Transfer funds")
+                .scenarioSource("classpath:scenarios/cucumber/transfer.md")
+                .expectedOutcome(Outcome.PASS)
+                .stepIndex(1).stepCount(2).stepTitle("Make the transfer")
+                .outcome(Outcome.PASS)
+                .reasoning("transferred")
+                .evidence(List.of("HTTP 200"))
+                .toolCalls(List.of("#0 httpRequest({}) -> HTTP 200"))
+                .elapsedMillis(1200)
+                .score(1.0).category("GROUNDED").feedback("")
+                .build();
+        val contradicted = StepEvaluationRecord.builder()
+                .scenario("Transfer funds")
+                .scenarioSource("classpath:scenarios/cucumber/transfer.md")
+                .expectedOutcome(Outcome.PASS)
+                .stepIndex(2).stepCount(2).stepTitle("Check the balance")
+                .outcome(Outcome.PASS)
+                .reasoning("balance matches")
+                .evidence(List.of("balance 100"))
+                .toolCalls(List.of("#0 sqlQuery(SELECT) -> [{balance=50}]"))
+                .elapsedMillis(800)
+                .score(0.0).category("CONTRADICTED")
+                .feedback("claims balance 100; the trace shows 50")
+                .build();
         return EvaluationReport.of(Instant.parse("2026-07-14T18:00:00Z"), Duration.ofMinutes(65),
                 "gpt-oss-20b / reasoning off",
                 new EvaluationRunInfo("gpt-oss-20b", "http://127.0.0.1:8000",

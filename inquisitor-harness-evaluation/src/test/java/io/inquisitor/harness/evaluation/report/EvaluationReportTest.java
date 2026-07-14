@@ -33,9 +33,22 @@ class EvaluationReportTest {
     private static StepEvaluationRecord record(String scenario, @Nullable String source,
             Outcome expected, int stepIndex, int stepCount, Outcome outcome,
             double score, String category) {
-        return new StepEvaluationRecord(scenario, source, expected, stepIndex, stepCount,
-                "step " + stepIndex, outcome, "reasoning", List.of(), List.of("#0 t({}) -> ok"),
-                10, score, category, "");
+        return StepEvaluationRecord.builder()
+                .scenario(scenario)
+                .scenarioSource(source)
+                .expectedOutcome(expected)
+                .stepIndex(stepIndex)
+                .stepCount(stepCount)
+                .stepTitle("step " + stepIndex)
+                .outcome(outcome)
+                .reasoning("reasoning")
+                .evidence(List.of())
+                .toolCalls(List.of("#0 t({}) -> ok"))
+                .elapsedMillis(10)
+                .score(score)
+                .category(category)
+                .feedback("")
+                .build();
     }
 
     @Test
