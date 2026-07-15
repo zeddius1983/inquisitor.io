@@ -16,15 +16,12 @@
 
 package io.inquisitor.harness.evaluation.report;
 
-import java.time.Duration;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import io.inquisitor.harness.evaluation.StepEvaluationRecord;
 import io.inquisitor.harness.model.Outcome;
 import lombok.val;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The human-readable rendering: a headline block (ended by {@value #HEADLINE_END},
@@ -57,14 +54,14 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
     private static void appendHeadline(StringBuilder out, EvaluationReport report) {
         val totals = report.totals();
         out.append("- Generated: ").append(report.generatedAt())
-                .append(" (took ").append(humanDuration(report.durationMillis())).append(")\n");
+                .append(" (took ").append(ReportFormats.humanDuration(report.durationMillis())).append(")\n");
         if (report.header() != null) {
             out.append("- Header: ").append(report.header()).append('\n');
         }
         val runInfo = report.runInfo();
         if (runInfo != null) {
-            out.append("- Actor: ").append(endpoint(runInfo.actorModel(), runInfo.actorBaseUrl())).append('\n');
-            out.append("- Judge: ").append(endpoint(runInfo.judgeModel(), runInfo.judgeBaseUrl())).append('\n');
+            out.append("- Actor: ").append(ReportFormats.endpoint(runInfo.actorModel(), runInfo.actorBaseUrl())).append('\n');
+            out.append("- Judge: ").append(ReportFormats.endpoint(runInfo.judgeModel(), runInfo.judgeBaseUrl())).append('\n');
         }
         out.append("- Expectation gate: ").append(gate(totals)).append('\n');
         out.append("- Evaluation score: **").append(score(totals)).append("** (")
@@ -93,7 +90,7 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
                     .append(" | ").append(scenario.steps().size()).append('/')
                     .append(scenario.steps().getFirst().stepCount())
                     .append(" | ").append(scenario.matched() ? "yes" : missedLabel(scenario))
-                    .append(" | ").append(Double.isNaN(mean) ? "—" : percent(mean))
+                    .append(" | ").append(Double.isNaN(mean) ? "—" : ReportFormats.percent(mean))
                     .append(" |\n");
         }
         appendFindings(out, bucket);
@@ -139,24 +136,9 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
     }
 
     private static String score(EvaluationReport.Totals totals) {
-        return totals.meanScore() == null ? "n/a" : percent(totals.meanScore());
+        return totals.meanScore() == null ? "n/a" : ReportFormats.percent(totals.meanScore());
     }
 
-    private static String percent(double score) {
-        return String.format(Locale.ROOT, "%.1f%%", score * 100.0);
-    }
 
-    private static String endpoint(@Nullable String model, @Nullable String baseUrl) {
-        return (model == null ? "(unknown model)" : model) + (baseUrl == null ? "" : " @ " + baseUrl);
-    }
 
-    private static String humanDuration(long millis) {
-        val duration = Duration.ofMillis(millis);
-        val hours = duration.toHours();
-        val minutes = duration.toMinutesPart();
-        val seconds = duration.toSecondsPart();
-        return hours > 0 ? "%dh %dm %ds".formatted(hours, minutes, seconds)
-                : minutes > 0 ? "%dm %ds".formatted(minutes, seconds)
-                : "%ds".formatted(seconds);
-    }
 }

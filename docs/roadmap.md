@@ -23,7 +23,7 @@ The authoritative status is git history + this table.
 | 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); report pending (`tasks/task-08`) |
 | 11 | `io.inquisitor.harness` Gradle plugin — `evaluate` task (task-08 Phase C1) | ✅ done — plugin + TestKit test + demo `includeBuild` wiring (`:inquisitor-demo:evaluate`) (`tasks/task-11`) |
 | 12 | Evaluation report (task-08 Phase C2) — JSON + Markdown artifacts, bucket-grouped, expectation-aware gate | ✅ done — session-listener flush, echo folded into `evaluate` (`tasks/task-12`); C3 (README table, `benchmark.yml`, publishing) pending |
-| 13 | HTML evaluation report — `evaluation.html` with Success rate × Evaluation rate side by side (task-08 C3, part) | 📝 planned (`tasks/task-13`) |
+| 13 | HTML evaluation report — `evaluation.html` with Success rate × Evaluation rate side by side, JUnit-report-style navigation (task-08 C3, part) | ✅ done (`tasks/task-13`) |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 

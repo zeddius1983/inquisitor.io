@@ -135,6 +135,7 @@ class InquisitorHarnessPluginFunctionalTest {
                                 (bucket detail that must not be echoed)
                                 \""");
                         Files.writeString(dir.resolve("evaluation.json"), "{}");
+                        Files.writeString(dir.resolve("evaluation.html"), "<html></html>");
                         fail("a scenario failed - the report must still be echoed");
                     }
                 }
@@ -147,6 +148,8 @@ class InquisitorHarnessPluginFunctionalTest {
                 "the evaluate task itself must echo the headline, even on a red run");
         assertFalse(result.getOutput().contains("(bucket detail that must not be echoed)"),
                 "only the headline (before the marker) is echoed");
+        assertTrue(result.getOutput().contains("Evaluation report (html):"),
+                "the echo links the html report when present");
     }
 
     @Test

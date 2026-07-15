@@ -65,6 +65,10 @@ final class EvaluationReportEcho implements TestListener {
             }
             LOGGER.lifecycle(headline.toString().stripTrailing());
             LOGGER.lifecycle("Evaluation report: {}", markdown.toAbsolutePath());
+            var html = markdown.resolveSibling("evaluation.html");
+            if (Files.exists(html)) {
+                LOGGER.lifecycle("Evaluation report (html): {}", html.toAbsolutePath());
+            }
         } catch (IOException e) {
             // The echo is convenience output; never let it break the test task.
             LOGGER.warn("Could not read the evaluation report {}", markdown, e);

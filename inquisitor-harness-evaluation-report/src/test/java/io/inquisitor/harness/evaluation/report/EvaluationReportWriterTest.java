@@ -71,11 +71,11 @@ class EvaluationReportWriterTest {
     }
 
     @Test
-    void discoversBothBuiltInRenderersAndWritesOneFileEach() throws IOException {
+    void discoversAllBuiltInRenderersAndWritesOneFileEach() throws IOException {
         val files = EvaluationReportWriter.discover().write(sampleReport(), dir.resolve("reports"));
 
         assertThat(files).extracting(file -> file.getFileName().toString())
-                .containsExactlyInAnyOrder("evaluation.json", "evaluation.md");
+                .containsExactlyInAnyOrder("evaluation.json", "evaluation.md", "evaluation.html");
         for (val file : files) {
             assertThat(file).exists();
         }

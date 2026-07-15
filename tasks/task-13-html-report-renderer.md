@@ -9,7 +9,13 @@ brittle across Gradle versions. Instead the harness ships its own HTML through t
 pluggable renderer seam (`EvaluationReportRenderer`, ServiceLoader-discovered) that
 task-12 introduced for exactly this kind of growth.
 
-> Status: **planned, not implemented.**
+> Status: **implemented** on `feature/evaluate-gradle-plugin`. Two amendments landed
+> during implementation (review feedback): **JUnit-report-style navigation** — the
+> single file drills down via in-page anchors (summary tiles → buckets overview
+> table → bucket table → per-scenario section with its own step table, "back to
+> top" links); and **findings per test** — every scenario section lists its
+> findings, including `NOT_EVALUATED` steps with their reason (synthetic verdict /
+> failed judge call), not only judge-flagged ones.
 
 ## Shape
 

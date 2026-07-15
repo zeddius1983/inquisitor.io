@@ -1,2 +1,3 @@
 io.inquisitor.harness.evaluation.report.JsonReportRenderer
 io.inquisitor.harness.evaluation.report.MarkdownReportRenderer
+io.inquisitor.harness.evaluation.report.HtmlReportRenderer
