@@ -26,6 +26,7 @@ dependencies {
         api(project(":inquisitor-harness-openapi"))
         api(project(":inquisitor-harness-openapi-starter"))
         api(project(":inquisitor-harness-evaluation"))
+        api(project(":inquisitor-harness-evaluation-report"))
         api(project(":inquisitor-harness-evaluation-starter"))
     }
 }

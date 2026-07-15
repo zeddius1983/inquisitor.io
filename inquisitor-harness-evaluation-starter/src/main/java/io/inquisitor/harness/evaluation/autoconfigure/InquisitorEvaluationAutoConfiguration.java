@@ -41,6 +41,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.util.Assert;
@@ -93,22 +94,32 @@ public class InquisitorEvaluationAutoConfiguration {
     }
 
     /**
-     * Registers the recorder (and the model configuration) with the JVM-wide
-     * {@link EvaluationReportSession}, so the report session listener can drain it after
-     * the whole test plan. Registration is passive — a report is only written when the
-     * listener finds {@code inquisitor.report.dir} set (the Gradle plugin's
-     * {@code evaluate} task sets it).
+     * Report wiring, active only when the optional {@code inquisitor-harness-evaluation-report}
+     * module is on the classpath (the starter ships it by default; excluding it degrades
+     * evaluation to score-only, no artifacts).
      */
-    @Bean
-    InitializingBean inquisitorEvaluationReportRegistration(
-            StepEvaluationRecorder recorder, EvaluationProperties properties, Environment environment) {
-        return () -> EvaluationReportSession.register(recorder, new EvaluationRunInfo(
-                environment.getProperty("spring.ai.openai.chat.model"),
-                environment.getProperty("spring.ai.openai.base-url"),
-                properties.model(),
-                properties.baseUrl() != null
-                        ? properties.baseUrl()
-                        : environment.getProperty("spring.ai.openai.base-url")));
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(EvaluationReportSession.class)
+    static class EvaluationReportConfiguration {
+
+        /**
+         * Registers the recorder (and the model configuration) with the JVM-wide
+         * {@link EvaluationReportSession}, so the report session listener can drain it
+         * after the whole test plan. Registration is passive — a report is only written
+         * when the listener finds {@code inquisitor.report.dir} set (the Gradle plugin's
+         * {@code evaluate} task sets it).
+         */
+        @Bean
+        InitializingBean inquisitorEvaluationReportRegistration(
+                StepEvaluationRecorder recorder, EvaluationProperties properties, Environment environment) {
+            return () -> EvaluationReportSession.register(recorder, new EvaluationRunInfo(
+                    environment.getProperty("spring.ai.openai.chat.model"),
+                    environment.getProperty("spring.ai.openai.base-url"),
+                    properties.model(),
+                    properties.baseUrl() != null
+                            ? properties.baseUrl()
+                            : environment.getProperty("spring.ai.openai.base-url")));
+        }
     }
 
     @Bean

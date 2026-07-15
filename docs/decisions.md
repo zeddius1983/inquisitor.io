@@ -286,6 +286,14 @@ see [roadmap.md](roadmap.md); for stable repo context see
   expectation travels on the core model (`Scenario.expectedOutcome`, default PASS,
   set by the JUnit layer) because the evaluation module can't see JUnit annotations.
   This is also the groundwork for task-07's deferred detection-%.
+- **Reporting is its own module (`inquisitor-harness-evaluation-report`).** Keeps the
+  judge module purely recorder + judge (the launcher and Jackson dependencies move
+  out), isolates the one piece of static state (`EvaluationReportSession`) and the
+  ServiceLoader listener, and gives renderer growth (C3: HTML, templates,
+  multi-config aggregation) a home. The starter ships it by default
+  (`implementation` dependency) with the registration bean
+  `@ConditionalOnClass`-guarded, so excluding the module degrades evaluation to
+  score-only — the OpenAPI-grade removal bar.
 - **Renderers are pluggable via `ServiceLoader`.** `EvaluationReportRenderer`
   (`fileName()` + `render(report)`) is the format seam; the module contributes
   `JsonReportRenderer` (artifact of record) and `MarkdownReportRenderer` through its

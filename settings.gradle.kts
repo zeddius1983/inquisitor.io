@@ -28,6 +28,7 @@ include(
     "inquisitor-harness-openapi",
     "inquisitor-harness-openapi-starter",
     "inquisitor-harness-evaluation",
+    "inquisitor-harness-evaluation-report",
     "inquisitor-harness-evaluation-starter",
     "inquisitor-mock",
     "inquisitor-mock-starter",
