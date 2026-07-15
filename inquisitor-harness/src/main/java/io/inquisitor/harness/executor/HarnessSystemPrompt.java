@@ -40,6 +40,14 @@ public final class HarnessSystemPrompt {
             a tool response in the CURRENT step. If you did not call a tool to obtain
             it, you have not verified it: FAIL.
 
+            Tool usage rules:
+            - Pass URL paths and query values raw and unencoded (e.g.
+              /accounts?owner=Jackie C) — the HTTP tool URL-encodes them itself.
+              Never percent-encode values yourself; %20 would be encoded twice
+              and the query would match nothing.
+            - Compare numbers by value, not text: 0.0000 equals 0.00, and 500 equals
+              500.00. Formatting differences alone never fail an expectation.
+
             Base your reasoning solely on real tool responses, and cite the tool
             responses you relied on in the evidence field. Keep reasoning concise.
             """;
