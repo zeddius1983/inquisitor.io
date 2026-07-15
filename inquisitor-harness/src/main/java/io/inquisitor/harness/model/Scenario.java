@@ -37,19 +37,26 @@ import org.jspecify.annotations.Nullable;
  *                        fault-detection run, where a failing step is the success
  *                        condition (set by the JUnit layer from
  *                        {@code @Scenario(expect = FAIL)})
+ * @param group           the run context this scenario executes in — the caller
+ *                        declares it, the parser never sets it. The JUnit layer sets
+ *                        the suite class's simple name (a suite may mix scenarios from
+ *                        any buckets, and the same file may run under several suites
+ *                        with different expectations); optional for standalone runs.
+ *                        The evaluation report groups by it, falling back to the
+ *                        source directory
  */
 @Builder
 @With
 public record Scenario(String name, String description, List<Step> steps, @Nullable String source,
-                       Outcome expectedOutcome) {
+                       Outcome expectedOutcome, @Nullable String group) {
 
     public Scenario {
         steps = List.copyOf(steps);
     }
 
-    /** A scenario expected to pass — the parser's and the ordinary run's default. */
+    /** A scenario expected to pass with no group — the parser's default. */
     public Scenario(String name, String description, List<Step> steps, @Nullable String source) {
-        this(name, description, steps, source, Outcome.PASS);
+        this(name, description, steps, source, Outcome.PASS, null);
     }
 
     /** Whether this scenario has more than one step. */

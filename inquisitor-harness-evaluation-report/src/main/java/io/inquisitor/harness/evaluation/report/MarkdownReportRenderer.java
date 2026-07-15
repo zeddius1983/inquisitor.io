@@ -30,7 +30,7 @@ import lombok.val;
 /**
  * The human-readable rendering: a headline block (ended by {@value #HEADLINE_END},
  * which the Gradle plugin's {@code evaluateReport} task echoes to the console), then
- * one section per style bucket with a scenario table and, for every non-{@code
+ * one section per group (the suite class, or the source directory standalone) with a scenario table and, for every non-{@code
  * GROUNDED} step, both sides of the audit — the actor's claim, the judge's findings,
  * and the real tool trace.
  */
@@ -60,8 +60,8 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
         val out = new StringBuilder("# Inquisitor evaluation report\n\n");
         appendHeadline(out, report);
         out.append('\n').append(HEADLINE_END).append('\n');
-        for (val bucket : report.buckets()) {
-            appendBucket(out, bucket);
+        for (val group : report.groups()) {
+            appendGroup(out, group);
         }
         return out.toString();
     }
@@ -90,13 +90,13 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
                 .collect(Collectors.joining(", "))).append('\n');
     }
 
-    private static void appendBucket(StringBuilder out, EvaluationReport.Bucket bucket) {
-        out.append("\n## ").append(bucket.name()).append('\n')
-                .append("\n- Result: ").append(gate(bucket.totals()))
-                .append(" — Score: **").append(score(bucket.totals())).append("**\n\n")
+    private static void appendGroup(StringBuilder out, EvaluationReport.Group group) {
+        out.append("\n## ").append(group.name()).append('\n')
+                .append("\n- Result: ").append(gate(group.totals()))
+                .append(" — Score: **").append(score(group.totals())).append("**\n\n")
                 .append("| Scenario | Expected | Steps | Result | Evaluation score |\n")
                 .append("|---|---|---|---|---|\n");
-        for (val scenario : bucket.scenarios()) {
+        for (val scenario : group.scenarios()) {
             val evaluatedSteps = scenario.steps().stream().filter(StepEvaluationRecord::evaluated).toList();
             val mean = evaluatedSteps.isEmpty() ? Double.NaN : evaluatedSteps.stream()
                     .mapToDouble(StepEvaluationRecord::score).average().orElseThrow();
@@ -108,7 +108,7 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
                     .append(" | ").append(Double.isNaN(mean) ? "—" : ReportFormats.percent(mean))
                     .append(" |\n");
         }
-        appendFindings(out, bucket);
+        appendFindings(out, group);
     }
 
     private static String resultLabel(EvaluationReport.ScenarioReport scenario) {
@@ -118,8 +118,8 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
         return scenario.missedDetection() ? "**FAILED (missed detection)**" : "**FAILED**";
     }
 
-    private static void appendFindings(StringBuilder out, EvaluationReport.Bucket bucket) {
-        val flagged = bucket.scenarios().stream()
+    private static void appendFindings(StringBuilder out, EvaluationReport.Group group) {
+        val flagged = group.scenarios().stream()
                 .flatMap(scenario -> scenario.steps().stream()
                         .filter(step -> step.evaluated() && step.score() < 1.0)
                         .map(step -> Map.entry(scenario, step)))

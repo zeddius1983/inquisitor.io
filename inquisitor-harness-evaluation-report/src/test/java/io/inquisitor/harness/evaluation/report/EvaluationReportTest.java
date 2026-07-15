@@ -52,13 +52,40 @@ class EvaluationReportTest {
     }
 
     @Test
-    void groupsByBucketFromTheSourceDirectory() {
+    void groupsByScenarioGroupWhenPresent() {
+        val faultSuite = "FaultDetectionSuiteTest";
+        val positiveSuite = "ExplicitScenarioSuiteTest";
+        val source = "classpath:scenarios/explicit/a.md";
+        val report = EvaluationReport.of(Instant.now(), Duration.ofMinutes(1), null, null, List.of(
+                withGroup(record("A", source, Outcome.PASS, 1, 1, Outcome.PASS, 1.0, "GROUNDED"), positiveSuite),
+                withGroup(record("A", source, Outcome.FAIL, 1, 1, Outcome.FAIL, 1.0, "GROUNDED"), faultSuite)));
+
+        // same file, different suites: grouped by the suite, not the source directory
+        assertThat(report.groups()).extracting(EvaluationReport.Group::name)
+                .containsExactly(positiveSuite, faultSuite);
+        assertThat(report.totals().scenariosPassed()).isEqualTo(2);
+    }
+
+    private static StepEvaluationRecord withGroup(StepEvaluationRecord record, String group) {
+        return StepEvaluationRecord.builder()
+                .scenario(record.scenario()).scenarioSource(record.scenarioSource())
+                .scenarioGroup(group).expectedOutcome(record.expectedOutcome())
+                .stepIndex(record.stepIndex()).stepCount(record.stepCount())
+                .stepTitle(record.stepTitle()).outcome(record.outcome())
+                .reasoning(record.reasoning()).evidence(record.evidence())
+                .toolCalls(record.toolCalls()).elapsedMillis(record.elapsedMillis())
+                .score(record.score()).category(record.category()).feedback(record.feedback())
+                .build();
+    }
+
+    @Test
+    void fallsBackToTheSourceDirectoryWithoutAGroup() {
         val report = EvaluationReport.of(Instant.now(), Duration.ofMinutes(1), null, null, List.of(
                 record("A", "classpath:scenarios/explicit/a.md", Outcome.PASS, 1, 1, Outcome.PASS, 1.0, "GROUNDED"),
                 record("A", "classpath:scenarios/cucumber/a.md", Outcome.PASS, 1, 1, Outcome.PASS, 1.0, "GROUNDED"),
                 record("B", null, Outcome.PASS, 1, 1, Outcome.PASS, 1.0, "GROUNDED")));
 
-        assertThat(report.buckets()).extracting(EvaluationReport.Bucket::name)
+        assertThat(report.groups()).extracting(EvaluationReport.Group::name)
                 .containsExactly("explicit", "cucumber", "(no source)");
     }
 
@@ -74,10 +101,10 @@ class EvaluationReportTest {
                 record("Open", source, Outcome.FAIL, 1, 3, Outcome.PASS, 1.0, "GROUNDED"),
                 record("Open", source, Outcome.FAIL, 2, 3, Outcome.FAIL, 1.0, "GROUNDED")));
 
-        val bucket = report.buckets().getFirst();
-        assertThat(bucket.scenarios()).hasSize(2);
-        assertThat(bucket.scenarios().getFirst().passed()).isTrue();   // all PASS, complete
-        assertThat(bucket.scenarios().getLast().passed()).isTrue();    // expected FAIL landed
+        val group = report.groups().getFirst();
+        assertThat(group.scenarios()).hasSize(2);
+        assertThat(group.scenarios().getFirst().passed()).isTrue();   // all PASS, complete
+        assertThat(group.scenarios().getLast().passed()).isTrue();    // expected FAIL landed
         assertThat(report.totals().scenariosPassed()).isEqualTo(2);
     }
 

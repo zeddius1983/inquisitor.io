@@ -82,13 +82,13 @@ class HtmlReportRendererTest {
         val files = new HtmlReportRenderer().render(sampleReport(), dir);
         assertThat(files).allSatisfy(file -> assertThat(file).exists());
         index = Files.readString(dir.resolve("evaluation.html"));
-        cucumberPage = Files.readString(dir.resolve("buckets/cucumber.html"));
+        cucumberPage = Files.readString(dir.resolve("groups/cucumber.html"));
         transferPage = Files.readString(dir.resolve("scenarios/cucumber-0.html"));
         faultPage = Files.readString(dir.resolve("scenarios/explicit-0.html"));
     }
 
     @Test
-    void indexPageCarriesTilesAndLinksToBucketPages() {
+    void indexPageCarriesTilesAndLinksToGroupPages() {
         assertThat(index)
                 // tiles: scenarios passed, evaluation score (mean of 3 evaluated steps), duration
                 .contains("<div class=\"value\">1/2</div>")
@@ -97,8 +97,8 @@ class HtmlReportRendererTest {
                 .contains("Header: run label")
                 .contains("Actor: actor-model @ http://a")
                 .contains("<th>Evaluation score</th>")
-                .contains("<a href=\"buckets/cucumber.html\">cucumber</a>")
-                .contains("<a href=\"buckets/explicit.html\">explicit</a>")
+                .contains("<a href=\"groups/cucumber.html\">cucumber</a>")
+                .contains("<a href=\"groups/explicit.html\">explicit</a>")
                 // success rate is expectation-aware: cucumber 1/1 passed, explicit 0/1
                 .contains("<td>1/1</td><td>100.0%</td>")
                 .contains("<td>0/1</td><td>0.0%</td>");
@@ -106,20 +106,20 @@ class HtmlReportRendererTest {
     }
 
     @Test
-    void bucketPageShowsResultAndLinksToScenarioPages() {
+    void groupPageShowsResultAndLinksToScenarioPages() {
         assertThat(cucumberPage)
                 .contains("<a href=\"../evaluation.html\">report</a> &rsaquo; cucumber")
                 // the contradicted-PASS row: PASSED result, evaluation score 50% — the gap
                 .contains("<td><a href=\"../scenarios/cucumber-0.html\">Transfer funds</a></td>"
                         + "<td>PASS</td><td>2/2</td>"
                         + "<td><span class=\"ok\">PASSED</span></td><td>50.0%</td>");
-        assertThat(Files.exists(dir.resolve("buckets/explicit.html"))).isTrue();
+        assertThat(Files.exists(dir.resolve("groups/explicit.html"))).isTrue();
     }
 
     @Test
     void scenarioPageCarriesStepTableFindingsAndBreadcrumb() {
         assertThat(transferPage)
-                .contains("<a href=\"../buckets/cucumber.html\">cucumber</a> &rsaquo; Transfer funds")
+                .contains("<a href=\"../groups/cucumber.html\">cucumber</a> &rsaquo; Transfer funds")
                 .contains("<td>2/2</td><td>step 2</td><td><span class=\"ok\">PASS</span></td>"
                         + "<td>CONTRADICTED</td><td>0.0%</td><td>10 ms</td>")
                 .contains("<details><summary>Step 2 “step 2” &mdash; CONTRADICTED</summary>")

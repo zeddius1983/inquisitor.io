@@ -40,7 +40,8 @@ class StepEvaluationRecorderTest {
             "classpath:scenarios/explicit/transfer.md");
 
     private static StepRequest request(int stepIndex) {
-        return StepRequest.of("conv", SCENARIO, SCENARIO.steps().get(stepIndex - 1));
+        val scenario = SCENARIO.withGroup("TransferSuiteTest");
+        return StepRequest.of("conv", scenario, scenario.steps().get(stepIndex - 1));
     }
 
     private static StepRun run(StepVerdict verdict) {
@@ -59,6 +60,7 @@ class StepEvaluationRecorderTest {
         assertThat(recorder.records()).singleElement().satisfies(record -> {
             assertThat(record.scenario()).isEqualTo("Transfer");
             assertThat(record.scenarioSource()).isEqualTo("classpath:scenarios/explicit/transfer.md");
+            assertThat(record.scenarioGroup()).isEqualTo("TransferSuiteTest");
             assertThat(record.expectedOutcome()).isEqualTo(Outcome.PASS);
             assertThat(record.stepIndex()).isEqualTo(1);
             assertThat(record.stepCount()).isEqualTo(2);

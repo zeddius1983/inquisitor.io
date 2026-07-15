@@ -71,9 +71,14 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                 .map(io.inquisitor.harness.junit.Scenario::expect)
                 .orElse(Expect.PASS);
         val loaded = load(applicationContext, parser, resolveLocation(context));
-        // Carry the expectation into the model so downstream consumers (the evaluation
-        // report's expectation gate) see how this run defines success.
-        val scenario = expect == Expect.FAIL ? loaded.withExpectedOutcome(Outcome.FAIL) : loaded;
+        // Carry the run context into the model for downstream consumers (the evaluation
+        // report): the expectation defines what success means for this run, the group
+        // (the suite class) defines where it ran — a suite may mix scenarios from any
+        // buckets, and the same file may run under several suites.
+        val contextualized = loaded.withGroup(context.getRequiredTestClass().getSimpleName());
+        val scenario = expect == Expect.FAIL
+                ? contextualized.withExpectedOutcome(Outcome.FAIL)
+                : contextualized;
         // One execution shared by every step invocation of this method; they run
         // sequentially, so each invocation advances the same conversation in order.
         val state = new ScenarioState(executor.start(scenario), expect);
@@ -100,7 +105,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         val resource = applicationContext.getResource(location);
         try {
             // The full location (not resource.getFilename()) so Scenario.source keeps the
-            // directory — the style bucket the evaluation report groups by.
+            // directory — the evaluation report's grouping fallback when no group is set.
             return parser.parse(resource.getContentAsString(StandardCharsets.UTF_8), location);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read scenario " + location, e);

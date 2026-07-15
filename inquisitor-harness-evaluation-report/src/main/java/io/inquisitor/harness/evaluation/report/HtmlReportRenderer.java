@@ -31,8 +31,9 @@ import lombok.val;
 
 /**
  * The default report: multi-page HTML with the Gradle-test-report structure —
- * {@code evaluation.html} (summary tiles + buckets overview) → {@code buckets/*.html}
- * (one scenario table per bucket) → {@code scenarios/*.html} (per-scenario step table
+ * {@code evaluation.html} (summary tiles + groups overview) → {@code groups/*.html}
+ * (one scenario table per group — the JUnit suite, or the source directory standalone) →
+ * {@code scenarios/*.html} (per-scenario step table
  * and findings), breadcrumbs on every page. Its headline column pair is
  * <b>Evaluation score next to Success rate</b>: the task-08 headline
  * ("100% passed / 85% grounded") as one view.
@@ -84,16 +85,16 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
     @Override
     public List<Path> render(EvaluationReport report, Path dir) {
         try {
-            Files.createDirectories(dir.resolve("buckets"));
+            Files.createDirectories(dir.resolve("groups"));
             Files.createDirectories(dir.resolve("scenarios"));
             val files = new ArrayList<Path>();
             files.add(write(dir.resolve("evaluation.html"), indexPage(report)));
-            for (val bucket : report.buckets()) {
-                files.add(write(dir.resolve("buckets/" + slug(bucket.name()) + ".html"),
-                        bucketPage(bucket)));
-                for (var index = 0; index < bucket.scenarios().size(); index++) {
-                    files.add(write(dir.resolve("scenarios/" + scenarioFile(bucket, index)),
-                            scenarioPage(bucket, index)));
+            for (val group : report.groups()) {
+                files.add(write(dir.resolve("groups/" + slug(group.name()) + ".html"),
+                        groupPage(group)));
+                for (var index = 0; index < group.scenarios().size(); index++) {
+                    files.add(write(dir.resolve("scenarios/" + scenarioFile(group, index)),
+                            scenarioPage(group, index)));
                 }
             }
             return List.copyOf(files);
@@ -113,33 +114,33 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         val body = new StringBuilder("<h1>Inquisitor evaluation report</h1>\n");
         appendMeta(body, report);
         appendTiles(body, report);
-        body.append("<table>\n<thead><tr><th>Bucket</th><th>Scenarios</th><th>Passed</th>")
+        body.append("<table>\n<thead><tr><th>Group</th><th>Scenarios</th><th>Passed</th>")
                 .append("<th>Success rate</th><th>Evaluation score</th></tr></thead>\n<tbody>\n");
-        for (val bucket : report.buckets()) {
-            body.append("<tr><td><a href=\"buckets/").append(slug(bucket.name())).append(".html\">")
-                    .append(escape(bucket.name())).append("</a></td><td>")
-                    .append(bucket.totals().scenarios()).append("</td><td>")
-                    .append(bucket.totals().scenariosPassed()).append('/')
-                    .append(bucket.totals().scenarios()).append("</td><td>")
-                    .append(successRate(bucket.totals()))
-                    .append("</td><td>").append(score(allSteps(bucket))).append("</td></tr>\n");
+        for (val group : report.groups()) {
+            body.append("<tr><td><a href=\"groups/").append(slug(group.name())).append(".html\">")
+                    .append(escape(group.name())).append("</a></td><td>")
+                    .append(group.totals().scenarios()).append("</td><td>")
+                    .append(group.totals().scenariosPassed()).append('/')
+                    .append(group.totals().scenarios()).append("</td><td>")
+                    .append(successRate(group.totals()))
+                    .append("</td><td>").append(score(allSteps(group))).append("</td></tr>\n");
         }
         body.append("</tbody>\n</table>\n");
         return page("Inquisitor evaluation report", null, body.toString());
     }
 
-    private static String bucketPage(EvaluationReport.Bucket bucket) {
-        val body = new StringBuilder("<h1>").append(escape(bucket.name())).append("</h1>\n")
-                .append("<p class=\"meta\">Passed: ").append(bucket.totals().scenariosPassed())
-                .append('/').append(bucket.totals().scenarios())
-                .append(" (success rate ").append(successRate(bucket.totals()))
-                .append(") &mdash; Evaluation score: ").append(score(allSteps(bucket))).append("</p>\n")
+    private static String groupPage(EvaluationReport.Group group) {
+        val body = new StringBuilder("<h1>").append(escape(group.name())).append("</h1>\n")
+                .append("<p class=\"meta\">Passed: ").append(group.totals().scenariosPassed())
+                .append('/').append(group.totals().scenarios())
+                .append(" (success rate ").append(successRate(group.totals()))
+                .append(") &mdash; Evaluation score: ").append(score(allSteps(group))).append("</p>\n")
                 .append("<table>\n<thead><tr><th>Scenario</th><th>Expected</th><th>Steps</th>")
                 .append("<th>Result</th><th>Evaluation score</th></tr></thead>\n")
                 .append("<tbody>\n");
-        for (var index = 0; index < bucket.scenarios().size(); index++) {
-            val scenario = bucket.scenarios().get(index);
-            body.append("<tr><td><a href=\"../scenarios/").append(scenarioFile(bucket, index))
+        for (var index = 0; index < group.scenarios().size(); index++) {
+            val scenario = group.scenarios().get(index);
+            body.append("<tr><td><a href=\"../scenarios/").append(scenarioFile(group, index))
                     .append("\">").append(escape(scenario.name())).append("</a></td><td>")
                     .append(scenario.expectedOutcome())
                     .append("</td><td>").append(scenario.steps().size()).append('/')
@@ -149,12 +150,12 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
                     .append("</td></tr>\n");
         }
         body.append("</tbody>\n</table>\n");
-        val breadcrumb = "<a href=\"../evaluation.html\">report</a> &rsaquo; " + escape(bucket.name());
-        return page(bucket.name(), breadcrumb, body.toString());
+        val breadcrumb = "<a href=\"../evaluation.html\">report</a> &rsaquo; " + escape(group.name());
+        return page(group.name(), breadcrumb, body.toString());
     }
 
-    private static String scenarioPage(EvaluationReport.Bucket bucket, int index) {
-        val scenario = bucket.scenarios().get(index);
+    private static String scenarioPage(EvaluationReport.Group group, int index) {
+        val scenario = group.scenarios().get(index);
         val body = new StringBuilder("<h1>").append(escape(scenario.name()));
         if (scenario.source() != null) {
             body.append(" <small>").append(escape(scenario.source())).append("</small>");
@@ -180,8 +181,8 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         for (val step : scenario.steps()) {
             appendFinding(body, step);
         }
-        val breadcrumb = "<a href=\"../evaluation.html\">report</a> &rsaquo; <a href=\"../buckets/"
-                + slug(bucket.name()) + ".html\">" + escape(bucket.name()) + "</a> &rsaquo; "
+        val breadcrumb = "<a href=\"../evaluation.html\">report</a> &rsaquo; <a href=\"../groups/"
+                + slug(group.name()) + ".html\">" + escape(group.name()) + "</a> &rsaquo; "
                 + escape(scenario.name());
         return page(scenario.name(), breadcrumb, body.toString());
     }
@@ -261,8 +262,8 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         out.append("</details>\n");
     }
 
-    private static List<StepEvaluationRecord> allSteps(EvaluationReport.Bucket bucket) {
-        return bucket.scenarios().stream().flatMap(scenario -> scenario.steps().stream()).toList();
+    private static List<StepEvaluationRecord> allSteps(EvaluationReport.Group group) {
+        return group.scenarios().stream().flatMap(scenario -> scenario.steps().stream()).toList();
     }
 
     private static String score(List<StepEvaluationRecord> steps) {
@@ -291,8 +292,8 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
                 : ReportFormats.percent(totals.scenariosPassed() / (double) totals.scenarios());
     }
 
-    private static String scenarioFile(EvaluationReport.Bucket bucket, int index) {
-        return slug(bucket.name()) + "-" + index + ".html";
+    private static String scenarioFile(EvaluationReport.Group group, int index) {
+        return slug(group.name()) + "-" + index + ".html";
     }
 
     private static String slug(String name) {

@@ -28,8 +28,10 @@ import org.jspecify.annotations.Nullable;
  * (the rendered tool trace), and the judge's ruling (category, score, feedback).
  *
  * @param scenario        the scenario name
- * @param scenarioSource  where the scenario was loaded from; carries the directory the
- *                        report groups by (the same name exists in several style buckets)
+ * @param scenarioSource  where the scenario was loaded from (the markdown file)
+ * @param scenarioGroup   the run context — the JUnit suite class when run through the
+ *                        JUnit layer, absent standalone; the report's grouping key
+ *                        (falling back to the source directory)
  * @param expectedOutcome how this run defines success ({@code FAIL} for fault detection)
  * @param stepIndex       1-based step number
  * @param stepCount       total steps in the scenario (fewer records than this means the
@@ -50,6 +52,7 @@ import org.jspecify.annotations.Nullable;
 public record StepEvaluationRecord(
         String scenario,
         @Nullable String scenarioSource,
+        @Nullable String scenarioGroup,
         Outcome expectedOutcome,
         int stepIndex,
         int stepCount,

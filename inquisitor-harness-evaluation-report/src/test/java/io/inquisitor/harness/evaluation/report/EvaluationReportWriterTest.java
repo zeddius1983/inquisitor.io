@@ -87,8 +87,8 @@ class EvaluationReportWriterTest {
                 .readTree(Files.readString(dir.resolve("reports/evaluation.json")));
         assertThat(json.get("header").asString()).isEqualTo("gpt-oss-20b / reasoning off");
         assertThat(json.get("totals").get("stepsEvaluated").asInt()).isEqualTo(2);
-        assertThat(json.get("buckets").get(0).get("name").asString()).isEqualTo("cucumber");
-        assertThat(json.get("buckets").get(0).get("scenarios").get(0)
+        assertThat(json.get("groups").get(0).get("name").asString()).isEqualTo("cucumber");
+        assertThat(json.get("groups").get(0).get("scenarios").get(0)
                 .get("steps").get(1).get("feedback").asString())
                 .isEqualTo("claims balance 100; the trace shows 50");
     }
@@ -99,7 +99,7 @@ class EvaluationReportWriterTest {
                 .write(sampleReport(), dir.resolve("reports"));
 
         assertThat(files.getFirst().getFileName().toString()).isEqualTo("evaluation.html");
-        assertThat(dir.resolve("reports/buckets/cucumber.html")).exists();
+        assertThat(dir.resolve("reports/groups/cucumber.html")).exists();
         assertThat(dir.resolve("reports/scenarios/cucumber-0.html")).exists();
         assertThat(dir.resolve("reports/evaluation.md")).doesNotExist();
         assertThat(dir.resolve("reports/evaluation.json")).doesNotExist();

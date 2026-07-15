@@ -74,7 +74,7 @@ class EvaluationReportSessionListenerTest {
         listener.launcherSessionClosed(null);
 
         assertThat(dir.resolve("inquisitor/evaluation.html")).exists();
-        assertThat(dir.resolve("inquisitor/buckets/explicit.html")).exists();
+        assertThat(dir.resolve("inquisitor/groups/explicit.html")).exists();
         assertThat(dir.resolve("inquisitor/evaluation.json")).doesNotExist();
         assertThat(dir.resolve("inquisitor/evaluation.md")).doesNotExist();
         assertThat(EvaluationReportSession.records()).isEmpty();

@@ -332,13 +332,18 @@ see [roadmap.md](roadmap.md); for stable repo context see
   (JMustache — not Groovy, which drags in a whole language runtime as a consumer-test
   dependency) becomes attractive if C3's formats grow, and would slot in behind the
   renderer interface.
-- **Report grouping: bucket = the parent directory of `Scenario.source`.** The suite
-  class name never reaches the evaluation layer (dependency arrow: junit → harness →
-  evaluation seam), and the buckets differ only by `@Harness(scenarioDir)` — which is
-  exactly what the source path encodes. The JUnit provider now passes the full
+- **Report grouping: `Scenario.group` (the suite), source directory as fallback.**
+  Originally the report grouped by the parent directory of `Scenario.source` (the
+  style bucket), because the suite class name never reaches the evaluation layer
+  (dependency arrow: junit → harness → evaluation seam). Review showed source is the
+  wrong denominator — a suite may mix scenarios from any buckets, and the same file
+  runs under several suites with different expectations. So the caller now declares
+  the run context on the model: `Scenario.group`, set by the JUnit layer to the suite
+  class's simple name (`FaultDetectionSuiteTest`), optional for standalone runs, where
+  the report falls back to the source directory. The JUnit provider passes the full
   location (not the bare filename) as `source`. Records are split into scenario
-  *instances* by step-index resets, because the same file legitimately runs several
-  times in one JVM (positive suite + fault suite share the explicit bucket).
+  *instances* by group/source changes and step-index resets, because the same file
+  legitimately runs several times in one JVM.
 
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.

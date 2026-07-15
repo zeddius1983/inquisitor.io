@@ -61,6 +61,7 @@ public class StepEvaluationRecorder {
         return StepEvaluationRecord.builder()
                 .scenario(scenario.name())
                 .scenarioSource(scenario.source())
+                .scenarioGroup(scenario.group())
                 .expectedOutcome(scenario.expectedOutcome())
                 .stepIndex(step.index())
                 .stepCount(scenario.steps().size())
