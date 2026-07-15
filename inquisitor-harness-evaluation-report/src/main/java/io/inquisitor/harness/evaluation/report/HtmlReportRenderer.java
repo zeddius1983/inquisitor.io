@@ -52,29 +52,51 @@ import lombok.val;
 public class HtmlReportRenderer implements EvaluationReportRenderer {
 
     private static final String STYLE = """
-            body { font-family: system-ui, sans-serif; margin: 2em auto; max-width: 70em; \
-            padding: 0 1em; color: #303030; }
-            h1 { font-size: 1.6em; }
-            h1 small { color: #808080; font-weight: normal; font-size: 0.6em; }
-            .breadcrumb { color: #808080; font-size: 0.9em; margin-bottom: 1.2em; }
-            .meta { color: #606060; line-height: 1.5; }
-            .tiles { display: flex; gap: 1em; flex-wrap: wrap; margin: 1.5em 0; }
-            .tile { border: 1px solid #d0d0d0; border-radius: 4px; padding: 0.7em 1.3em; \
-            text-align: center; background: #f7f7f7; }
-            .tile .value { font-size: 1.5em; font-weight: bold; }
-            .tile .label { color: #606060; font-size: 0.85em; }
-            table { border-collapse: collapse; width: 100%; margin: 0.8em 0 1.2em; }
-            th, td { border: 1px solid #d0d0d0; padding: 0.45em 0.8em; text-align: left; \
-            font-size: 0.95em; }
-            th { background: #f0f0f0; }
-            a { color: #1564bf; text-decoration: none; } a:hover { text-decoration: underline; }
-            .ok { color: #197f19; font-weight: bold; }
-            .bad { color: #b60808; font-weight: bold; }
-            .dim { color: #808080; }
-            details { margin: 0.5em 0; border: 1px solid #e0d5b8; background: #fdf8ea; \
-            border-radius: 4px; padding: 0.5em 0.9em; }
-            summary { cursor: pointer; font-weight: bold; }
-            pre { background: #f4f4f4; padding: 0.7em; overflow-x: auto; font-size: 0.85em; }
+            :root { --surface: #fcfcfb; --page: #f5f5f2; --ink: #0b0b0b; --ink-2: #52514e; \
+            --ink-3: #8a8984; --line: #e6e5e0; --line-soft: #edece7; --accent: #2a78d6; \
+            --good-ink: #0a6b0a; --good-bg: #e6f4e6; --bad-ink: #b02a2a; --bad-bg: #fbe9e9; }
+            * { box-sizing: border-box; }
+            body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; \
+            margin: 0 auto; max-width: 72em; padding: 2.5em 1.5em 3em; color: var(--ink); \
+            background: var(--page); line-height: 1.55; }
+            h1 { font-size: 1.5em; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 0.4em; }
+            h1 small { color: var(--ink-3); font-weight: 400; font-size: 0.6em; letter-spacing: 0; }
+            .breadcrumb { color: var(--ink-3); font-size: 0.85em; margin: 0 0 1.6em; }
+            .meta { color: var(--ink-2); font-size: 0.9em; line-height: 1.7; margin: 0.4em 0 1em; }
+            .tiles { display: flex; gap: 0.9em; flex-wrap: wrap; margin: 1.6em 0; }
+            .tile { background: var(--surface); border: 1px solid var(--line); \
+            border-radius: 12px; padding: 0.9em 1.4em; min-width: 8em; \
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03); }
+            .tile .value { font-size: 1.55em; font-weight: 650; letter-spacing: -0.01em; }
+            .tile .label { color: var(--ink-2); font-size: 0.8em; margin-top: 0.15em; }
+            table { border-collapse: separate; border-spacing: 0; width: 100%; \
+            margin: 1em 0 1.6em; background: var(--surface); border: 1px solid var(--line); \
+            border-radius: 12px; overflow: hidden; font-size: 0.92em; \
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+            th { text-align: left; font-size: 0.78em; font-weight: 600; \
+            text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-2); \
+            background: #f3f2ee; padding: 0.7em 1em; border-bottom: 1px solid var(--line); }
+            td { padding: 0.6em 1em; border-bottom: 1px solid var(--line-soft); \
+            font-variant-numeric: tabular-nums; }
+            tbody tr:last-child td { border-bottom: none; }
+            tbody tr:hover { background: #f6f8fc; }
+            a { color: var(--accent); text-decoration: none; }
+            a:hover { text-decoration: underline; }
+            .ok, .bad { display: inline-block; border-radius: 999px; padding: 0.1em 0.7em; \
+            font-size: 0.85em; font-weight: 600; }
+            .ok { color: var(--good-ink); background: var(--good-bg); }
+            .bad { color: var(--bad-ink); background: var(--bad-bg); }
+            .dim { color: var(--ink-3); }
+            details { margin: 0.7em 0; border: 1px solid #ecdfb4; background: #fffbee; \
+            border-radius: 10px; padding: 0.6em 1em; }
+            details[open] { padding-bottom: 0.9em; }
+            summary { cursor: pointer; font-weight: 600; font-size: 0.92em; }
+            summary:hover { color: var(--accent); }
+            details p { margin: 0.5em 0; font-size: 0.9em; }
+            pre { background: #f2f1ed; border: 1px solid var(--line); border-radius: 8px; \
+            padding: 0.8em 1em; overflow-x: auto; font-size: 0.82em; line-height: 1.5; \
+            font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; }
+            .top { font-size: 0.85em; }
             """;
 
     @Override
