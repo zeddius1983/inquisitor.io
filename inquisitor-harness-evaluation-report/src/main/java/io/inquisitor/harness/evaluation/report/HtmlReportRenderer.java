@@ -169,13 +169,12 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
             body.append("<tr><td>").append(step.stepIndex()).append('/').append(step.stepCount())
                     .append("</td><td>").append(escape(step.stepTitle()))
                     .append("</td><td>").append(outcomeCell(step.outcome()))
-                    .append("</td><td>").append(step.category() == null
-                            ? "<span class=\"dim\">&mdash;</span>"
-                            : escape(step.category()))
+                    .append("</td><td>").append(categoryCell(step))
                     .append("</td><td>").append(step.evaluated()
-                            ? ReportFormats.percent(step.score())
+                            ? colored(step.score(), ReportFormats.percent(step.score()))
                             : "<span class=\"dim\">&mdash;</span>")
-                    .append("</td><td>").append(step.elapsedMillis()).append(" ms</td></tr>\n");
+                    .append("</td><td>").append(ReportFormats.humanMillis(step.elapsedMillis()))
+                    .append("</td></tr>\n");
         }
         body.append("</tbody>\n</table>\n");
         for (val step : scenario.steps()) {
@@ -224,7 +223,9 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         out.append("<div class=\"tiles\">\n");
         tile(out, totals.scenariosPassed() + "/" + totals.scenarios(), "scenarios passed");
         tile(out, String.valueOf(totals.stepsRecorded()), "steps recorded");
-        tile(out, totals.meanScore() == null ? "n/a" : ReportFormats.percent(totals.meanScore()),
+        rawTile(out, totals.meanScore() == null
+                ? "n/a"
+                : colored(totals.meanScore(), ReportFormats.percent(totals.meanScore())),
                 "evaluation score");
         if (totals.stepsNotEvaluated() > 0) {
             tile(out, String.valueOf(totals.stepsNotEvaluated()), "not evaluated");
@@ -234,7 +235,11 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
     }
 
     private static void tile(StringBuilder out, String value, String label) {
-        out.append("<div class=\"tile\"><div class=\"value\">").append(escape(value))
+        rawTile(out, escape(value), label);
+    }
+
+    private static void rawTile(StringBuilder out, String valueHtml, String label) {
+        out.append("<div class=\"tile\"><div class=\"value\">").append(valueHtml)
                 .append("</div><div class=\"label\">").append(escape(label))
                 .append("</div></div>\n");
     }
@@ -268,7 +273,31 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
 
     private static String score(List<StepEvaluationRecord> steps) {
         val score = ReportFormats.evaluationScore(steps);
-        return Double.isNaN(score) ? "<span class=\"dim\">&mdash;</span>" : ReportFormats.percent(score);
+        return Double.isNaN(score)
+                ? "<span class=\"dim\">&mdash;</span>"
+                : colored(score, ReportFormats.percent(score));
+    }
+
+    /** Green (1.0) → amber (0.5) → red (0.0), interpolated on the hue axis. */
+    private static String colored(double score, String text) {
+        val hue = (int) Math.round(Math.clamp(score, 0.0, 1.0) * 120);
+        return "<span style=\"color:hsl(" + hue + ",70%,33%)\">" + escape(text) + "</span>";
+    }
+
+    /** The category tinted by the score its classification maps to. */
+    private static String categoryCell(StepEvaluationRecord step) {
+        val category = step.category();
+        if (category == null) {
+            return "<span class=\"dim\">&mdash;</span>";
+        }
+        return switch (category) {
+            case "GROUNDED" -> colored(1.0, category);
+            case "PARTIALLY_GROUNDED" -> colored(0.5, category);
+            case "UNSUPPORTED" -> colored(0.2, category);
+            case "CONTRADICTED" -> colored(0.0, category);
+            case StepEvaluationRecord.NOT_EVALUATED -> "<span class=\"dim\">" + category + "</span>";
+            default -> escape(category);
+        };
     }
 
     private static String outcomeCell(Outcome outcome) {

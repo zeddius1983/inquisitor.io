@@ -46,6 +46,17 @@ final class ReportFormats {
                 : "%ds".formatted(seconds);
     }
 
+    /** Step-scale durations: {@code "340ms"} / {@code "12.5s"} / {@code "1m 12s"}. */
+    static String humanMillis(long millis) {
+        if (millis >= 60_000) {
+            return humanDuration(millis);
+        }
+        if (millis >= 1_000) {
+            return String.format(Locale.ROOT, "%.1fs", millis / 1000.0);
+        }
+        return millis + "ms";
+    }
+
     /** {@code "model @ baseUrl"}, degrading gracefully when parts are unknown. */
     static String endpoint(@Nullable String model, @Nullable String baseUrl) {
         return (model == null ? "(unknown model)" : model) + (baseUrl == null ? "" : " @ " + baseUrl);
