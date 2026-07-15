@@ -121,7 +121,10 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
     private static void appendFindings(StringBuilder out, EvaluationReport.Group group) {
         val flagged = group.scenarios().stream()
                 .flatMap(scenario -> scenario.steps().stream()
-                        .filter(step -> step.evaluated() && step.score() < 1.0)
+                        // Everything except a grounded, perfectly-scored step — mirrors the
+                        // HTML renderer, so never-scored (NOT_EVALUATED) steps keep their
+                        // diagnostic reason instead of vanishing from the Markdown findings.
+                        .filter(step -> !(step.evaluated() && step.score() >= 1.0))
                         .map(step -> Map.entry(scenario, step)))
                 .toList();
         if (flagged.isEmpty()) {
