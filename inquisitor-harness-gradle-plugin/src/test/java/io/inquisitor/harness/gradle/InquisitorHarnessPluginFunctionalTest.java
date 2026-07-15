@@ -154,6 +154,29 @@ class InquisitorHarnessPluginFunctionalTest {
     }
 
     @Test
+    void evaluateIsNeverUpToDateOrCached() throws IOException {
+        // An isolated local build cache: reuse must be prevented by the plugin, not by
+        // cache absence.
+        write("settings.gradle.kts", """
+                rootProject.name = "consumer"
+
+                buildCache {
+                    local {
+                        directory = file("local-build-cache")
+                    }
+                }
+                """);
+
+        var first = runner("evaluate", "--build-cache").build();
+        var second = runner("evaluate", "--build-cache").build();
+
+        assertEquals(TaskOutcome.SUCCESS, first.task(":evaluate").getOutcome());
+        assertEquals(TaskOutcome.SUCCESS, second.task(":evaluate").getOutcome(),
+                "an identical re-run must execute again - an LLM evaluation is a "
+                        + "non-deterministic measurement, never UP-TO-DATE or FROM-CACHE");
+    }
+
+    @Test
     void reportOptionSelectsTheFormats() throws IOException {
         write("src/test/java/ScenarioProbeTest.java", """
                 import org.junit.jupiter.api.Tag;
