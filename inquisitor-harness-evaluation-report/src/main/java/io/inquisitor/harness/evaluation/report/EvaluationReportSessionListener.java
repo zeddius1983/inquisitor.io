@@ -21,11 +21,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.jspecify.annotations.Nullable;
 import org.junit.platform.launcher.LauncherSession;
 import org.junit.platform.launcher.LauncherSessionListener;
 
@@ -56,16 +58,30 @@ public class EvaluationReportSessionListener implements LauncherSessionListener 
 
     private volatile Instant openedAt = Instant.now();
 
+    private volatile @Nullable EvaluationReportWriter writer;
+
     @Override
     public void launcherSessionOpened(LauncherSession session) {
         openedAt = Instant.now();
+        if (reportDir() == null) {
+            return;
+        }
+        // Discover — and thereby class-load — the renderers up front: session close can
+        // race the JVM shutdown Gradle initiates after a red test plan, and once
+        // shutdown begins the worker's classloader may refuse new classes
+        // (ServiceConfigurationError: "Provider ... not found").
+        try {
+            writer = EvaluationReportWriter.discover(requestedFormats());
+        } catch (Exception | ServiceConfigurationError | LinkageError e) {
+            log.warn("Could not discover the evaluation report renderers", e);
+        }
     }
 
     @Override
     public void launcherSessionClosed(LauncherSession session) {
         try {
-            val dir = System.getProperty(REPORT_DIR_PROPERTY);
-            if (dir == null || dir.isBlank()) {
+            val dir = reportDir();
+            if (dir == null) {
                 return;
             }
             val records = EvaluationReportSession.records();
@@ -75,18 +91,31 @@ public class EvaluationReportSessionListener implements LauncherSessionListener 
             val generatedAt = Instant.now();
             val report = EvaluationReport.of(generatedAt, Duration.between(openedAt, generatedAt),
                     System.getProperty(HEADER_PROPERTY), EvaluationReportSession.runInfo(), records);
-            val files = EvaluationReportWriter.discover(requestedFormats()).write(report, Path.of(dir));
+            val files = writer().write(report, Path.of(dir));
             // Println on purpose: this must reach the console even without a logger config.
             // Entry pages only — the multi-page HTML report has one file per scenario.
             val reportDir = Path.of(dir);
             System.out.println("Inquisitor evaluation report written: "
                     + files.stream().filter(file -> reportDir.equals(file.getParent())).toList());
-        } catch (RuntimeException e) {
-            // Never let report writing fail the JVM's orderly test shutdown.
+        } catch (Exception | ServiceConfigurationError | LinkageError e) {
+            // Never let report writing fail the JVM's orderly test shutdown —
+            // ServiceConfigurationError and LinkageError are Errors, so a plain
+            // RuntimeException catch would let them kill the Gradle test executor.
             log.warn("Could not write the evaluation report", e);
         } finally {
             EvaluationReportSession.reset();
         }
+    }
+
+    private EvaluationReportWriter writer() {
+        val discovered = writer;
+        // Fallback for a session where opened never ran (or discovery failed there).
+        return discovered != null ? discovered : EvaluationReportWriter.discover(requestedFormats());
+    }
+
+    private static @Nullable String reportDir() {
+        val dir = System.getProperty(REPORT_DIR_PROPERTY);
+        return dir == null || dir.isBlank() ? null : dir;
     }
 
     private static Set<String> requestedFormats() {

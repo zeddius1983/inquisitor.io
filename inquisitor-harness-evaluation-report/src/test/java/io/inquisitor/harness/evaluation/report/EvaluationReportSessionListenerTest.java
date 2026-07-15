@@ -17,6 +17,7 @@
 package io.inquisitor.harness.evaluation.report;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,6 +106,21 @@ class EvaluationReportSessionListenerTest {
         try (val files = Files.list(dir)) {
             assertThat(files).isEmpty();
         }
+    }
+
+    @Test
+    void neverFailsTheSessionCloseWhenRenderingThrowsAnError() {
+        EvaluationReportSession.register(recorderWithOneRecord(),
+                new EvaluationRunInfo(null, null, null, null));
+        System.setProperty(EvaluationReportSessionListener.REPORT_DIR_PROPERTY,
+                dir.resolve("inquisitor").toString());
+        System.setProperty(EvaluationReportSessionListener.FORMATS_PROPERTY, "exploding");
+
+        val listener = new EvaluationReportSessionListener();
+        listener.launcherSessionOpened(null);
+        assertThatNoException().isThrownBy(() -> listener.launcherSessionClosed(null));
+
+        assertThat(EvaluationReportSession.records()).isEmpty();
     }
 
     @Test

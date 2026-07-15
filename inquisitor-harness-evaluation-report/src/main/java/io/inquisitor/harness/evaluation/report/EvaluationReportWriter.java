@@ -51,7 +51,10 @@ public class EvaluationReportWriter {
      * {@code formats}; unknown names are logged and skipped.
      */
     public static EvaluationReportWriter discover(Set<String> formats) {
-        val available = ServiceLoader.load(EvaluationReportRenderer.class).stream()
+        // The interface's own classloader, not the TCCL: the discovery must work no
+        // matter which thread (and context classloader) reaches it.
+        val available = ServiceLoader.load(EvaluationReportRenderer.class,
+                        EvaluationReportRenderer.class.getClassLoader()).stream()
                 .map(ServiceLoader.Provider::get)
                 .toList();
         val selected = available.stream()
