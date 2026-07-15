@@ -92,7 +92,7 @@ class HtmlReportRendererTest {
         assertThat(index)
                 // tiles: scenarios passed, evaluation score (mean of 3 evaluated steps), duration
                 .contains("<div class=\"value\">1/2</div>")
-                .contains("<div class=\"value\"><span style=\"color:hsl(80,70%,33%)\">66.7%</span></div>")
+                .contains("<div class=\"value\"><span style=\"color:hsl(80,70%,var(--score-l))\">66.7%</span></div>")
                 .contains("<div class=\"value\">1h 5m 0s</div>")
                 .contains("Header: run label")
                 .contains("Actor: actor-model @ http://a")
@@ -114,7 +114,7 @@ class HtmlReportRendererTest {
                 .contains("<td><a href=\"../scenarios/cucumber-0.html\">Transfer funds</a></td>"
                         + "<td>PASS</td><td>2/2</td>"
                         + "<td><span class=\"ok\">PASSED</span></td>"
-                        + "<td><span style=\"color:hsl(60,70%,33%)\">50.0%</span></td>");
+                        + "<td><span style=\"color:hsl(60,70%,var(--score-l))\">50.0%</span></td>");
         assertThat(Files.exists(dir.resolve("groups/explicit.html"))).isTrue();
     }
 
@@ -123,8 +123,8 @@ class HtmlReportRendererTest {
         assertThat(transferPage)
                 .contains("<a href=\"../groups/cucumber.html\">cucumber</a> &rsaquo; Transfer funds")
                 .contains("<td>2/2</td><td>step 2</td><td><span class=\"ok\">PASS</span></td>"
-                        + "<td><span style=\"color:hsl(0,70%,33%)\">CONTRADICTED</span></td>"
-                        + "<td><span style=\"color:hsl(0,70%,33%)\">0.0%</span></td>"
+                        + "<td><span style=\"color:hsl(0,70%,var(--score-l))\">CONTRADICTED</span></td>"
+                        + "<td><span style=\"color:hsl(0,70%,var(--score-l))\">0.0%</span></td>"
                         + "<td>10ms</td>")
                 .contains("<details><summary>Step 2 “step 2” &mdash; CONTRADICTED</summary>")
                 .contains("<p><b>Judge:</b> claimed reload; the trace shows none</p>")

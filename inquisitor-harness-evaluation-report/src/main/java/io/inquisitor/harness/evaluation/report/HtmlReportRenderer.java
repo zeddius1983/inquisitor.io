@@ -52,9 +52,18 @@ import lombok.val;
 public class HtmlReportRenderer implements EvaluationReportRenderer {
 
     private static final String STYLE = """
-            :root { --surface: #fcfcfb; --page: #f5f5f2; --ink: #0b0b0b; --ink-2: #52514e; \
+            :root { color-scheme: light; \
+            --surface: #fcfcfb; --page: #f5f5f2; --ink: #0b0b0b; --ink-2: #52514e; \
             --ink-3: #8a8984; --line: #e6e5e0; --line-soft: #edece7; --accent: #2a78d6; \
-            --good-ink: #0a6b0a; --good-bg: #e6f4e6; --bad-ink: #b02a2a; --bad-bg: #fbe9e9; }
+            --good-ink: #0a6b0a; --good-bg: #e6f4e6; --bad-ink: #b02a2a; --bad-bg: #fbe9e9; \
+            --head-bg: #f3f2ee; --hover-bg: #f6f8fc; --find-bg: #fffbee; --find-line: #ecdfb4; \
+            --pre-bg: #f2f1ed; --score-l: 33%; }
+            @media (prefers-color-scheme: dark) { :root { color-scheme: dark; \
+            --surface: #1d1d1b; --page: #131312; --ink: #f2f1ec; --ink-2: #c3c2b7; \
+            --ink-3: #8a8984; --line: #34332f; --line-soft: #2a2927; --accent: #3987e5; \
+            --good-ink: #6fce7c; --good-bg: #16301c; --bad-ink: #e66767; --bad-bg: #3a1c1c; \
+            --head-bg: #232320; --hover-bg: #22262c; --find-bg: #262218; --find-line: #4a4230; \
+            --pre-bg: #232220; --score-l: 60%; } }
             * { box-sizing: border-box; }
             body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; \
             margin: 0 auto; max-width: 72em; padding: 2.5em 1.5em 3em; color: var(--ink); \
@@ -75,11 +84,11 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
             box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
             th { text-align: left; font-size: 0.78em; font-weight: 600; \
             text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-2); \
-            background: #f3f2ee; padding: 0.7em 1em; border-bottom: 1px solid var(--line); }
+            background: var(--head-bg); padding: 0.7em 1em; border-bottom: 1px solid var(--line); }
             td { padding: 0.6em 1em; border-bottom: 1px solid var(--line-soft); \
             font-variant-numeric: tabular-nums; }
             tbody tr:last-child td { border-bottom: none; }
-            tbody tr:hover { background: #f6f8fc; }
+            tbody tr:hover { background: var(--hover-bg); }
             a { color: var(--accent); text-decoration: none; }
             a:hover { text-decoration: underline; }
             .ok, .bad { display: inline-block; border-radius: 999px; padding: 0.1em 0.7em; \
@@ -87,13 +96,13 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
             .ok { color: var(--good-ink); background: var(--good-bg); }
             .bad { color: var(--bad-ink); background: var(--bad-bg); }
             .dim { color: var(--ink-3); }
-            details { margin: 0.7em 0; border: 1px solid #ecdfb4; background: #fffbee; \
+            details { margin: 0.7em 0; border: 1px solid var(--find-line); background: var(--find-bg); \
             border-radius: 10px; padding: 0.6em 1em; }
             details[open] { padding-bottom: 0.9em; }
             summary { cursor: pointer; font-weight: 600; font-size: 0.92em; }
             summary:hover { color: var(--accent); }
             details p { margin: 0.5em 0; font-size: 0.9em; }
-            pre { background: #f2f1ed; border: 1px solid var(--line); border-radius: 8px; \
+            pre { background: var(--pre-bg); border: 1px solid var(--line); border-radius: 8px; \
             padding: 0.8em 1em; overflow-x: auto; font-size: 0.82em; line-height: 1.5; \
             font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; }
             .top { font-size: 0.85em; }
@@ -303,7 +312,7 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
     /** Green (1.0) → amber (0.5) → red (0.0), interpolated on the hue axis. */
     private static String colored(double score, String text) {
         val hue = (int) Math.round(Math.clamp(score, 0.0, 1.0) * 120);
-        return "<span style=\"color:hsl(" + hue + ",70%,33%)\">" + escape(text) + "</span>";
+        return "<span style=\"color:hsl(" + hue + ",70%,var(--score-l))\">" + escape(text) + "</span>";
     }
 
     /** The category tinted by the score its classification maps to. */
