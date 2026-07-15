@@ -85,6 +85,11 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
                 }
                 return arguments;
             });
+            // Own the report dir (unregistered files under build/ are fair game for
+            // Gradle's stale-output cleanup), and never skip: an LLM evaluation is a
+            // non-deterministic measurement — an UP-TO-DATE hit would silently reuse it.
+            task.getOutputs().dir(reportDir).withPropertyName("inquisitorReportDir");
+            task.getOutputs().upToDateWhen(t -> false);
             task.addTestListener(new EvaluationReportEcho(
                     reportDir.map(dir -> dir.file("evaluation.md").getAsFile().toPath())));
         });
