@@ -74,6 +74,11 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
             task.setGroup(HARNESS_GROUP);
             task.setDescription("Runs Inquisitor scenario tests with LLM-as-judge evaluation.");
             task.getReportFormats().convention("html");
+            task.getReportDirectory().convention(reportDir);
+            // Sweep the previous run's artifacts: renderers only overwrite what they
+            // write, so stale pages/formats would linger and mislead.
+            task.doFirst("sweep stale report artifacts",
+                    t -> ((EvaluateTask) t).sweepReportDirectory());
             task.setTestClassesDirs(testSourceSet.getOutput().getClassesDirs());
             task.setClasspath(testSourceSet.getRuntimeClasspath());
             task.useJUnitPlatform(options ->

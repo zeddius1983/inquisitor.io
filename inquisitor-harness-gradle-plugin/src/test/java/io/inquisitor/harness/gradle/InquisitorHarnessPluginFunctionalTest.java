@@ -154,6 +154,17 @@ class InquisitorHarnessPluginFunctionalTest {
     }
 
     @Test
+    void evaluateSweepsStaleReportArtifacts() throws IOException {
+        write("build/reports/inquisitor/buckets/stale.html", "<html>from a previous run</html>");
+
+        var result = runner("evaluate").build();
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":evaluate").getOutcome());
+        assertFalse(Files.exists(projectDir.resolve("build/reports/inquisitor/buckets")),
+                "the previous run's report artifacts must be swept before the run");
+    }
+
+    @Test
     void evaluateIsNeverUpToDateOrCached() throws IOException {
         // An isolated local build cache: reuse must be prevented by the plugin, not by
         // cache absence.

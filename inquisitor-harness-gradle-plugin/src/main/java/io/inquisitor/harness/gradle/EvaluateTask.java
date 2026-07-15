@@ -16,8 +16,13 @@
 
 package io.inquisitor.harness.gradle;
 
+import javax.inject.Inject;
+
+import org.gradle.api.file.DirectoryProperty;
+import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.options.Option;
 import org.gradle.api.tasks.testing.Test;
 
@@ -27,6 +32,10 @@ import org.gradle.api.tasks.testing.Test;
  * report formats the test JVM writes (renderer names, comma-separated; default
  * {@code html}). User-supplied renderers on the test classpath are selectable by
  * their {@code EvaluationReportRenderer.name()} the same way as the built-ins.
+ *
+ * <p>The report directory is swept before each run: renderers only overwrite what
+ * they write, so pages from a previous run's scenario set (or formats from a previous
+ * {@code --report} selection) would otherwise linger and mislead.
  */
 public abstract class EvaluateTask extends Test {
 
@@ -34,9 +43,21 @@ public abstract class EvaluateTask extends Test {
     @Input
     public abstract Property<String> getReportFormats();
 
+    /** Where the test JVM writes the report; declared as a task output by the plugin. */
+    @Internal
+    public abstract DirectoryProperty getReportDirectory();
+
+    @Inject
+    protected abstract FileSystemOperations getFileSystemOperations();
+
     @Option(option = "report", description = "Report format(s) to write, comma-separated "
             + "renderer names (built-ins: html, markdown, json). Default: html.")
     public void setReport(String formats) {
         getReportFormats().set(formats);
+    }
+
+    /** Deletes the previous run's report artifacts. */
+    void sweepReportDirectory() {
+        getFileSystemOperations().delete(spec -> spec.delete(getReportDirectory()));
     }
 }
