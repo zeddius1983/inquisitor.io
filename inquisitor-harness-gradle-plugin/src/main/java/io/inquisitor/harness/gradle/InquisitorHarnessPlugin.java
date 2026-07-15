@@ -16,7 +16,6 @@
 
 package io.inquisitor.harness.gradle;
 
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Set;
 
@@ -32,6 +31,12 @@ import org.gradle.api.tasks.testing.Test;
  * set that selects the scenario tests by JUnit tag and switches on the LLM gate
  * ({@code INQUISITOR_LLM_IT}) plus LLM-as-judge evaluation ({@code INQUISITOR_EVAL}).
  * Deliberately not wired into {@code check} — evaluation is an explicit opt-in run.
+ *
+ * <p>Reporting is implicit, like the JUnit HTML report of any {@code Test} task: the
+ * test JVM writes {@code build/reports/inquisitor/evaluation.{json,md}} at session
+ * close, and the task echoes the Markdown headline to the console from a root-suite
+ * {@code afterSuite} callback — which fires after all tests but <em>before</em> the
+ * task fails on failing tests, so the echo survives a red run.
  */
 public class InquisitorHarnessPlugin implements Plugin<Project> {
 
@@ -44,9 +49,6 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
     /** System property carrying the report header label (rendered into the report). */
     public static final String REPORT_HEADER_PROPERTY = "inquisitor.report.header";
 
-    /** The name of the report-echoing finalizer task. */
-    public static final String EVALUATE_REPORT_TASK_NAME = "evaluateReport";
-
     /** System property telling the test JVM where to write the report artifacts. */
     public static final String REPORT_DIR_PROPERTY = "inquisitor.report.dir";
 
@@ -56,24 +58,14 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
         extension.getTags().convention(Set.of("inquisitor"));
 
         project.getPlugins().withType(JavaPlugin.class,
-                javaPlugin -> registerEvaluateTasks(project, extension));
+                javaPlugin -> registerEvaluateTask(project, extension));
     }
 
-    private void registerEvaluateTasks(Project project, InquisitorHarnessExtension extension) {
+    private void registerEvaluateTask(Project project, InquisitorHarnessExtension extension) {
         var testSourceSet = project.getExtensions().getByType(SourceSetContainer.class)
                 .getByName(SourceSet.TEST_SOURCE_SET_NAME);
         var header = project.getProviders().gradleProperty("header");
         var reportDir = project.getLayout().getBuildDirectory().dir("reports/inquisitor");
-
-        var reportTask = project.getTasks().register(EVALUATE_REPORT_TASK_NAME,
-                EvaluationReportTask.class, task -> {
-                    task.setGroup(HARNESS_GROUP);
-                    task.setDescription("Prints the evaluation report written by the evaluate task.");
-                    task.getReportDir().convention(reportDir);
-                    // The report only exists when the evaluation modules ran in the test JVM.
-                    task.onlyIf("an evaluation report was written",
-                            t -> Files.exists(((EvaluationReportTask) t).getMarkdownReport()));
-                });
 
         project.getTasks().register(EVALUATE_TASK_NAME, Test.class, task -> {
             task.setGroup(HARNESS_GROUP);
@@ -93,8 +85,8 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
                 }
                 return arguments;
             });
-            // The report is echoed even — especially — when scenario tests fail.
-            task.finalizedBy(reportTask);
+            task.addTestListener(new EvaluationReportEcho(
+                    reportDir.map(dir -> dir.file("evaluation.md").getAsFile().toPath())));
         });
     }
 }

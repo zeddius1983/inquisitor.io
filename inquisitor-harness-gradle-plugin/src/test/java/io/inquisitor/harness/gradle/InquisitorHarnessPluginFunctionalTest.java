@@ -99,8 +99,6 @@ class InquisitorHarnessPluginFunctionalTest {
         var result = runner("evaluate").build();
 
         assertEquals(TaskOutcome.SUCCESS, result.task(":evaluate").getOutcome());
-        assertEquals(TaskOutcome.SKIPPED, result.task(":evaluateReport").getOutcome(),
-                "no report was written, so the report task must skip");
         var results = testResults("evaluate");
         assertTrue(results.contains("name=\"tagged()\"") || results.contains("name=\"tagged\""),
                 "the tagged test must run under evaluate");
@@ -108,7 +106,7 @@ class InquisitorHarnessPluginFunctionalTest {
     }
 
     @Test
-    void evaluateReportEchoesTheHeadlineEvenWhenTestsFail() throws IOException {
+    void evaluateEchoesTheReportHeadlineEvenWhenTestsFail() throws IOException {
         // Simulates the evaluation module's session listener (the real one needs a judge
         // model): the tagged test writes the report artifacts, then fails.
         write("src/test/java/ScenarioProbeTest.java", """
@@ -145,10 +143,8 @@ class InquisitorHarnessPluginFunctionalTest {
         var result = runner("evaluate").buildAndFail();
 
         assertEquals(TaskOutcome.FAILED, result.task(":evaluate").getOutcome());
-        assertEquals(TaskOutcome.SUCCESS, result.task(":evaluateReport").getOutcome(),
-                "the report task is a finalizer - it runs even when evaluate fails");
         assertTrue(result.getOutput().contains("Evaluation score: **93.8%**"),
-                "the headline block must be echoed to the console");
+                "the evaluate task itself must echo the headline, even on a red run");
         assertFalse(result.getOutput().contains("(bucket detail that must not be echoed)"),
                 "only the headline (before the marker) is echoed");
     }

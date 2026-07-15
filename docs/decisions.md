@@ -271,9 +271,13 @@ see [roadmap.md](roadmap.md); for stable repo context see
   read-modify-write file merging. The listener no-ops unless `inquisitor.report.dir`
   is set (only the plugin's `evaluate` task sets it), so ordinary test runs write
   nothing even with evaluation enabled.
-- **`finalizedBy`, never `doLast`, for the report echo.** A failing scenario run is
-  exactly when the report matters, and `doLast` never runs when the test action
-  throws; finalizers run regardless.
+- **The echo lives inside `evaluate` (root-suite `afterSuite`), not a finalizer
+  task.** Reporting should be implicit, like any `Test` task's HTML report — a
+  separate `evaluateReport` task was surface without substance (it never rendered
+  anything; rendering lives in the test JVM). A failing scenario run is exactly when
+  the report matters and `doLast` never runs when the test action throws — but
+  `TestListener.afterSuite` on the root descriptor fires after all tests *before*
+  the task fails, so the echo survives a red run without a second task.
 - **Synthetic verdicts are not audited.** When the actor's response is empty or
   unparseable, `LlmStepRunner` fabricates the FAIL (now marked `StepRun.synthetic`);
   the first real run showed the judge "contradicting" such a verdict — technically

@@ -32,11 +32,15 @@ There is no channel back to the build but files — the JaCoCo pattern (agent wr
      concurrent read-modify-write merges into one file get fiddly. One flush point,
      after the test plan, before shutdown hooks.
 
-2. **Gradle side renders nothing — it surfaces.** The plugin registers an
-   **`evaluateReport`** task and wires `evaluate.finalizedBy(evaluateReport)` —
-   finalizers run even when the finalized task fails. It reads the headline section
-   of `evaluation.md` and prints it with the artifact paths; `onlyIf` the file
-   exists. No JSON parsing (and no Jackson) in the plugin.
+2. **Gradle side renders nothing — it surfaces.** *(Amended after review: reporting
+   must be implicit in `evaluate`, like any `Test` task's HTML report — no separate
+   task.)* The plugin registers a `TestListener` on `evaluate` whose root-suite
+   `afterSuite` callback reads the headline section of `evaluation.md` and prints it
+   with the artifact path. `afterSuite` fires after all tests but *before* the task
+   fails on failing tests, so the echo survives a red run without a finalizer.
+   Silent when no report exists. No JSON parsing (and no Jackson) in the plugin.
+   (The original design's separate `evaluateReport` finalizer task was implemented,
+   then removed as redundant surface.)
 
 ## Changes
 
