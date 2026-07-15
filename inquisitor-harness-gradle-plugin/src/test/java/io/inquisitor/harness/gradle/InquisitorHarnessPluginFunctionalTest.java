@@ -85,6 +85,7 @@ class InquisitorHarnessPluginFunctionalTest {
                         assertEquals("true", System.getenv("INQUISITOR_EVAL"));
                         assertTrue(System.getProperty("inquisitor.report.dir")
                                 .replace('\\\\', '/').endsWith("build/reports/inquisitor"));
+                        assertEquals("html", System.getProperty("inquisitor.report.formats"));
                     }
 
                     @Test
@@ -150,6 +151,29 @@ class InquisitorHarnessPluginFunctionalTest {
                 "only the headline (before the marker) is echoed");
         assertTrue(result.getOutput().contains("Evaluation report (html):"),
                 "the echo links the html report when present");
+    }
+
+    @Test
+    void reportOptionSelectsTheFormats() throws IOException {
+        write("src/test/java/ScenarioProbeTest.java", """
+                import org.junit.jupiter.api.Tag;
+                import org.junit.jupiter.api.Test;
+
+                import static org.junit.jupiter.api.Assertions.assertEquals;
+
+                class ScenarioProbeTest {
+
+                    @Test
+                    @Tag("inquisitor")
+                    void tagged() {
+                        assertEquals("json,markdown", System.getProperty("inquisitor.report.formats"));
+                    }
+                }
+                """);
+
+        var result = runner("evaluate", "--report=json,markdown").build();
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":evaluate").getOutcome());
     }
 
     @Test

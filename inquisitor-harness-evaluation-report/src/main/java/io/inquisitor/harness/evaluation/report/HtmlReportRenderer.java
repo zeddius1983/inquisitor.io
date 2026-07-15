@@ -16,7 +16,12 @@
 
 package io.inquisitor.harness.evaluation.report;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -25,30 +30,30 @@ import io.inquisitor.harness.model.Outcome;
 import lombok.val;
 
 /**
- * A self-contained {@code evaluation.html}: the Gradle-test-report look with
- * <b>Evaluation rate next to Success rate</b> — the task-08 headline
- * ("100% passed / 85% grounded") as one page — and the same drill-down navigation as
- * the ordinary JUnit report, via in-page anchors: buckets overview → bucket table →
- * per-scenario section with its step table and expandable findings. Inline CSS, no
- * JavaScript (findings use native {@code <details>}); opens from the report directory
- * with no server.
+ * The default report: multi-page HTML with the Gradle-test-report structure —
+ * {@code evaluation.html} (summary tiles + buckets overview) → {@code buckets/*.html}
+ * (one scenario table per bucket) → {@code scenarios/*.html} (per-scenario step table
+ * and findings), breadcrumbs on every page. Its headline column pair is
+ * <b>Evaluation score next to Success rate</b>: the task-08 headline
+ * ("100% passed / 85% grounded") as one view.
  *
  * <p>Success rate is the actor's notion (PASS-outcome steps over recorded steps);
  * expectation semantics live in the Matched column, so a fault-detection row
  * deliberately reads "low success rate, matched" — that contrast is the information.
+ * Findings include never-scored steps ({@code NOT_EVALUATED}) with their reason.
  *
- * <p>Every interpolated value goes through {@link #escape(String)}: reasoning,
- * evidence, feedback and the trace carry JSON/HTML-hostile characters from live
- * systems. See {@code tasks/task-13-html-report-renderer.md}.
+ * <p>Pages are self-contained (inline CSS, no JavaScript, native {@code <details>});
+ * every interpolated value goes through {@link #escape(String)} — reasoning, evidence,
+ * feedback and the trace carry JSON/HTML-hostile characters from live systems.
  */
 public class HtmlReportRenderer implements EvaluationReportRenderer {
 
     private static final String STYLE = """
             body { font-family: system-ui, sans-serif; margin: 2em auto; max-width: 70em; \
             padding: 0 1em; color: #303030; }
-            h1 { font-size: 1.6em; } h2 { font-size: 1.25em; margin-top: 1.8em; }
-            h3 { font-size: 1.05em; margin-top: 1.6em; }
-            h3 small { color: #808080; font-weight: normal; }
+            h1 { font-size: 1.6em; }
+            h1 small { color: #808080; font-weight: normal; font-size: 0.6em; }
+            .breadcrumb { color: #808080; font-size: 0.9em; margin-bottom: 1.2em; }
             .meta { color: #606060; line-height: 1.5; }
             .tiles { display: flex; gap: 1em; flex-wrap: wrap; margin: 1.5em 0; }
             .tile { border: 1px solid #d0d0d0; border-radius: 4px; padding: 0.7em 1.3em; \
@@ -67,28 +72,132 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
             border-radius: 4px; padding: 0.5em 0.9em; }
             summary { cursor: pointer; font-weight: bold; }
             pre { background: #f4f4f4; padding: 0.7em; overflow-x: auto; font-size: 0.85em; }
-            .top { font-size: 0.85em; }
             """;
 
     @Override
-    public String fileName() {
-        return "evaluation.html";
+    public String name() {
+        return "html";
     }
 
     @Override
-    public String render(EvaluationReport report) {
+    public List<Path> render(EvaluationReport report, Path dir) {
+        try {
+            Files.createDirectories(dir.resolve("buckets"));
+            Files.createDirectories(dir.resolve("scenarios"));
+            val files = new ArrayList<Path>();
+            files.add(write(dir.resolve("evaluation.html"), indexPage(report)));
+            for (val bucket : report.buckets()) {
+                files.add(write(dir.resolve("buckets/" + slug(bucket.name()) + ".html"),
+                        bucketPage(bucket)));
+                for (var index = 0; index < bucket.scenarios().size(); index++) {
+                    files.add(write(dir.resolve("scenarios/" + scenarioFile(bucket, index)),
+                            scenarioPage(bucket, index)));
+                }
+            }
+            return List.copyOf(files);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not write the HTML evaluation report to " + dir, e);
+        }
+    }
+
+    private static Path write(Path file, String content) throws IOException {
+        Files.writeString(file, content);
+        return file;
+    }
+
+    // ---- pages ----
+
+    private static String indexPage(EvaluationReport report) {
+        val body = new StringBuilder("<h1>Inquisitor evaluation report</h1>\n");
+        appendMeta(body, report);
+        appendTiles(body, report);
+        body.append("<table>\n<thead><tr><th>Bucket</th><th>Scenarios</th><th>Matched</th>")
+                .append("<th>Success rate</th><th>Evaluation score</th></tr></thead>\n<tbody>\n");
+        for (val bucket : report.buckets()) {
+            val steps = allSteps(bucket);
+            body.append("<tr><td><a href=\"buckets/").append(slug(bucket.name())).append(".html\">")
+                    .append(escape(bucket.name())).append("</a></td><td>")
+                    .append(bucket.totals().scenarios()).append("</td><td>")
+                    .append(bucket.totals().scenariosMatched()).append('/')
+                    .append(bucket.totals().scenarios()).append("</td><td>")
+                    .append(ReportFormats.percent(ReportFormats.successRate(steps)))
+                    .append("</td><td>").append(score(steps)).append("</td></tr>\n");
+        }
+        body.append("</tbody>\n</table>\n");
+        return page("Inquisitor evaluation report", null, body.toString());
+    }
+
+    private static String bucketPage(EvaluationReport.Bucket bucket) {
+        val body = new StringBuilder("<h1>").append(escape(bucket.name())).append("</h1>\n")
+                .append("<p class=\"meta\">Gate: ").append(bucket.totals().scenariosMatched())
+                .append('/').append(bucket.totals().scenarios())
+                .append(" matched &mdash; Success rate: ")
+                .append(ReportFormats.percent(ReportFormats.successRate(allSteps(bucket))))
+                .append(" &mdash; Evaluation score: ").append(score(allSteps(bucket))).append("</p>\n")
+                .append("<table>\n<thead><tr><th>Scenario</th><th>Expected</th><th>Steps</th>")
+                .append("<th>Success rate</th><th>Evaluation score</th><th>Matched</th></tr></thead>\n")
+                .append("<tbody>\n");
+        for (var index = 0; index < bucket.scenarios().size(); index++) {
+            val scenario = bucket.scenarios().get(index);
+            body.append("<tr><td><a href=\"../scenarios/").append(scenarioFile(bucket, index))
+                    .append("\">").append(escape(scenario.name())).append("</a></td><td>")
+                    .append(scenario.expectedOutcome())
+                    .append("</td><td>").append(scenario.steps().size()).append('/')
+                    .append(scenario.steps().getFirst().stepCount())
+                    .append("</td><td>")
+                    .append(ReportFormats.percent(ReportFormats.successRate(scenario.steps())))
+                    .append("</td><td>").append(score(scenario.steps()))
+                    .append("</td><td>").append(matchedCell(scenario)).append("</td></tr>\n");
+        }
+        body.append("</tbody>\n</table>\n");
+        val breadcrumb = "<a href=\"../evaluation.html\">report</a> &rsaquo; " + escape(bucket.name());
+        return page(bucket.name(), breadcrumb, body.toString());
+    }
+
+    private static String scenarioPage(EvaluationReport.Bucket bucket, int index) {
+        val scenario = bucket.scenarios().get(index);
+        val body = new StringBuilder("<h1>").append(escape(scenario.name()));
+        if (scenario.source() != null) {
+            body.append(" <small>").append(escape(scenario.source())).append("</small>");
+        }
+        body.append("</h1>\n<p class=\"meta\">Expected ").append(scenario.expectedOutcome())
+                .append(" &mdash; ").append(matchedCell(scenario))
+                .append(" &mdash; Evaluation score: ").append(score(scenario.steps())).append("</p>\n")
+                .append("<table>\n<thead><tr><th>#</th><th>Step</th><th>Outcome</th>")
+                .append("<th>Category</th><th>Score</th><th>Actor time</th></tr></thead>\n<tbody>\n");
+        for (val step : scenario.steps()) {
+            body.append("<tr><td>").append(step.stepIndex()).append('/').append(step.stepCount())
+                    .append("</td><td>").append(escape(step.stepTitle()))
+                    .append("</td><td>").append(outcomeCell(step.outcome()))
+                    .append("</td><td>").append(step.category() == null
+                            ? "<span class=\"dim\">&mdash;</span>"
+                            : escape(step.category()))
+                    .append("</td><td>").append(step.evaluated()
+                            ? ReportFormats.percent(step.score())
+                            : "<span class=\"dim\">&mdash;</span>")
+                    .append("</td><td>").append(step.elapsedMillis()).append(" ms</td></tr>\n");
+        }
+        body.append("</tbody>\n</table>\n");
+        for (val step : scenario.steps()) {
+            appendFinding(body, step);
+        }
+        val breadcrumb = "<a href=\"../evaluation.html\">report</a> &rsaquo; <a href=\"../buckets/"
+                + slug(bucket.name()) + ".html\">" + escape(bucket.name()) + "</a> &rsaquo; "
+                + escape(scenario.name());
+        return page(scenario.name(), breadcrumb, body.toString());
+    }
+
+    // ---- fragments ----
+
+    private static String page(String title, String breadcrumb, String body) {
         val out = new StringBuilder();
         out.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n")
-                .append("<title>Inquisitor evaluation report</title>\n<style>\n").append(STYLE)
-                .append("</style>\n</head>\n<body id=\"top\">\n")
-                .append("<h1>Inquisitor evaluation report</h1>\n");
-        appendMeta(out, report);
-        appendTiles(out, report);
-        appendBucketsOverview(out, report);
-        for (val bucket : report.buckets()) {
-            appendBucket(out, bucket);
+                .append("<title>").append(escape(title)).append("</title>\n<style>\n").append(STYLE)
+                .append("</style>\n</head>\n<body>\n");
+        if (breadcrumb != null) {
+            out.append("<p class=\"breadcrumb\">").append(breadcrumb).append("</p>\n");
         }
-        out.append("</body>\n</html>\n");
+        out.append(body).append("</body>\n</html>\n");
         return out.toString();
     }
 
@@ -130,85 +239,6 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
                 .append("</div></div>\n");
     }
 
-    /** The index-page view: one row per bucket, linking into the bucket sections. */
-    private static void appendBucketsOverview(StringBuilder out, EvaluationReport report) {
-        out.append("<table>\n<thead><tr><th>Bucket</th><th>Scenarios</th><th>Matched</th>")
-                .append("<th>Success rate</th><th>Evaluation rate</th></tr></thead>\n<tbody>\n");
-        for (val bucket : report.buckets()) {
-            val steps = allSteps(bucket);
-            out.append("<tr><td><a href=\"#").append(bucketId(bucket)).append("\">")
-                    .append(escape(bucket.name())).append("</a></td><td>")
-                    .append(bucket.totals().scenarios()).append("</td><td>")
-                    .append(bucket.totals().scenariosMatched()).append('/')
-                    .append(bucket.totals().scenarios()).append("</td><td>")
-                    .append(ReportFormats.percent(ReportFormats.successRate(steps)))
-                    .append("</td><td>").append(rate(steps)).append("</td></tr>\n");
-        }
-        out.append("</tbody>\n</table>\n");
-    }
-
-    private static void appendBucket(StringBuilder out, EvaluationReport.Bucket bucket) {
-        out.append("<h2 id=\"").append(bucketId(bucket)).append("\">").append(escape(bucket.name()))
-                .append("</h2>\n<p class=\"meta\">Gate: ").append(bucket.totals().scenariosMatched())
-                .append('/').append(bucket.totals().scenarios())
-                .append(" matched &mdash; Success rate: ")
-                .append(ReportFormats.percent(ReportFormats.successRate(allSteps(bucket))))
-                .append(" &mdash; Evaluation rate: ").append(rate(allSteps(bucket))).append("</p>\n")
-                .append("<table>\n<thead><tr><th>Scenario</th><th>Expected</th><th>Steps</th>")
-                .append("<th>Success rate</th><th>Evaluation rate</th><th>Matched</th></tr></thead>\n")
-                .append("<tbody>\n");
-        for (var index = 0; index < bucket.scenarios().size(); index++) {
-            val scenario = bucket.scenarios().get(index);
-            out.append("<tr><td><a href=\"#").append(scenarioId(bucket, index)).append("\">")
-                    .append(escape(scenario.name())).append("</a></td><td>")
-                    .append(scenario.expectedOutcome())
-                    .append("</td><td>").append(scenario.steps().size()).append('/')
-                    .append(scenario.steps().getFirst().stepCount())
-                    .append("</td><td>")
-                    .append(ReportFormats.percent(ReportFormats.successRate(scenario.steps())))
-                    .append("</td><td>").append(rate(scenario.steps()))
-                    .append("</td><td>").append(matchedCell(scenario)).append("</td></tr>\n");
-        }
-        out.append("</tbody>\n</table>\n");
-        for (var index = 0; index < bucket.scenarios().size(); index++) {
-            appendScenario(out, bucket, index);
-        }
-    }
-
-    /** The class-page view: per-scenario step table plus its findings. */
-    private static void appendScenario(StringBuilder out, EvaluationReport.Bucket bucket, int index) {
-        val scenario = bucket.scenarios().get(index);
-        out.append("<h3 id=\"").append(scenarioId(bucket, index)).append("\">")
-                .append(escape(scenario.name()));
-        if (scenario.source() != null) {
-            out.append(" <small>").append(escape(scenario.source())).append("</small>");
-        }
-        out.append("</h3>\n<p class=\"meta\">Expected ").append(scenario.expectedOutcome())
-                .append(" &mdash; ").append(scenario.matched()
-                        ? "<span class=\"ok\">matched</span>"
-                        : matchedCell(scenario))
-                .append("</p>\n")
-                .append("<table>\n<thead><tr><th>#</th><th>Step</th><th>Outcome</th>")
-                .append("<th>Category</th><th>Score</th><th>Actor time</th></tr></thead>\n<tbody>\n");
-        for (val step : scenario.steps()) {
-            out.append("<tr><td>").append(step.stepIndex()).append('/').append(step.stepCount())
-                    .append("</td><td>").append(escape(step.stepTitle()))
-                    .append("</td><td>").append(outcomeCell(step.outcome()))
-                    .append("</td><td>").append(step.category() == null
-                            ? "<span class=\"dim\">&mdash;</span>"
-                            : escape(step.category()))
-                    .append("</td><td>").append(step.evaluated()
-                            ? ReportFormats.percent(step.score())
-                            : "<span class=\"dim\">&mdash;</span>")
-                    .append("</td><td>").append(step.elapsedMillis()).append(" ms</td></tr>\n");
-        }
-        out.append("</tbody>\n</table>\n");
-        for (val step : scenario.steps()) {
-            appendFinding(out, step);
-        }
-        out.append("<p class=\"top\"><a href=\"#top\">&uarr; back to top</a></p>\n");
-    }
-
     /** A finding: any step the judge scored below 1.0, or never scored (with the reason). */
     private static void appendFinding(StringBuilder out, StepEvaluationRecord step) {
         if (step.evaluated() && step.score() >= 1.0) {
@@ -236,9 +266,9 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         return bucket.scenarios().stream().flatMap(scenario -> scenario.steps().stream()).toList();
     }
 
-    private static String rate(List<StepEvaluationRecord> steps) {
-        val rate = ReportFormats.evaluationRate(steps);
-        return Double.isNaN(rate) ? "<span class=\"dim\">&mdash;</span>" : ReportFormats.percent(rate);
+    private static String score(List<StepEvaluationRecord> steps) {
+        val score = ReportFormats.evaluationScore(steps);
+        return Double.isNaN(score) ? "<span class=\"dim\">&mdash;</span>" : ReportFormats.percent(score);
     }
 
     private static String outcomeCell(Outcome outcome) {
@@ -249,19 +279,15 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
 
     private static String matchedCell(EvaluationReport.ScenarioReport scenario) {
         if (scenario.matched()) {
-            return "<span class=\"ok\">yes</span>";
+            return "<span class=\"ok\">matched</span>";
         }
         return scenario.expectedOutcome() == Outcome.FAIL
                 ? "<span class=\"bad\">MISSED DETECTION</span>"
-                : "<span class=\"bad\">no</span>";
+                : "<span class=\"bad\">not matched</span>";
     }
 
-    private static String bucketId(EvaluationReport.Bucket bucket) {
-        return "bucket-" + slug(bucket.name());
-    }
-
-    private static String scenarioId(EvaluationReport.Bucket bucket, int index) {
-        return "scenario-" + slug(bucket.name()) + "-" + index;
+    private static String scenarioFile(EvaluationReport.Bucket bucket, int index) {
+        return slug(bucket.name()) + "-" + index + ".html";
     }
 
     private static String slug(String name) {

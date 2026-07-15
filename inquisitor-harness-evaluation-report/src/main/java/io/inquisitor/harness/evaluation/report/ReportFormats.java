@@ -59,8 +59,8 @@ final class ReportFormats {
                         / (double) steps.size();
     }
 
-    /** Judge evaluation rate: mean score over evaluated steps; NaN when none. */
-    static double evaluationRate(List<StepEvaluationRecord> steps) {
+    /** Judge evaluation score: mean score over evaluated steps; NaN when none. */
+    static double evaluationScore(List<StepEvaluationRecord> steps) {
         return steps.stream()
                 .filter(StepEvaluationRecord::evaluated)
                 .mapToDouble(StepEvaluationRecord::score)

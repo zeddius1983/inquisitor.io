@@ -308,12 +308,17 @@ see [roadmap.md](roadmap.md); for stable repo context see
   (`implementation` dependency) with the registration bean
   `@ConditionalOnClass`-guarded, so excluding the module degrades evaluation to
   score-only — the OpenAPI-grade removal bar.
-- **Renderers are pluggable via `ServiceLoader`.** `EvaluationReportRenderer`
-  (`fileName()` + `render(report)`) is the format seam; the module contributes
-  `JsonReportRenderer` (artifact of record) and `MarkdownReportRenderer` through its
-  own `META-INF/services` entry, and any jar on the test classpath can contribute
-  more (HTML, XML, …) without touching this module. `ServiceLoader` over Spring beans
-  because the writing happens in the `LauncherSessionListener`, outside any context.
+- **Renderers are pluggable via `ServiceLoader`, selected by `--report`.**
+  `EvaluationReportRenderer` (`name()` + `render(report, dir) → List<Path>`) is the
+  format seam — a renderer owns its files, because the HTML report is multi-page
+  (Gradle-report-style: index → bucket pages → scenario pages). The module
+  contributes `html` (default), `markdown` and `json` through its own
+  `META-INF/services` entry; any jar on the test classpath can contribute more, and
+  the `evaluate` task's `--report=name,name` option (a `@Option` on the custom
+  `EvaluateTask`, passed as `inquisitor.report.formats`) selects by `name()` —
+  built-ins and user renderers alike; unknown names are warned and skipped.
+  `ServiceLoader` over Spring beans because the writing happens in the
+  `LauncherSessionListener`, outside any context.
   Rendering by `StringBuilder`, not a template engine, for now: Markdown is
   newline-sensitive and the document is ~100 lines of logic; a logic-less engine
   (JMustache — not Groovy, which drags in a whole language runtime as a consumer-test

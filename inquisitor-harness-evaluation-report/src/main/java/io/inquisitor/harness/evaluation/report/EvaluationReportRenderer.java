@@ -16,19 +16,27 @@
 
 package io.inquisitor.harness.evaluation.report;
 
+import java.nio.file.Path;
+import java.util.List;
+
 /**
- * Renders an {@link EvaluationReport} into one output format. Implementations are
+ * Renders an {@link EvaluationReport} into one output format — one or several files
+ * (the HTML report is multi-page, like Gradle's own test report). Implementations are
  * discovered via {@code ServiceLoader}
- * ({@code META-INF/services/io.inquisitor.harness.evaluation.report.EvaluationReportRenderer}),
- * so adding a format — XML, HTML, … — is a jar on the test classpath with a service
- * entry; this module ships {@link JsonReportRenderer} (the artifact of record) and
- * {@link MarkdownReportRenderer}.
+ * ({@code META-INF/services/io.inquisitor.harness.evaluation.report.EvaluationReportRenderer})
+ * and selected by {@link #name()} through the {@code evaluate} task's {@code --report}
+ * option (default {@code html}) — so adding a format is a jar on the test classpath
+ * with a service entry, selectable the same way as the built-ins: {@code html},
+ * {@code markdown}, {@code json}.
  */
 public interface EvaluationReportRenderer {
 
-    /** The file name this renderer's output is written as, e.g. {@code evaluation.json}. */
-    String fileName();
+    /** The format name used to select this renderer, e.g. {@code --report=html,json}. */
+    String name();
 
-    /** Renders the complete document. */
-    String render(EvaluationReport report);
+    /**
+     * Renders the report into {@code dir} (which exists) and returns the files written,
+     * entry page first.
+     */
+    List<Path> render(EvaluationReport report, Path dir);
 }

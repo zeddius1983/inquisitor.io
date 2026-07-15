@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import io.inquisitor.harness.evaluation.StepEvaluationRecord;
 import io.inquisitor.harness.model.Outcome;
@@ -71,11 +72,12 @@ class EvaluationReportWriterTest {
     }
 
     @Test
-    void discoversAllBuiltInRenderersAndWritesOneFileEach() throws IOException {
-        val files = EvaluationReportWriter.discover().write(sampleReport(), dir.resolve("reports"));
+    void discoverSelectsRenderersByNameAndSkipsUnknownOnes() throws IOException {
+        val files = EvaluationReportWriter.discover(Set.of("json", "markdown", "nonexistent"))
+                .write(sampleReport(), dir.resolve("reports"));
 
         assertThat(files).extracting(file -> file.getFileName().toString())
-                .containsExactlyInAnyOrder("evaluation.json", "evaluation.md", "evaluation.html");
+                .containsExactlyInAnyOrder("evaluation.json", "evaluation.md");
         for (val file : files) {
             assertThat(file).exists();
         }
@@ -92,8 +94,20 @@ class EvaluationReportWriterTest {
     }
 
     @Test
+    void htmlSelectionWritesTheMultiPageReport() {
+        val files = EvaluationReportWriter.discover(Set.of("html"))
+                .write(sampleReport(), dir.resolve("reports"));
+
+        assertThat(files.getFirst().getFileName().toString()).isEqualTo("evaluation.html");
+        assertThat(dir.resolve("reports/buckets/cucumber.html")).exists();
+        assertThat(dir.resolve("reports/scenarios/cucumber-0.html")).exists();
+        assertThat(dir.resolve("reports/evaluation.md")).doesNotExist();
+        assertThat(dir.resolve("reports/evaluation.json")).doesNotExist();
+    }
+
+    @Test
     void markdownHeadlineEndsAtTheMarkerAndCarriesTheAggregates() {
-        val markdown = new MarkdownReportRenderer().render(sampleReport());
+        val markdown = new MarkdownReportRenderer().renderMarkdown(sampleReport());
 
         val headline = markdown.substring(0, markdown.indexOf(MarkdownReportRenderer.HEADLINE_END));
         assertThat(headline)
@@ -109,7 +123,7 @@ class EvaluationReportWriterTest {
 
     @Test
     void findingsShowBothSidesOfANonGroundedStep() {
-        val markdown = new MarkdownReportRenderer().render(sampleReport());
+        val markdown = new MarkdownReportRenderer().renderMarkdown(sampleReport());
 
         val findings = markdown.substring(markdown.indexOf("### Findings"));
         assertThat(findings)

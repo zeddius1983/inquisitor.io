@@ -46,6 +46,7 @@ class EvaluationReportSessionListenerTest {
     void cleanUp() {
         System.clearProperty(EvaluationReportSessionListener.REPORT_DIR_PROPERTY);
         System.clearProperty(EvaluationReportSessionListener.HEADER_PROPERTY);
+        System.clearProperty(EvaluationReportSessionListener.FORMATS_PROPERTY);
         EvaluationReportSession.reset();
     }
 
@@ -61,7 +62,7 @@ class EvaluationReportSessionListenerTest {
     }
 
     @Test
-    void writesTheReportAtSessionCloseWhenTheDirIsConfigured() {
+    void writesTheDefaultHtmlReportAtSessionClose() {
         EvaluationReportSession.register(recorderWithOneRecord(),
                 new EvaluationRunInfo("actor", "http://a", "judge", "http://j"));
         System.setProperty(EvaluationReportSessionListener.REPORT_DIR_PROPERTY,
@@ -72,9 +73,26 @@ class EvaluationReportSessionListenerTest {
         listener.launcherSessionOpened(null);
         listener.launcherSessionClosed(null);
 
-        assertThat(dir.resolve("inquisitor/evaluation.json")).exists();
-        assertThat(dir.resolve("inquisitor/evaluation.md")).exists();
+        assertThat(dir.resolve("inquisitor/evaluation.html")).exists();
+        assertThat(dir.resolve("inquisitor/buckets/explicit.html")).exists();
+        assertThat(dir.resolve("inquisitor/evaluation.json")).doesNotExist();
+        assertThat(dir.resolve("inquisitor/evaluation.md")).doesNotExist();
         assertThat(EvaluationReportSession.records()).isEmpty();
+    }
+
+    @Test
+    void honoursTheRequestedFormats() {
+        EvaluationReportSession.register(recorderWithOneRecord(),
+                new EvaluationRunInfo(null, null, null, null));
+        System.setProperty(EvaluationReportSessionListener.REPORT_DIR_PROPERTY,
+                dir.resolve("inquisitor").toString());
+        System.setProperty(EvaluationReportSessionListener.FORMATS_PROPERTY, "markdown, json");
+
+        new EvaluationReportSessionListener().launcherSessionClosed(null);
+
+        assertThat(dir.resolve("inquisitor/evaluation.md")).exists();
+        assertThat(dir.resolve("inquisitor/evaluation.json")).exists();
+        assertThat(dir.resolve("inquisitor/evaluation.html")).doesNotExist();
     }
 
     @Test

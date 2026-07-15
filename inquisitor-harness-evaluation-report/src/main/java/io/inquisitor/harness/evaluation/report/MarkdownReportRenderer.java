@@ -16,6 +16,11 @@
 
 package io.inquisitor.harness.evaluation.report;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -36,12 +41,23 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
     public static final String HEADLINE_END = "<!-- headline-end -->";
 
     @Override
-    public String fileName() {
-        return "evaluation.md";
+    public String name() {
+        return "markdown";
     }
 
     @Override
-    public String render(EvaluationReport report) {
+    public List<Path> render(EvaluationReport report, Path dir) {
+        val file = dir.resolve("evaluation.md");
+        try {
+            Files.writeString(file, renderMarkdown(report));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not write " + file, e);
+        }
+        return List.of(file);
+    }
+
+    /** Renders the whole document. */
+    public String renderMarkdown(EvaluationReport report) {
         val out = new StringBuilder("# Inquisitor evaluation report\n\n");
         appendHeadline(out, report);
         out.append('\n').append(HEADLINE_END).append('\n');

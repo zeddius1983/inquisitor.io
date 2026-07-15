@@ -19,6 +19,10 @@ package io.inquisitor.harness.evaluation.report;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -41,6 +45,15 @@ public class EvaluationReportSessionListener implements LauncherSessionListener 
     /** Free-form run label rendered into the report (the plugin's {@code -Pheader}). */
     public static final String HEADER_PROPERTY = "inquisitor.report.header";
 
+    /**
+     * Comma-separated renderer names to write (the plugin's {@code --report} option);
+     * defaults to {@value #DEFAULT_FORMATS}.
+     */
+    public static final String FORMATS_PROPERTY = "inquisitor.report.formats";
+
+    /** The default report format. */
+    public static final String DEFAULT_FORMATS = "html";
+
     private volatile Instant openedAt = Instant.now();
 
     @Override
@@ -62,14 +75,26 @@ public class EvaluationReportSessionListener implements LauncherSessionListener 
             val generatedAt = Instant.now();
             val report = EvaluationReport.of(generatedAt, Duration.between(openedAt, generatedAt),
                     System.getProperty(HEADER_PROPERTY), EvaluationReportSession.runInfo(), records);
-            val files = EvaluationReportWriter.discover().write(report, Path.of(dir));
+            val files = EvaluationReportWriter.discover(requestedFormats()).write(report, Path.of(dir));
             // Println on purpose: this must reach the console even without a logger config.
-            System.out.println("Inquisitor evaluation report written: " + files);
+            // Entry pages only — the multi-page HTML report has one file per scenario.
+            val reportDir = Path.of(dir);
+            System.out.println("Inquisitor evaluation report written: "
+                    + files.stream().filter(file -> reportDir.equals(file.getParent())).toList());
         } catch (RuntimeException e) {
             // Never let report writing fail the JVM's orderly test shutdown.
             log.warn("Could not write the evaluation report", e);
         } finally {
             EvaluationReportSession.reset();
         }
+    }
+
+    private static Set<String> requestedFormats() {
+        val formats = System.getProperty(FORMATS_PROPERTY, DEFAULT_FORMATS);
+        val requested = Arrays.stream(formats.split(","))
+                .map(String::trim)
+                .filter(format -> !format.isEmpty())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return requested.isEmpty() ? Set.of(DEFAULT_FORMATS) : requested;
     }
 }

@@ -9,13 +9,20 @@ brittle across Gradle versions. Instead the harness ships its own HTML through t
 pluggable renderer seam (`EvaluationReportRenderer`, ServiceLoader-discovered) that
 task-12 introduced for exactly this kind of growth.
 
-> Status: **implemented** on `feature/evaluate-gradle-plugin`. Two amendments landed
-> during implementation (review feedback): **JUnit-report-style navigation** — the
-> single file drills down via in-page anchors (summary tiles → buckets overview
-> table → bucket table → per-scenario section with its own step table, "back to
-> top" links); and **findings per test** — every scenario section lists its
+> Status: **implemented** on `feature/evaluate-gradle-plugin`, then amended twice by
+> review. Amendment 1: **findings per test** — every scenario view lists its
 > findings, including `NOT_EVALUATED` steps with their reason (synthetic verdict /
-> failed judge call), not only judge-flagged ones.
+> failed judge call), not only judge-flagged ones. Amendment 2 (superseding the
+> original single-file/anchors shape): **multi-page navigation like Gradle's own
+> report** — `evaluation.html` (tiles + buckets overview) → `buckets/*.html` →
+> `scenarios/*.html`, breadcrumbs throughout; "Evaluation rate" renamed
+> **"Evaluation score"**; and **HTML is the default (and only) report** unless the
+> `evaluate` task's `--report` option selects others (comma-separated renderer
+> names: `html`, `markdown`, `json`, or any user-supplied renderer's `name()`).
+> The renderer seam changed accordingly: `EvaluationReportRenderer` is now
+> `name()` + `render(report, dir) → List<Path>` (a renderer owns its files —
+> multi-page formats need that; this also settled the earlier byte[]/String
+> debate in favour of "the renderer writes").
 
 ## Shape
 

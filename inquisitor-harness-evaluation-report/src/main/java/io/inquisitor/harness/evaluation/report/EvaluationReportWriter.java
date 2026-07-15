@@ -21,18 +21,23 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.ServiceLoader;
+import java.util.Set;
 
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
 /**
- * Writes an {@link EvaluationReport} through every configured
- * {@link EvaluationReportRenderer} — one file per renderer, all into one directory.
- * {@link #discover()} assembles the renderer set via {@code ServiceLoader}, so
- * formats are pluggable: this module contributes JSON + Markdown; any jar on the test
- * classpath can contribute more.
+ * Writes an {@link EvaluationReport} through the selected
+ * {@link EvaluationReportRenderer}s — all into one directory. {@link #discover(Set)}
+ * assembles the renderer set via {@code ServiceLoader} filtered by renderer
+ * {@linkplain EvaluationReportRenderer#name() name} (the {@code --report} tokens), so
+ * formats are pluggable: this module contributes {@code html}, {@code markdown} and
+ * {@code json}; any jar on the test classpath can contribute more.
  */
+@Slf4j
 public class EvaluationReportWriter {
 
     private final List<EvaluationReportRenderer> renderers;
@@ -41,26 +46,37 @@ public class EvaluationReportWriter {
         this.renderers = List.copyOf(renderers);
     }
 
-    /** A writer over every {@code ServiceLoader}-discovered renderer. */
-    public static EvaluationReportWriter discover() {
-        return new EvaluationReportWriter(ServiceLoader.load(EvaluationReportRenderer.class).stream()
+    /**
+     * A writer over the {@code ServiceLoader}-discovered renderers whose names are in
+     * {@code formats}; unknown names are logged and skipped.
+     */
+    public static EvaluationReportWriter discover(Set<String> formats) {
+        val available = ServiceLoader.load(EvaluationReportRenderer.class).stream()
                 .map(ServiceLoader.Provider::get)
-                .toList());
+                .toList();
+        val selected = available.stream()
+                .filter(renderer -> formats.contains(renderer.name()))
+                .toList();
+        val unknown = new LinkedHashSet<>(formats);
+        selected.forEach(renderer -> unknown.remove(renderer.name()));
+        if (!unknown.isEmpty()) {
+            log.warn("Unknown report format(s) {} — available: {}", unknown,
+                    available.stream().map(EvaluationReportRenderer::name).toList());
+        }
+        return new EvaluationReportWriter(selected);
     }
 
-    /** Renders and writes every format into {@code dir} (created if absent). */
+    /** Renders every selected format into {@code dir} (created if absent). */
     public List<Path> write(EvaluationReport report, Path dir) {
         try {
             Files.createDirectories(dir);
-            val files = new ArrayList<Path>();
-            for (val renderer : renderers) {
-                val file = dir.resolve(renderer.fileName());
-                Files.writeString(file, renderer.render(report));
-                files.add(file);
-            }
-            return List.copyOf(files);
         } catch (IOException e) {
-            throw new UncheckedIOException("Could not write the evaluation report to " + dir, e);
+            throw new UncheckedIOException("Could not create the report directory " + dir, e);
         }
+        val files = new ArrayList<Path>();
+        for (val renderer : renderers) {
+            files.addAll(renderer.render(report, dir));
+        }
+        return List.copyOf(files);
     }
 }

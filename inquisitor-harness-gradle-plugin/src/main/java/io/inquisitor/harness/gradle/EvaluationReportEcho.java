@@ -52,19 +52,20 @@ final class EvaluationReportEcho implements TestListener {
             return;
         }
         var markdown = markdownReport.get();
-        if (!Files.exists(markdown)) {
-            return;
-        }
         try {
-            var headline = new StringBuilder(System.lineSeparator());
-            for (var line : Files.readAllLines(markdown)) {
-                if (line.contains(HEADLINE_END)) {
-                    break;
+            // The headline needs the Markdown rendering (--report=markdown,...); the
+            // default html-only run still gets its entry-page link below.
+            if (Files.exists(markdown)) {
+                var headline = new StringBuilder(System.lineSeparator());
+                for (var line : Files.readAllLines(markdown)) {
+                    if (line.contains(HEADLINE_END)) {
+                        break;
+                    }
+                    headline.append(line).append(System.lineSeparator());
                 }
-                headline.append(line).append(System.lineSeparator());
+                LOGGER.lifecycle(headline.toString().stripTrailing());
+                LOGGER.lifecycle("Evaluation report: {}", markdown.toAbsolutePath());
             }
-            LOGGER.lifecycle(headline.toString().stripTrailing());
-            LOGGER.lifecycle("Evaluation report: {}", markdown.toAbsolutePath());
             var html = markdown.resolveSibling("evaluation.html");
             if (Files.exists(html)) {
                 LOGGER.lifecycle("Evaluation report (html): {}", html.toAbsolutePath());

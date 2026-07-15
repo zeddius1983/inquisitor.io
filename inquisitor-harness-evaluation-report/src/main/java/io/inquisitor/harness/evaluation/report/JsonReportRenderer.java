@@ -16,12 +16,20 @@
 
 package io.inquisitor.harness.evaluation.report;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import lombok.val;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The artifact of record: the full report model as pretty-printed JSON, the input for
- * any downstream generation (the future README verified-models table, trend tracking).
+ * The machine-readable artifact of record: the full report model as pretty-printed
+ * JSON, the input for any downstream generation (the future README verified-models
+ * table, trend tracking).
  */
 public class JsonReportRenderer implements EvaluationReportRenderer {
 
@@ -30,12 +38,18 @@ public class JsonReportRenderer implements EvaluationReportRenderer {
             .build();
 
     @Override
-    public String fileName() {
-        return "evaluation.json";
+    public String name() {
+        return "json";
     }
 
     @Override
-    public String render(EvaluationReport report) {
-        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report);
+    public List<Path> render(EvaluationReport report, Path dir) {
+        val file = dir.resolve("evaluation.json");
+        try {
+            Files.writeString(file, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not write " + file, e);
+        }
+        return List.of(file);
     }
 }

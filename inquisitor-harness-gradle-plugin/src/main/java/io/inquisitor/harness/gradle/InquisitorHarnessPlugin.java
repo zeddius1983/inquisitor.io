@@ -52,6 +52,9 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
     /** System property telling the test JVM where to write the report artifacts. */
     public static final String REPORT_DIR_PROPERTY = "inquisitor.report.dir";
 
+    /** System property carrying the selected report formats (the {@code --report} option). */
+    public static final String REPORT_FORMATS_PROPERTY = "inquisitor.report.formats";
+
     @Override
     public void apply(Project project) {
         var extension = project.getExtensions().create("harness", InquisitorHarnessExtension.class);
@@ -67,9 +70,10 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
         var header = project.getProviders().gradleProperty("header");
         var reportDir = project.getLayout().getBuildDirectory().dir("reports/inquisitor");
 
-        project.getTasks().register(EVALUATE_TASK_NAME, Test.class, task -> {
+        project.getTasks().register(EVALUATE_TASK_NAME, EvaluateTask.class, task -> {
             task.setGroup(HARNESS_GROUP);
             task.setDescription("Runs Inquisitor scenario tests with LLM-as-judge evaluation.");
+            task.getReportFormats().convention("html");
             task.setTestClassesDirs(testSourceSet.getOutput().getClassesDirs());
             task.setClasspath(testSourceSet.getRuntimeClasspath());
             task.useJUnitPlatform(options ->
@@ -80,6 +84,7 @@ public class InquisitorHarnessPlugin implements Plugin<Project> {
                 var arguments = new ArrayList<String>();
                 arguments.add("-D" + REPORT_DIR_PROPERTY + "="
                         + reportDir.get().getAsFile().getAbsolutePath());
+                arguments.add("-D" + REPORT_FORMATS_PROPERTY + "=" + task.getReportFormats().get());
                 if (header.isPresent()) {
                     arguments.add("-D" + REPORT_HEADER_PROPERTY + "=" + header.get());
                 }
