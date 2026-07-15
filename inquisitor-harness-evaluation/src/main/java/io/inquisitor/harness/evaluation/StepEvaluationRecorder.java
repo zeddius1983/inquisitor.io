@@ -45,10 +45,12 @@ public class StepEvaluationRecorder {
         records.add(build(request, run, response.getScore(), category, response.getFeedback()));
     }
 
-    /** Records a step whose verdict the harness synthesized — the judge never saw it. */
-    public void recordNotEvaluated(StepRequest request, StepRun run) {
-        records.add(build(request, run, 0.0, StepEvaluationRecord.NOT_EVALUATED,
-                "Harness-synthesized verdict (no actor claim to audit); not evaluated."));
+    /**
+     * Records a step the judge never scored — a harness-synthesized verdict, or a failed
+     * judge call — with the reason as the feedback.
+     */
+    public void recordNotEvaluated(StepRequest request, StepRun run, String reason) {
+        records.add(build(request, run, 0.0, StepEvaluationRecord.NOT_EVALUATED, reason));
     }
 
     private static StepEvaluationRecord build(StepRequest request, StepRun run,

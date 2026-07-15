@@ -84,7 +84,8 @@ class StepEvaluationRecorderTest {
         recorder.record(request(2), run(new StepVerdict(Outcome.PASS, "ok", List.of())),
                 new EvaluationResponse(false, 0.5f, "", Map.of("category", "PARTIALLY_GROUNDED")));
         recorder.recordNotEvaluated(request(2),
-                run(new StepVerdict(Outcome.FAIL, "unparseable", List.of())));
+                run(new StepVerdict(Outcome.FAIL, "unparseable", List.of())),
+                "Harness-synthesized verdict; not evaluated.");
 
         assertThat(recorder.overallScore()).hasValue(0.75);
         assertThat(recorder.records()).hasSize(3);

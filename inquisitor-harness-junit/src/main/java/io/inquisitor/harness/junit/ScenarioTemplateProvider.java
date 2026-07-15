@@ -148,7 +148,16 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                         ? "skipped: the scenario already failed as expected at an earlier step"
                         : "skipped: an earlier step in this scenario failed");
             }
-            val result = state.execution.next();
+            StepResult result;
+            try {
+                result = state.execution.next();
+            } catch (RuntimeException e) {
+                // An infrastructure error (not a verdict): without this, the execution's
+                // cursor hasn't advanced and the *next* sub-test would silently re-run this
+                // step under the wrong name, with the last step never running at all.
+                state.done = true;
+                throw e;
+            }
 
             if (state.expect == Expect.FAIL) {
                 if (!result.passed()) {

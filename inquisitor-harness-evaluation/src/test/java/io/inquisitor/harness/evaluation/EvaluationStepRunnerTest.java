@@ -86,6 +86,27 @@ class EvaluationStepRunnerTest {
     }
 
     @Test
+    void judgeFailureNeverFailsTheStep() {
+        val verdict = new StepVerdict(Outcome.PASS, "fine", List.of("HTTP 200"));
+        val delegate = (StepRunner) request -> new StepRun(verdict, List.of(), Duration.ZERO);
+        val evaluator = (Evaluator) request -> {
+            throw new IllegalStateException("judge timed out");
+        };
+        val recorder = new StepEvaluationRecorder();
+        val runner = new EvaluationStepRunner(delegate, evaluator, recorder);
+
+        val run = runner.run(StepRequest.of("conv-4", SCENARIO, SCENARIO.steps().get(0)));
+
+        // the judge is an observer: its failure must not propagate, the verdict stands
+        assertThat(run.verdict()).isSameAs(verdict);
+        assertThat(recorder.records()).singleElement().satisfies(record -> {
+            assertThat(record.category()).isEqualTo(StepEvaluationRecord.NOT_EVALUATED);
+            assertThat(record.feedback()).contains("judge call failed").contains("judge timed out");
+        });
+        assertThat(recorder.overallScore()).isEmpty();
+    }
+
+    @Test
     void syntheticVerdictSkipsTheJudge() {
         val verdict = new StepVerdict(Outcome.FAIL,
                 "The model returned an empty or unparseable response.", List.of());

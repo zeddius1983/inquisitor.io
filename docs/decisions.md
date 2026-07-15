@@ -278,6 +278,16 @@ see [roadmap.md](roadmap.md); for stable repo context see
   the report matters and `doLast` never runs when the test action throws — but
   `TestListener.afterSuite` on the root descriptor fires after all tests *before*
   the task fails, so the echo survives a red run without a second task.
+- **The judge is an observer — its failures never fail the step.** The second real
+  run had a judge call hang ~4 minutes and throw `InterruptedIOException`, which
+  failed the JUnit sub-test and desynced the sub-test↔step mapping (the execution
+  cursor hadn't advanced, so the next sub-test silently re-ran the step under the
+  wrong name and the last step never ran). Two fixes: `EvaluationStepRunner`
+  catches judge `RuntimeException`s and records `NOT_EVALUATED` with the error as
+  feedback (the verdict stands untouched — decorator transparency is the contract);
+  and the JUnit layer's `StepExecution` marks the scenario done when `next()`
+  throws, so a genuine infrastructure failure aborts cleanly instead of shifting
+  steps.
 - **Synthetic verdicts are not audited.** When the actor's response is empty or
   unparseable, `LlmStepRunner` fabricates the FAIL (now marked `StepRun.synthetic`);
   the first real run showed the judge "contradicting" such a verdict — technically
