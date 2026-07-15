@@ -40,10 +40,10 @@ import org.jspecify.annotations.Nullable;
  *   by watching the step index reset — the same file runs several times in one JVM
  *   (positive suite and fault suite share the explicit bucket), and name + source alone
  *   would fold those runs together.</li>
- *   <li><b>The gate is expectation-aware.</b> A scenario matched its expectation when it
- *   completed with every step PASS (expected {@link Outcome#PASS}) or when some step
- *   FAILed (expected {@link Outcome#FAIL} — fault detection, where the failure is the
- *   success and a fully-green run is a <em>missed detection</em>).</li>
+ *   <li><b>PASSED/FAILED is expectation-aware</b> — JUnit's reading. A scenario PASSED
+ *   when it completed with every step PASS (expected {@link Outcome#PASS}) or when some
+ *   step FAILed (expected {@link Outcome#FAIL} — fault detection, where the failure is
+ *   the success and a fully-green run is a <em>missed detection</em>).</li>
  * </ul>
  */
 @Builder
@@ -59,7 +59,7 @@ public record EvaluationReport(
     @Builder
     public record Totals(
             int scenarios,
-            int scenariosMatched,
+            int scenariosPassed,
             int stepsRecorded,
             int stepsEvaluated,
             int stepsNotEvaluated,
@@ -76,8 +76,13 @@ public record EvaluationReport(
             String name,
             @Nullable String source,
             Outcome expectedOutcome,
-            boolean matched,
+            boolean passed,
             List<StepEvaluationRecord> steps) {
+
+        /** An expected failure that never happened — expectation-aware FAILED, flagged. */
+        public boolean missedDetection() {
+            return !passed && expectedOutcome == Outcome.FAIL;
+        }
     }
 
     /** Builds the grouped report from the flat, execution-ordered record stream. */
@@ -130,8 +135,8 @@ public record EvaluationReport(
         val expected = first.expectedOutcome();
         val anyFailed = steps.stream().anyMatch(step -> step.outcome() == Outcome.FAIL);
         val complete = steps.getLast().stepIndex() == first.stepCount();
-        val matched = expected == Outcome.FAIL ? anyFailed : !anyFailed && complete;
-        return new ScenarioReport(first.scenario(), first.scenarioSource(), expected, matched,
+        val passed = expected == Outcome.FAIL ? anyFailed : !anyFailed && complete;
+        return new ScenarioReport(first.scenario(), first.scenarioSource(), expected, passed,
                 List.copyOf(steps));
     }
 
@@ -148,7 +153,7 @@ public record EvaluationReport(
         }
         return Totals.builder()
                 .scenarios(scenarios.size())
-                .scenariosMatched((int) scenarios.stream().filter(ScenarioReport::matched).count())
+                .scenariosPassed((int) scenarios.stream().filter(ScenarioReport::passed).count())
                 .stepsRecorded(steps.size())
                 .stepsEvaluated(evaluated.size())
                 .stepsNotEvaluated(steps.size() - evaluated.size())

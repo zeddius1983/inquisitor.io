@@ -90,7 +90,7 @@ class HtmlReportRendererTest {
     @Test
     void indexPageCarriesTilesAndLinksToBucketPages() {
         assertThat(index)
-                // tiles: gate, evaluation score (mean of the 3 evaluated steps), duration
+                // tiles: scenarios passed, evaluation score (mean of 3 evaluated steps), duration
                 .contains("<div class=\"value\">1/2</div>")
                 .contains("<div class=\"value\">66.7%</div>")
                 .contains("<div class=\"value\">1h 5m 0s</div>")
@@ -98,18 +98,21 @@ class HtmlReportRendererTest {
                 .contains("Actor: actor-model @ http://a")
                 .contains("<th>Evaluation score</th>")
                 .contains("<a href=\"buckets/cucumber.html\">cucumber</a>")
-                .contains("<a href=\"buckets/explicit.html\">explicit</a>");
+                .contains("<a href=\"buckets/explicit.html\">explicit</a>")
+                // success rate is expectation-aware: cucumber 1/1 passed, explicit 0/1
+                .contains("<td>1/1</td><td>100.0%</td>")
+                .contains("<td>0/1</td><td>0.0%</td>");
         assertThat(index).doesNotContain("Evaluation rate");
     }
 
     @Test
-    void bucketPageShowsBothRatesAndLinksToScenarioPages() {
+    void bucketPageShowsResultAndLinksToScenarioPages() {
         assertThat(cucumberPage)
                 .contains("<a href=\"../evaluation.html\">report</a> &rsaquo; cucumber")
-                // the contradicted-PASS row: success rate 100%, evaluation score 50%
+                // the contradicted-PASS row: PASSED result, evaluation score 50% — the gap
                 .contains("<td><a href=\"../scenarios/cucumber-0.html\">Transfer funds</a></td>"
-                        + "<td>PASS</td><td>2/2</td><td>100.0%</td><td>50.0%</td>"
-                        + "<td><span class=\"ok\">matched</span></td>");
+                        + "<td>PASS</td><td>2/2</td>"
+                        + "<td><span class=\"ok\">PASSED</span></td><td>50.0%</td>");
         assertThat(Files.exists(dir.resolve("buckets/explicit.html"))).isTrue();
     }
 
@@ -129,7 +132,7 @@ class HtmlReportRendererTest {
     @Test
     void missedDetectionAndJudgeFailureSurfaceOnTheFaultScenarioPage() {
         assertThat(faultPage)
-                .contains("<span class=\"bad\">MISSED DETECTION</span>")
+                .contains("<span class=\"bad\">FAILED (missed detection)</span>")
                 .contains("<details><summary>Step 2 “step 2” &mdash; NOT_EVALUATED</summary>")
                 .contains("The judge call failed (timeout); not evaluated.");
     }

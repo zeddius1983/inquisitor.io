@@ -294,6 +294,14 @@ see [roadmap.md](roadmap.md); for stable repo context see
   right, semantically noise, since there is no actor claim to audit. The evaluation
   runner skips the judge and records `NOT_EVALUATED`, excluded from the mean score
   but counted in the report (it is a run-health signal).
+- **The report's PASSED/FAILED is expectation-aware — JUnit's reading.** A scenario
+  is *PASSED* when its outcome matches `@Scenario(expect)`: an expected failure that
+  failed is PASSED; one that stayed green is *FAILED (missed detection)*. Success
+  rate aggregates passed scenarios (so a clean fault-suite run reads 100%, matching
+  the green JUnit report), while the raw actor verdicts stay visible per step on the
+  scenario pages. (Originally shipped as a separate "Matched" column beside a
+  step-based success rate; review showed that misleads — the JUnit reading is the
+  right primary status.)
 - **The deterministic gate is "outcome matches expectation", not "all PASS".**
   Fault-detection suites (`@Scenario(expect = FAIL)`) are part of `evaluate` runs and
   a detected fault is a success; a fully-green fault run is a *missed detection*. The

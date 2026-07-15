@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Locale;
 
 import io.inquisitor.harness.evaluation.StepEvaluationRecord;
-import io.inquisitor.harness.model.Outcome;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 
@@ -50,13 +49,6 @@ final class ReportFormats {
     /** {@code "model @ baseUrl"}, degrading gracefully when parts are unknown. */
     static String endpoint(@Nullable String model, @Nullable String baseUrl) {
         return (model == null ? "(unknown model)" : model) + (baseUrl == null ? "" : " @ " + baseUrl);
-    }
-
-    /** Actor success rate: PASS-outcome steps over recorded steps (Gradle's notion). */
-    static double successRate(List<StepEvaluationRecord> steps) {
-        return steps.isEmpty() ? 0.0
-                : steps.stream().filter(step -> step.outcome() == Outcome.PASS).count()
-                        / (double) steps.size();
     }
 
     /** Judge evaluation score: mean score over evaluated steps; NaN when none. */

@@ -76,9 +76,9 @@ class EvaluationReportTest {
 
         val bucket = report.buckets().getFirst();
         assertThat(bucket.scenarios()).hasSize(2);
-        assertThat(bucket.scenarios().getFirst().matched()).isTrue();   // all PASS, complete
-        assertThat(bucket.scenarios().getLast().matched()).isTrue();    // expected FAIL landed
-        assertThat(report.totals().scenariosMatched()).isEqualTo(2);
+        assertThat(bucket.scenarios().getFirst().passed()).isTrue();   // all PASS, complete
+        assertThat(bucket.scenarios().getLast().passed()).isTrue();    // expected FAIL landed
+        assertThat(report.totals().scenariosPassed()).isEqualTo(2);
     }
 
     @Test
@@ -95,7 +95,7 @@ class EvaluationReportTest {
                         Outcome.FAIL, 1, 1, Outcome.PASS, 1.0, "GROUNDED")));
 
         assertThat(report.totals().scenarios()).isEqualTo(3);
-        assertThat(report.totals().scenariosMatched()).isZero();
+        assertThat(report.totals().scenariosPassed()).isZero();
     }
 
     @Test

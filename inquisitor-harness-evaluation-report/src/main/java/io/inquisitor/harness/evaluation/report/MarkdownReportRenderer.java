@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import io.inquisitor.harness.evaluation.StepEvaluationRecord;
-import io.inquisitor.harness.model.Outcome;
 import lombok.val;
 
 /**
@@ -79,7 +78,7 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
             out.append("- Actor: ").append(ReportFormats.endpoint(runInfo.actorModel(), runInfo.actorBaseUrl())).append('\n');
             out.append("- Judge: ").append(ReportFormats.endpoint(runInfo.judgeModel(), runInfo.judgeBaseUrl())).append('\n');
         }
-        out.append("- Expectation gate: ").append(gate(totals)).append('\n');
+        out.append("- Result: ").append(gate(totals)).append('\n');
         out.append("- Evaluation score: **").append(score(totals)).append("** (")
                 .append(totals.stepsEvaluated()).append(" steps evaluated");
         if (totals.stepsNotEvaluated() > 0) {
@@ -93,9 +92,9 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
 
     private static void appendBucket(StringBuilder out, EvaluationReport.Bucket bucket) {
         out.append("\n## ").append(bucket.name()).append('\n')
-                .append("\n- Gate: ").append(gate(bucket.totals()))
+                .append("\n- Result: ").append(gate(bucket.totals()))
                 .append(" — Score: **").append(score(bucket.totals())).append("**\n\n")
-                .append("| Scenario | Expected | Steps | Matched | Mean score |\n")
+                .append("| Scenario | Expected | Steps | Result | Evaluation score |\n")
                 .append("|---|---|---|---|---|\n");
         for (val scenario : bucket.scenarios()) {
             val evaluatedSteps = scenario.steps().stream().filter(StepEvaluationRecord::evaluated).toList();
@@ -105,15 +104,18 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
                     .append(" | ").append(scenario.expectedOutcome())
                     .append(" | ").append(scenario.steps().size()).append('/')
                     .append(scenario.steps().getFirst().stepCount())
-                    .append(" | ").append(scenario.matched() ? "yes" : missedLabel(scenario))
+                    .append(" | ").append(resultLabel(scenario))
                     .append(" | ").append(Double.isNaN(mean) ? "—" : ReportFormats.percent(mean))
                     .append(" |\n");
         }
         appendFindings(out, bucket);
     }
 
-    private static String missedLabel(EvaluationReport.ScenarioReport scenario) {
-        return scenario.expectedOutcome() == Outcome.FAIL ? "**MISSED DETECTION**" : "**no**";
+    private static String resultLabel(EvaluationReport.ScenarioReport scenario) {
+        if (scenario.passed()) {
+            return "PASSED";
+        }
+        return scenario.missedDetection() ? "**FAILED (missed detection)**" : "**FAILED**";
     }
 
     private static void appendFindings(StringBuilder out, EvaluationReport.Bucket bucket) {
@@ -148,13 +150,12 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
     }
 
     private static String gate(EvaluationReport.Totals totals) {
-        return totals.scenariosMatched() + "/" + totals.scenarios() + " scenarios matched their expectation";
+        return totals.scenariosPassed() + "/" + totals.scenarios()
+                + " scenarios PASSED (expectation-aware: an expected failure that failed is a pass)";
     }
 
     private static String score(EvaluationReport.Totals totals) {
         return totals.meanScore() == null ? "n/a" : ReportFormats.percent(totals.meanScore());
     }
-
-
 
 }

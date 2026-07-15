@@ -114,9 +114,9 @@ class EvaluationReportWriterTest {
                 .contains("Header: gpt-oss-20b / reasoning off")
                 .contains("Actor: gpt-oss-20b @ http://127.0.0.1:8000")
                 .contains("Judge: Qwen3.6-35B @ http://127.0.0.1:8001")
-                // the contradicted step still has a PASS outcome: the gate holds, the score drops —
-                // exactly the "100% passed / 50% score" gap the report exists to expose
-                .contains("1/1 scenarios matched")
+                // the contradicted step still has a PASS outcome: the result holds, the score
+                // drops — exactly the "100% passed / 50% score" gap the report exists to expose
+                .contains("1/1 scenarios PASSED")
                 .contains("50.0%")
                 .contains("took 1h 5m 0s");
     }
