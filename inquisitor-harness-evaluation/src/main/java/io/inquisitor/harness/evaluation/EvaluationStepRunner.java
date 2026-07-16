@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationRequest;
+import org.springframework.ai.evaluation.EvaluationResponse;
 import org.springframework.ai.evaluation.Evaluator;
 
 /**
@@ -57,15 +58,36 @@ public class EvaluationStepRunner implements StepRunner {
 
         val scenario = request.scenario();
         val step = request.step();
+        if (run.synthetic()) {
+            // The harness fabricated this verdict (empty/unparseable model response) —
+            // there is no actor claim to audit, so judging it would only produce noise.
+            log.debug("[{}] step {}/{} - NOT_EVALUATED: harness-synthesized verdict",
+                    scenario.name(), step.index(), scenario.steps().size());
+            recorder.recordNotEvaluated(request, run,
+                    "Harness-synthesized verdict (no actor claim to audit); not evaluated.");
+            return run;
+        }
         log.debug("[{}] step {}/{} - EVALUATE: {}",
                 scenario.name(), step.index(), scenario.steps().size(), step.title());
 
         val context = run.toolCalls().isEmpty()
                 ? List.<Document>of()
                 : List.of(new Document(renderTrace(run.toolCalls())));
-        val evaluation = evaluator.evaluate(
-                new EvaluationRequest(request.userMessage(), context, renderVerdict(run.verdict())));
-        recorder.record(scenario, step, evaluation);
+        EvaluationResponse evaluation;
+        try {
+            evaluation = evaluator.evaluate(
+                    new EvaluationRequest(request.userMessage(), context, renderVerdict(run.verdict())));
+        } catch (RuntimeException e) {
+            // The judge is an observer: its infrastructure failures (timeouts, transport
+            // errors) must never fail the actor's step. Record the gap and move on.
+            log.warn("[{}] step {}/{} - NOT_EVALUATED: the judge call failed",
+                    scenario.name(), step.index(), scenario.steps().size(), e);
+            recorder.recordNotEvaluated(request, run,
+                    "The judge call failed (" + e.getClass().getSimpleName() + ": " + e.getMessage()
+                            + "); not evaluated.");
+            return run;
+        }
+        recorder.record(request, run, evaluation);
 
         val category = evaluation.getMetadata() == null ? null : evaluation.getMetadata().get("category");
         log.debug("[{}] step {}/{} - {}: score {}",

@@ -24,6 +24,8 @@ Base package: `io.inquisitor`. Group: `io.inquisitor`.
 | `inquisitor-harness-junit-starter` | Autoconfiguration for the JUnit extension |
 | `inquisitor-harness-openapi` / `inquisitor-harness-openapi-starter` | Optional OpenAPI/Swagger discovery: an `OpenApiAdvisor` injects the app's spec into the system prompt. Off unless `inquisitor.harness.openapi.enabled=true`; removable without touching the core |
 | `inquisitor-harness-evaluation` / `inquisitor-harness-evaluation-starter` | Optional step evaluation (LLM-as-judge): a separate judge model scores each verdict against the real tool trace. Off unless `inquisitor.harness.evaluation.enabled=true`. The starter decorates the harness's `ToolCallback` beans (a `BeanPostProcessor` recording each call) and wraps the actor `StepRunner`; removable without touching the core (the trace seam — `TraceKeys`/`ToolCallRecord`/`StepRun` — lives in `inquisitor-harness`) |
+| `inquisitor-harness-evaluation-report` | The evaluation report: a `LauncherSessionListener` writes it — bucket-grouped, expectation-aware — when `inquisitor.report.dir` is set (the plugin's `evaluate` task sets it). Default format is multi-page HTML (`evaluation.html` → `groups/*.html` → `scenarios/*.html`, Gradle-report-style navigation, grouped by `Scenario.group` — the JUnit suite class; source-directory fallback standalone); `markdown` and `json` selectable via the task's `--report` option. Renderers are pluggable via `ServiceLoader` (`EvaluationReportRenderer`: `name()` + `render(report, dir)`). Shipped by the evaluation starter by default; excludable (`@ConditionalOnClass`-guarded registration) for score-only evaluation |
+| `inquisitor-harness-gradle-plugin` | The `io.inquisitor.harness` Gradle plugin: an `evaluate` `Test`-type task that runs the scenario tests with the LLM gate (`INQUISITOR_LLM_IT`) + LLM-as-judge evaluation (`INQUISITOR_EVAL`) switched on; reporting is implicit — the task echoes the report headline from a root-suite `afterSuite` callback, which survives a red run. Selection is by JUnit tag (`includeTags("inquisitor")`, configurable via the `harness { tags }` DSL) — `@Scenario` is meta-annotated `@Tag("inquisitor")`, so every `@Scenario` method is selected automatically, no annotation on the test class. A standalone **included build** (`includeBuild` in `settings.gradle.kts`, so the demo resolves the plugin id like a real consumer; it can't use `buildSrc` conventions — the overlap is inlined). Not wired into `check`; its own `check` is hooked into the root `check` for CI; validated by a TestKit functional test; not yet published |
 | `inquisitor-mock` / `inquisitor-mock-starter` | Reserved (mock server); not yet implemented |
 | `inquisitor-demo-db-starter` | Zero-config local Postgres via Testcontainers + Flyway |
 | `inquisitor-demo` | Banking REST demo app + scenario tests; the reference consumer |
@@ -54,6 +56,7 @@ Common commands:
 ./gradlew check              # tests + verification
 ./gradlew :inquisitor-demo:test       # run the demo's scenario suite
 ./gradlew :inquisitor-demo:bootRun    # run the demo app (local profile)
+./gradlew :inquisitor-demo:evaluate   # tagged scenario suites with LLM gate + evaluation on
 ```
 
 ## Releasing

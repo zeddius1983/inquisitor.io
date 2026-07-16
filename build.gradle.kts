@@ -10,6 +10,13 @@ mavenPublishing {
     coordinates(project.group.toString(), "inquisitor-bom", project.version.toString())
 }
 
+// The Gradle plugin lives in an included build, which `./gradlew build` would
+// otherwise skip — hook its verification into the root lifecycle so CI keeps
+// running its functional tests.
+tasks.named("check") {
+    dependsOn(gradle.includedBuild("inquisitor-harness-gradle-plugin").task(":check"))
+}
+
 dependencies {
     constraints {
         api(project(":inquisitor-harness"))
@@ -19,6 +26,7 @@ dependencies {
         api(project(":inquisitor-harness-openapi"))
         api(project(":inquisitor-harness-openapi-starter"))
         api(project(":inquisitor-harness-evaluation"))
+        api(project(":inquisitor-harness-evaluation-report"))
         api(project(":inquisitor-harness-evaluation-starter"))
     }
 }

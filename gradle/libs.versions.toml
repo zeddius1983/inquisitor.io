@@ -3,6 +3,7 @@ spring-boot      = "4.0.6"
 spring-ai        = "2.0.0"
 flexmark         = "0.64.8"
 junit-jupiter    = "5.12.2"
+jspecify         = "1.0.0"
 dependency-mgmt  = "1.1.7"
 lombok           = "1.18.38"
 vanniktech       = "0.36.0"
@@ -12,6 +13,7 @@ spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-depe
 spring-ai-bom            = { module = "org.springframework.ai:spring-ai-bom",              version.ref = "spring-ai" }
 flexmark-all             = { module = "com.vladsch.flexmark:flexmark-all",                 version.ref = "flexmark" }
 junit-jupiter            = { module = "org.junit.jupiter:junit-jupiter",                   version.ref = "junit-jupiter" }
+jspecify                 = { module = "org.jspecify:jspecify",                             version.ref = "jspecify" }
 lombok                   = { module = "org.projectlombok:lombok",                          version.ref = "lombok" }
 vanniktech-maven-publish = { module = "com.vanniktech:gradle-maven-publish-plugin",        version.ref = "vanniktech" }
 

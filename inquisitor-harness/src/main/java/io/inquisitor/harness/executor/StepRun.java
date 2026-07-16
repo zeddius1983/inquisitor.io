@@ -35,10 +35,20 @@ import io.inquisitor.harness.model.ToolCallRecord;
  * @param toolCalls the tool invocations made during the step, in call order
  * @param elapsed   wall-clock time the actor took to produce the verdict; measured by the
  *                  runner so it excludes any downstream evaluation
+ * @param synthetic whether the verdict was fabricated by the harness (an empty,
+ *                  unparseable or missing model response degraded to a FAIL) rather than
+ *                  claimed by the actor. A synthetic verdict is a run-health fact, not an
+ *                  actor claim — evaluation skips judging it
  */
-public record StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls, Duration elapsed) {
+public record StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls, Duration elapsed,
+                      boolean synthetic) {
 
     public StepRun {
         toolCalls = List.copyOf(toolCalls);
+    }
+
+    /** A run whose verdict the actor genuinely produced. */
+    public StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls, Duration elapsed) {
+        this(verdict, toolCalls, elapsed, false);
     }
 }

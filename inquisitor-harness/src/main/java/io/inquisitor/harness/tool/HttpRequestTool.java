@@ -55,7 +55,10 @@ public class HttpRequestTool {
                     description = "target name; omit when there is only one target (the application under test)")
             @Nullable String target,
             @ToolParam(description = "HTTP method: GET, POST, PUT, PATCH or DELETE") String method,
-            @ToolParam(description = "request path, e.g. /accounts or /accounts/42") String path,
+            @ToolParam(description = "request path with optional query string, written raw and "
+                    + "unencoded — the tool URL-encodes it. E.g. /accounts/42 or /accounts?owner=Jackie C. "
+                    + "Never percent-encode values yourself (no %20): it would be encoded twice.")
+            String path,
             @ToolParam(required = false, description = "request body, or empty for none")
             @Nullable String body,
             @ToolParam(required = false,

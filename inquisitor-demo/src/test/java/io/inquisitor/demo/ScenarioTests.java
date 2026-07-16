@@ -31,6 +31,10 @@ import org.junit.jupiter.api.Test;
  * evaluation read-out) lives in {@link AbstractScenarioTests}; this class only adds the
  * positive assertion that each scenario passes. Each test needs the local LLM, so it is
  * gated: run with {@code INQUISITOR_LLM_IT=true}.
+ *
+ * <p>Not part of the Gradle plugin's {@code evaluate} run: only {@code @Scenario}
+ * methods carry the {@code inquisitor} tag, and this class covers the same explicit
+ * bucket {@link ExplicitScenarioSuiteTest} already runs there.
  */
 class ScenarioTests extends AbstractScenarioTests {
 

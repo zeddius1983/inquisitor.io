@@ -9,9 +9,14 @@ tool-call trace. It records a per-step score, aggregates a suite-level
 > 100% of steps passed — but the evaluation score is only **85%**.
 
 > Status: **in progress.** The core and the optional-module split have landed on
-> `feature/evaluation`; the `harness:evaluate` Gradle task and the report are the
-> remaining work (Phase C). Design decisions once marked **[DECIDE]** are resolved
-> inline below.
+> `feature/evaluation`; the `io.inquisitor.harness` Gradle plugin with the `evaluate`
+> task has landed too ([task-11](task-11-evaluate-gradle-plugin.md), Phase C1 —
+> plugin-first, inverting §6's demo-task-first sequencing), and so has the report
+> ([task-12](task-12-evaluation-report.md), Phase C2 — JSON + Markdown written by a
+> JUnit session listener, echoed by the plugin's `evaluateReport` finalizer).
+> Remaining: C3 — the README verified-models table generated from `evaluation.json`,
+> `benchmark.yml` multi-config runs, publishing. Design decisions once marked
+> **[DECIDE]** are resolved inline below.
 
 ## Why
 

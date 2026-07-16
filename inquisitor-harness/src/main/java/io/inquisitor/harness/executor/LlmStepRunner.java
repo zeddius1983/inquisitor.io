@@ -69,6 +69,7 @@ public class LlmStepRunner implements StepRunner {
 
         val ledger = Collections.synchronizedList(new ArrayList<ToolCallRecord>());
         val startedNanos = System.nanoTime();
+        var synthetic = false;
         StepVerdict verdict;
         try {
             verdict = chatClient.prompt()
@@ -86,14 +87,19 @@ public class LlmStepRunner implements StepRunner {
                     scenario.name(), number, total, e.getMessage());
             verdict = new StepVerdict(Outcome.FAIL,
                     "The model returned an empty or unparseable response.", List.of());
+            synthetic = true;
         }
         val elapsed = Duration.ofNanos(System.nanoTime() - startedNanos);
-        val resolved = verdict != null
-                ? verdict
-                : new StepVerdict(Outcome.FAIL, "The model did not return a verdict.", List.of());
+        StepVerdict resolved;
+        if (verdict != null) {
+            resolved = verdict;
+        } else {
+            resolved = new StepVerdict(Outcome.FAIL, "The model did not return a verdict.", List.of());
+            synthetic = true;
+        }
 
         log.debug("[{}] step {}/{} — {} in {} ms: {}", scenario.name(), number, total,
                 resolved.outcome(), elapsed.toMillis(), resolved.reasoning());
-        return new StepRun(resolved, List.copyOf(ledger), elapsed);
+        return new StepRun(resolved, List.copyOf(ledger), elapsed, synthetic);
     }
 }

@@ -20,9 +20,13 @@ The authoritative status is git history + this table.
 | —  | Scenario style buckets (`explicit`/`cucumber`/`intent`); flattened (no `positive`/`negative` split) | ✅ done |
 | 09 | OpenAPI/Swagger discovery — optional `inquisitor-harness-openapi` plugin (`OpenApiAdvisor`) | ✅ done |
 | 07 | Fault detection (oracle calibration) — runtime fault router + standalone & `@Harness` suites | ✅ Phase 1 & 2 done (`tasks/task-07`) |
-| 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); Gradle task + report pending (`tasks/task-08`) |
+| 08 | Step evaluation (`harness:evaluate`) — trustworthy-green + model report | 🚧 in progress — core done (`StepRunner` seam, tool-call ledger, evaluator + autoconfig); report pending (`tasks/task-08`) |
+| 11 | `io.inquisitor.harness` Gradle plugin — `evaluate` task (task-08 Phase C1) | ✅ done — plugin + TestKit test + demo `includeBuild` wiring (`:inquisitor-demo:evaluate`) (`tasks/task-11`) |
+| 12 | Evaluation report (task-08 Phase C2) — JSON + Markdown artifacts, bucket-grouped, expectation-aware gate | ✅ done — session-listener flush, echo folded into `evaluate` (`tasks/task-12`); C3 (README table, `benchmark.yml`, publishing) pending |
+| 13 | HTML evaluation report — `evaluation.html` with Success rate × Evaluation rate side by side, JUnit-report-style navigation (task-08 C3, part) | ✅ done (`tasks/task-13`) |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
-| 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
+| 14 | Model benchmark — `bench` Gradle task (multi-model sweep, console table, repeats) | 📝 planned (`tasks/task-14`) |
+| 06 | `inquisitor-mock` + `inquisitor-mock-starter` — LLM-authored dependency mocks | 🧭 design outlined, not started (`tasks/task-06`) |
 
 ## Now
 
@@ -55,8 +59,14 @@ The authoritative status is git history + this table.
   `inquisitor-harness-evaluation` / `-starter` modules (like OpenAPI) and gated on
   `inquisitor.harness.evaluation.enabled` (off by default). The core keeps only the
   trace seam (`TraceKeys`/`ToolCallRecord`/`StepRun`); the starter decorates the
-  harness's `ToolCallback` beans via a `BeanPostProcessor`. **Pending**: the
-  `harness:evaluate` Gradle task and the JSON + Markdown report. See
+  harness's `ToolCallback` beans via a `BeanPostProcessor`. The `io.inquisitor.harness`
+  Gradle plugin with the `evaluate` task has landed too (task-11, Phase C1), and so has
+  the report (task-12, Phase C2): the test JVM writes
+  `build/reports/inquisitor/evaluation.{json,md}` at JUnit-session close, grouped by
+  style bucket with an expectation-aware gate (fault suites count detected faults as
+  matches), and the plugin's `evaluateReport` finalizer echoes the headline even when
+  the run fails. **Pending (C3)**: the README verified-models table generated from
+  `evaluation.json`, `benchmark.yml` multi-config runs, publishing. See
   `tasks/task-08-evaluation.md`. **Later idea — evaluation as an opt-in gate**:
   today the score is calibration-only (an actor-PASS judged `CONTRADICTED` still
   reports green in JUnit); two complementary opt-in gates are on the table.
@@ -79,7 +89,24 @@ The authoritative status is git history + this table.
   faithfully, *not* via an LLM) for medium specs, and **partial retrieval** (a
   table-of-contents + `getOperationSpec` lookup tool, with vector RAG as the escalation)
   for very large ones. No core change.
-- Decide on the mock-server design before implementing the `*-mock` modules.
+- **Model benchmark** (task-14) is planned: a `bench` Gradle task that sweeps
+  several actor models across the scenario suite (fixed judge) and prints a
+  `llama-bench`-style console table — μ±σ groundedness score + timing per model,
+  with repeats for variance. Reuses the `evaluate` path and the `json` renderer as
+  the cross-run interchange; console-only, no artifact. See `tasks/task-14`.
+- **Backlog — self-refine evaluation advisor** (idea, unscheduled): use the judge
+  in-loop to let the actor correct wrong tool interactions / ungrounded assertions
+  during a run, recording the pre-refinement verdict so the score still measures
+  the actor. Non-idempotency, judge-independence, and the "continue don't restart"
+  design are worked through in [notes-self-refine-advisor.md](notes-self-refine-advisor.md).
+- **`inquisitor-mock`** (task-06) design is outlined: LLM-authored mocks of the
+  AUT's outbound dependencies (FX rate, account state, asset search), authored in
+  NL/typed rules rather than hand-coded stubs. MVP = **live + structured output +
+  persistent memoization**; a **corpus-selection** hybrid (LLM selects from a
+  vetted dataset, ~30 lines of generic code paginate) and a full deterministic
+  "freeze" engine are additive later modes. Transport-agnostic core (HTTP first,
+  JMS/Kafka later); the request-recording spy feeds the evaluation trace. See
+  `tasks/task-06`.
 
 > Keep this file current as tasks complete; move durable rationale into
 > [decisions.md](decisions.md), not here.
