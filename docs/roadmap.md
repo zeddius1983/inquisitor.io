@@ -26,7 +26,7 @@ The authoritative status is git history + this table.
 | 13 | HTML evaluation report — `evaluation.html` with Success rate × Evaluation rate side by side, JUnit-report-style navigation (task-08 C3, part) | ✅ done (`tasks/task-13`) |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
 | 14 | Model benchmark — `bench` Gradle task (multi-model sweep, console table, repeats) | 📝 planned (`tasks/task-14`) |
-| 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
+| 06 | `inquisitor-mock` + `inquisitor-mock-starter` — LLM-authored dependency mocks | 🧭 design outlined, not started (`tasks/task-06`) |
 
 ## Now
 
@@ -99,7 +99,14 @@ The authoritative status is git history + this table.
   during a run, recording the pre-refinement verdict so the score still measures
   the actor. Non-idempotency, judge-independence, and the "continue don't restart"
   design are worked through in [notes-self-refine-advisor.md](notes-self-refine-advisor.md).
-- Decide on the mock-server design before implementing the `*-mock` modules.
+- **`inquisitor-mock`** (task-06) design is outlined: LLM-authored mocks of the
+  AUT's outbound dependencies (FX rate, account state, asset search), authored in
+  NL/typed rules rather than hand-coded stubs. MVP = **live + structured output +
+  persistent memoization**; a **corpus-selection** hybrid (LLM selects from a
+  vetted dataset, ~30 lines of generic code paginate) and a full deterministic
+  "freeze" engine are additive later modes. Transport-agnostic core (HTTP first,
+  JMS/Kafka later); the request-recording spy feeds the evaluation trace. See
+  `tasks/task-06`.
 
 > Keep this file current as tasks complete; move durable rationale into
 > [decisions.md](decisions.md), not here.
