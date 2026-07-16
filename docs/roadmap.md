@@ -25,6 +25,7 @@ The authoritative status is git history + this table.
 | 12 | Evaluation report (task-08 Phase C2) — JSON + Markdown artifacts, bucket-grouped, expectation-aware gate | ✅ done — session-listener flush, echo folded into `evaluate` (`tasks/task-12`); C3 (README table, `benchmark.yml`, publishing) pending |
 | 13 | HTML evaluation report — `evaluation.html` with Success rate × Evaluation rate side by side, JUnit-report-style navigation (task-08 C3, part) | ✅ done (`tasks/task-13`) |
 | 10 | OpenAPI context-size optimisation — deterministic digest + partial retrieval (size-gated) | 📝 planned (`tasks/task-10`) |
+| 14 | Model benchmark — `bench` Gradle task (multi-model sweep, console table, repeats) | 📝 planned (`tasks/task-14`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` | ⏳ reserved, not started |
 
 ## Now
@@ -88,6 +89,16 @@ The authoritative status is git history + this table.
   faithfully, *not* via an LLM) for medium specs, and **partial retrieval** (a
   table-of-contents + `getOperationSpec` lookup tool, with vector RAG as the escalation)
   for very large ones. No core change.
+- **Model benchmark** (task-14) is planned: a `bench` Gradle task that sweeps
+  several actor models across the scenario suite (fixed judge) and prints a
+  `llama-bench`-style console table — μ±σ groundedness score + timing per model,
+  with repeats for variance. Reuses the `evaluate` path and the `json` renderer as
+  the cross-run interchange; console-only, no artifact. See `tasks/task-14`.
+- **Backlog — self-refine evaluation advisor** (idea, unscheduled): use the judge
+  in-loop to let the actor correct wrong tool interactions / ungrounded assertions
+  during a run, recording the pre-refinement verdict so the score still measures
+  the actor. Non-idempotency, judge-independence, and the "continue don't restart"
+  design are worked through in [notes-self-refine-advisor.md](notes-self-refine-advisor.md).
 - Decide on the mock-server design before implementing the `*-mock` modules.
 
 > Keep this file current as tasks complete; move durable rationale into
