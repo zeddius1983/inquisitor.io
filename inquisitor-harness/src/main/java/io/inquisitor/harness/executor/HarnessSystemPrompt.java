@@ -45,6 +45,10 @@ public final class HarnessSystemPrompt {
               /accounts?owner=Jackie C) — the HTTP tool URL-encodes them itself.
               Never percent-encode values yourself; %20 would be encoded twice
               and the query would match nothing.
+            - Write a request body as raw JSON — {"fromId": 1, "amount": 500}.
+              Do not backslash-escape the quotes ({\\"fromId\\": 1}); the body is
+              sent verbatim, so escaped quotes reach the app as literal characters
+              and it rejects the payload as malformed.
             - Compare numbers by value, not text: 0.0000 equals 0.00, and 500 equals
               500.00. Formatting differences alone never fail an expectation.
 
