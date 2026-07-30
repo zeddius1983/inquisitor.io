@@ -10,6 +10,6 @@ dependencies {
     api(libs.slf4j.api)
     compileOnlyApi(libs.jspecify)
 
-    implementation(libs.flexmark.all)
+    implementation(libs.flexmark.core)
     implementation(libs.jansi)
 }

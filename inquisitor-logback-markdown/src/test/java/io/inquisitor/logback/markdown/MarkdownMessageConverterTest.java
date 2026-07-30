@@ -17,6 +17,8 @@
 package io.inquisitor.logback.markdown;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
@@ -58,6 +60,39 @@ class MarkdownMessageConverterTest {
     }
 
     @Test
+    void markedAndAnsiOptionsAreOrderIndependent() {
+        MarkdownMessageConverter converter = defaultConverter("ansi", "marked");
+        LoggingEvent marked = event("## rendered");
+        marked.addMarker(MarkdownMarkers.markdown());
+        String ordinary = "## ordinary";
+
+        assertTrue(converter.convert(marked).contains("\u001B["));
+        assertEquals(ordinary, converter.convert(event(ordinary)));
+    }
+
+    @Test
+    void plainOptionDisablesAnsiForTheDefaultRenderer() {
+        MarkdownMessageConverter converter = defaultConverter("marked", "plain");
+        LoggingEvent marked = event("## rendered");
+        marked.addMarker(MarkdownMarkers.markdown());
+
+        String rendered = converter.convert(marked);
+
+        assertEquals("rendered", rendered);
+        assertFalse(rendered.contains("\u001B["));
+    }
+
+    @Test
+    void preservesBlankMessagesAndNormalizesNullToEmpty() {
+        MarkdownMessageConverter converter = converter(new FlexmarkAnsiRenderer(false));
+        LoggingEvent nullMessage = new LoggingEvent();
+
+        assertEquals("", converter.convert(nullMessage));
+        assertEquals("", converter.convert(event("")));
+        assertEquals("  \t", converter.convert(event("  \t")));
+    }
+
+    @Test
     void fallsBackToRawMessageWhenRenderingFails() {
         MarkdownMessageConverter converter = converter(markdown -> {
             throw new IllegalStateException("renderer failed");
@@ -80,6 +115,13 @@ class MarkdownMessageConverterTest {
 
     private static MarkdownMessageConverter converter(MarkdownRenderer renderer) {
         MarkdownMessageConverter converter = new MarkdownMessageConverter(renderer);
+        converter.start();
+        return converter;
+    }
+
+    private static MarkdownMessageConverter defaultConverter(String... options) {
+        MarkdownMessageConverter converter = new MarkdownMessageConverter();
+        converter.setOptionList(List.of(options));
         converter.start();
         return converter;
     }

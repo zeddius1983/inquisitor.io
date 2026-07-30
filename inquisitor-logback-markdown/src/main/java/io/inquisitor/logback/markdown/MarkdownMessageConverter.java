@@ -24,35 +24,57 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Marker;
 
 /**
- * Logback pattern converter for {@code %mdMsg} and {@code %mdMsg{marked}}.
+ * Logback pattern converter for {@code %mdMsg}, {@code %mdMsg{marked}}, and the
+ * optional {@code plain}/{@code ansi} output policies.
  */
 public final class MarkdownMessageConverter extends MessageConverter {
 
     private static final String MARKED_OPTION = "marked";
+    private static final String PLAIN_OPTION = "plain";
+    private static final String ANSI_OPTION = "ansi";
 
-    private final MarkdownRenderer renderer;
-    private boolean markedOnly;
+    private final @Nullable MarkdownRenderer configuredRenderer;
+    private volatile MarkdownRenderer renderer;
+    private volatile boolean markedOnly;
 
     /** Creates a converter backed by the default Flexmark/Jansi renderer. */
     public MarkdownMessageConverter() {
-        this(new FlexmarkAnsiRenderer());
+        this.configuredRenderer = null;
+        this.renderer = new FlexmarkAnsiRenderer();
     }
 
-    MarkdownMessageConverter(MarkdownRenderer renderer) {
+    /**
+     * Creates a converter backed by a custom renderer.
+     *
+     * <p>The {@code plain} and {@code ansi} pattern options apply only to the
+     * default renderer; a supplied renderer owns its own output policy.
+     *
+     * @param renderer custom Markdown renderer
+     */
+    public MarkdownMessageConverter(MarkdownRenderer renderer) {
+        this.configuredRenderer = renderer;
         this.renderer = renderer;
     }
 
     @Override
     public void start() {
-        markedOnly = MARKED_OPTION.equalsIgnoreCase(getFirstOption());
+        List<String> options = getOptionList();
+        if (options == null) {
+            options = List.of();
+        }
+        markedOnly = hasOption(options, MARKED_OPTION);
+        configureDefaultRenderer(options);
         super.start();
     }
 
     @Override
     public String convert(ILoggingEvent event) {
         String rawMessage = event.getFormattedMessage();
-        if (rawMessage == null || rawMessage.isEmpty()) {
-            return rawMessage == null ? "" : rawMessage;
+        if (rawMessage == null) {
+            return "";
+        }
+        if (rawMessage.isBlank()) {
+            return rawMessage;
         }
         if (markedOnly && !isMarkdown(event.getMarkerList())) {
             return rawMessage;
@@ -64,6 +86,29 @@ public final class MarkdownMessageConverter extends MessageConverter {
             addWarn("Could not render Markdown log message; emitting the original message", exception);
             return rawMessage;
         }
+    }
+
+    private void configureDefaultRenderer(List<String> options) {
+        if (configuredRenderer != null) {
+            return;
+        }
+        boolean plain = hasOption(options, PLAIN_OPTION);
+        boolean ansi = hasOption(options, ANSI_OPTION);
+        if (plain && ansi) {
+            addWarn("Both 'plain' and 'ansi' were configured for %mdMsg; using plain output");
+        }
+        renderer = new FlexmarkAnsiRenderer(ansiEnabled(plain, ansi));
+    }
+
+    private static boolean hasOption(List<String> options, String expected) {
+        return options.stream().map(String::strip).anyMatch(expected::equalsIgnoreCase);
+    }
+
+    private static boolean ansiEnabled(boolean plain, boolean ansi) {
+        if (plain) {
+            return false;
+        }
+        return ansi || AnsiSupport.isAutoEnabled();
     }
 
     private static boolean isMarkdown(@Nullable List<Marker> markers) {

@@ -108,6 +108,60 @@ class FlexmarkAnsiRendererTest {
     }
 
     @Test
+    void preservesLeafContentAndUnescapesMarkdownText() {
+        String rendered = plainRenderer.render("""
+                see <https://example.test/x> and <dev@example.test> now
+
+                AT&amp;T and &lt;tag&gt;
+
+                a \\*not emphasis\\* b
+
+                before <span>inside</span> after
+
+                ---
+
+                ![diagram](https://img.test/a.png)
+                """);
+
+        assertEquals("""
+                see https://example.test/x and dev@example.test now
+
+                AT&T and <tag>
+
+                a *not emphasis* b
+
+                before <span>inside</span> after
+
+                ────────
+
+                diagram (https://img.test/a.png)""", rendered);
+    }
+
+    @Test
+    void rendersHardBreaksAndDoesNotRepeatSelfLabelledLinkUrls() {
+        String rendered = plainRenderer.render(
+                "first line  \nsecond line with [https://example.test](https://example.test)\n");
+
+        assertEquals("""
+                first line
+                second line with https://example.test""", rendered);
+    }
+
+    @Test
+    void prefixesBlankLinesInsideBlockQuotes() {
+        String rendered = plainRenderer.render("""
+                > first paragraph
+                >
+                > second paragraph
+                """);
+
+        assertEquals("""
+                │ first paragraph
+                │
+                │ second paragraph""", rendered);
+    }
+
+    @Test
     void disabledAnsiProducesReadablePlainText() {
         String rendered = plainRenderer.render("# Heading with **strong** text");
 

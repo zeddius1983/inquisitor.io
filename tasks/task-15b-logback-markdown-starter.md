@@ -49,7 +49,15 @@ file appenders or later-created layouts.
 
 Because the replacement converter is marker-aware, normal Spring, SQL, and
 application messages still return their original formatted text. Only events
-carrying `INQUISITOR_MARKDOWN` are parsed and ANSI-rendered.
+carrying `INQUISITOR_MARKDOWN` are parsed and rendered.
+
+The starter must bridge Spring Boot's ANSI policy explicitly. Manual
+`%mdMsg` uses task 15A's terminal detection and `plain`/`ansi` options, while
+Boot's `spring.output.ansi.enabled` controls a separate `AnsiOutput` state.
+When installing converter suppliers programmatically, construct the renderer
+from Boot's resolved policy (always/never/detect) rather than relying on Jansi's
+thread-local state. In detect mode, delegate to task 15A's conservative terminal
+detection.
 
 ## Compatibility and fallback
 
@@ -63,8 +71,8 @@ carrying `INQUISITOR_MARKDOWN` are parsed and ANSI-rendered.
   appenders.
 - Logback scan/reload support is out of scope for the first version; document
   that a runtime reconfiguration may remove the instance-level override.
-- If ANSI is disabled/not supported, preserve raw readable Markdown rather than
-  injecting escape codes.
+- If ANSI is disabled/not supported, produce rendered readable plain text rather
+  than injecting escape codes.
 
 ## Configuration
 
@@ -99,6 +107,8 @@ than one stable presentation is useful.
 - Repeated installation is idempotent and a shared appender is processed once.
 - End-to-end sample using the demo verifies ANSI output under Gradle's forced
   `spring.output.ansi.enabled=always` setting.
+- `spring.output.ansi.enabled=never` produces no escape bytes, while `always`
+  forces styles even when the test JVM has no console.
 
 Tests that mutate a real `LoggerContext` must restore it and any global ANSI
 state so parallel tests and later suites are not contaminated.

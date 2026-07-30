@@ -15,6 +15,7 @@ jansi            = "4.3.1"
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 spring-ai-bom            = { module = "org.springframework.ai:spring-ai-bom",              version.ref = "spring-ai" }
 flexmark-all             = { module = "com.vladsch.flexmark:flexmark-all",                 version.ref = "flexmark" }
+flexmark-core            = { module = "com.vladsch.flexmark:flexmark",                     version.ref = "flexmark" }
 junit-jupiter            = { module = "org.junit.jupiter:junit-jupiter",                   version.ref = "junit-jupiter" }
 jspecify                 = { module = "org.jspecify:jspecify",                             version.ref = "jspecify" }
 lombok                   = { module = "org.projectlombok:lombok",                          version.ref = "lombok" }

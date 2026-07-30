@@ -5,7 +5,7 @@
         <file>${TEST_LOG}</file>
         <append>false</append>
         <encoder>
-            <pattern>%mdMsg%n|RAW:%msg%n</pattern>
+            <pattern>%mdMsg{marked,plain}%n|RAW:%msg%n</pattern>
         </encoder>
     </appender>
 

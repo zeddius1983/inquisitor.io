@@ -28,8 +28,9 @@ Create `inquisitor-logback-markdown` with base package
 
 - Add the module to `settings.gradle.kts` and the published BOM.
 - Apply the Java/publishing conventions used by the other library modules.
-- Add Flexmark, Logback Classic, and the selected ANSI utility through the
-  version catalog/BOM rather than inline versions.
+- Add Flexmark core, Logback Classic, and the selected ANSI utility through the
+  version catalog/BOM rather than inline versions. Do not use `flexmark-all`
+  when the module only needs the parser/core AST.
 - Do not depend on `inquisitor-harness` or any Spring AI module.
 - Add `package-info.java` with `@NullMarked`.
 
@@ -56,6 +57,15 @@ The converter supports two modes:
   is the safe choice when replacing `%msg` in a shared console pattern and the
   mode the automatic starter will use in task 15B.
 
+The modes accept an additional ANSI policy option:
+
+- no option — emit ANSI only for an interactive terminal, respecting
+  `NO_COLOR`, `TERM=dumb`, and Jansi's process property;
+- `plain` — force escape-free output;
+- `ansi` — force styled output when terminal detection is unavailable.
+
+Options are order-independent, for example `%mdMsg{marked,plain}`.
+
 Expose the marker name (and, if useful, a marker factory/helper) as a tiny
 SLF4J-only API so applications can deliberately identify Markdown events.
 
@@ -80,11 +90,14 @@ Initial supported nodes:
 - bullet and ordered lists, including nesting;
 - block quotes;
 - links (visible label plus destination when useful);
+- autolinks, mail links, images (alt text plus destination), entities, and
+  thematic breaks;
 - plain text.
 
 Unknown nodes should degrade to readable child text rather than fail the event.
-Exact Rich/Glow parity, terminal tables, images, and syntax-highlighted code are
-not required for the prototype.
+Exact Rich/Glow parity, images, and syntax-highlighted code are not required for
+the prototype. Rich-style terminal table layout is a separate follow-on in task
+15D.
 
 ## ANSI behavior
 
@@ -98,6 +111,8 @@ not required for the prototype.
   terminal/CI ANSI policy appropriately.
 - If ANSI support is disabled by the selected abstraction, return readable
   plain text rather than escape sequences.
+- Document `-Dorg.jline.jansi.Ansi.disable=true` as the reliable process-wide
+  Jansi switch; its programmatic setter is thread-local.
 
 ## Bundled Logback include
 
@@ -144,6 +159,8 @@ appender using ordinary `%msg` to demonstrate that stored logs remain raw.
 - Renderer unit tests for every supported AST node and representative nesting.
 - Paragraph/list whitespace and indentation tests.
 - Fenced code containing Markdown-looking characters is not reinterpreted.
+- Unknown leaf nodes preserve their source, and explicit tests cover autolinks,
+  images, entities, thematic breaks, escapes, and hard line breaks.
 - ANSI reset/no-style-leak test across adjacent elements and messages.
 - Raw fallback when rendering throws.
 - Marked mode renders marked events and leaves ordinary events byte-for-byte
@@ -161,9 +178,12 @@ make the whole suite brittle.
 
 - No Spring Boot autoconfiguration — task 15B owns automatic installation.
 - No harness logging changes — task 15C owns scenario/model observability.
+- No Markdown table layout — task 15D owns Rich-style terminal tables.
 - No global mutation of Logback's static converter map.
 - No library-owned root `logback.xml`/`logback-spring.xml` that could take over a
   consumer application's logging configuration.
+- No Lombok dependency for this small module: its few immutable fields and
+  constructors do not justify another consumer-facing annotation processor.
 
 ## Acceptance
 

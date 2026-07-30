@@ -84,6 +84,11 @@ only Markdown:
 </logger>
 ```
 
+Unmarked mode deliberately parses every message as Markdown on the logging
+thread. Keep it on a dedicated logger: ordinary messages containing Markdown
+punctuation may otherwise be reformatted, and every event would pay the parse
+cost. Prefer `%mdMsg{marked}` on a shared console.
+
 Keep `%msg` on file and structured appenders so stored logs retain the original
 Markdown source:
 
@@ -96,8 +101,43 @@ Markdown source:
 </appender>
 ```
 
-ANSI output follows Jansi's enabled state when the converter is created. An
-application can disable styles before Logback initialization with
-`org.jline.jansi.Ansi.setEnabled(false)`; rendered text then remains readable
-without escape sequences. Configure terminal and CI color handling explicitly,
-and never use `%mdMsg` in JSON encoders.
+## ANSI policy
+
+The default `%mdMsg` policy emits ANSI only when all of these are true:
+
+- `System.console()` is available;
+- `NO_COLOR` is absent;
+- `TERM` is not `dumb`;
+- Jansi has not been disabled.
+
+This conservative default keeps redirected output and typical CI/file output
+plain. Pattern options can override detection:
+
+```xml
+<!-- Force plain text; options are order-independent. -->
+<pattern>%mdMsg{marked,plain}%n</pattern>
+
+<!-- Force ANSI for a console whose TTY cannot be detected. -->
+<pattern>%mdMsg{marked,ansi}%n</pattern>
+```
+
+For a process-wide plain-text switch, set
+`-Dorg.jline.jansi.Ansi.disable=true` before the JVM starts. Do not rely on
+`Ansi.setEnabled(false)` for Logback configuration: it is thread-local and may
+not affect the thread that initializes or uses the converter.
+
+Spring Boot's `spring.output.ansi.enabled` controls Boot's own `%clr`
+converter; it does not directly configure manual `%mdMsg` patterns. Select
+`plain` or `ansi` explicitly when those policies must agree. Task 15B's
+automatic starter will bridge the Boot policy programmatically.
+
+Never use ANSI mode in JSON encoders. File appenders should retain ordinary
+`%msg`; `%mdMsg{plain}` is available only when a rendered plain-text file is
+intentional.
+
+## Custom rendering
+
+`MarkdownRenderer` is a public functional interface, and
+`MarkdownMessageConverter(MarkdownRenderer)` supports programmatic integration
+with another terminal renderer. A custom renderer owns its ANSI policy; the
+`plain` and `ansi` pattern options configure only the built-in renderer.

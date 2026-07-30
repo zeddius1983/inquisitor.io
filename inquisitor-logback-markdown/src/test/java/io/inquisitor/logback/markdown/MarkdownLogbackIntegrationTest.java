@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.regex.Pattern;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
@@ -32,8 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class MarkdownLogbackIntegrationTest {
-
-    private static final Pattern ANSI = Pattern.compile("\\u001B\\[[;\\d]*m");
 
     @TempDir
     Path tempDir;
@@ -56,8 +53,8 @@ class MarkdownLogbackIntegrationTest {
         logger.info(MarkdownMarkers.markdown(), "# Integrated **Markdown**");
         context.stop();
 
-        String output = ANSI.matcher(Files.readString(logFile)).replaceAll("")
-                .replace("\r\n", "\n");
+        String output = Files.readString(logFile).replace("\r\n", "\n");
+        assertEquals(-1, output.indexOf('\u001B'));
         assertEquals("Integrated Markdown\n|RAW:# Integrated **Markdown**\n", output);
     }
 }

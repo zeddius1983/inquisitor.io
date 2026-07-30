@@ -16,8 +16,15 @@
 
 package io.inquisitor.logback.markdown;
 
+/** Strategy for converting Markdown source to terminal-oriented text. */
 @FunctionalInterface
-interface MarkdownRenderer {
+public interface MarkdownRenderer {
 
+    /**
+     * Renders one Markdown document.
+     *
+     * @param markdown Markdown source
+     * @return terminal-oriented text
+     */
     String render(String markdown);
 }

@@ -27,7 +27,9 @@ import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.STRONG;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.function.BiConsumer;
 
+import com.vladsch.flexmark.ast.AutoLink;
 import com.vladsch.flexmark.ast.BlockQuote;
 import com.vladsch.flexmark.ast.BulletList;
 import com.vladsch.flexmark.ast.BulletListItem;
@@ -36,21 +38,25 @@ import com.vladsch.flexmark.ast.Emphasis;
 import com.vladsch.flexmark.ast.FencedCodeBlock;
 import com.vladsch.flexmark.ast.HardLineBreak;
 import com.vladsch.flexmark.ast.Heading;
+import com.vladsch.flexmark.ast.HtmlEntity;
+import com.vladsch.flexmark.ast.Image;
 import com.vladsch.flexmark.ast.IndentedCodeBlock;
 import com.vladsch.flexmark.ast.Link;
 import com.vladsch.flexmark.ast.ListBlock;
 import com.vladsch.flexmark.ast.ListItem;
+import com.vladsch.flexmark.ast.MailLink;
 import com.vladsch.flexmark.ast.OrderedList;
 import com.vladsch.flexmark.ast.OrderedListItem;
 import com.vladsch.flexmark.ast.Paragraph;
 import com.vladsch.flexmark.ast.SoftLineBreak;
 import com.vladsch.flexmark.ast.StrongEmphasis;
 import com.vladsch.flexmark.ast.Text;
+import com.vladsch.flexmark.ast.ThematicBreak;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.ast.Node;
 import com.vladsch.flexmark.util.ast.NodeVisitor;
 import com.vladsch.flexmark.util.ast.VisitHandler;
-import org.jline.jansi.Ansi;
+import com.vladsch.flexmark.util.ast.Visitor;
 
 /** Renders a practical Markdown subset as ANSI-styled terminal text. */
 public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
@@ -59,9 +65,12 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
 
     private final AnsiStyler styler;
 
-    /** Creates a renderer that follows Jansi's current enabled/disabled policy. */
+    /**
+     * Creates a renderer that emits ANSI only when an interactive, color-capable
+     * terminal is detected.
+     */
     public FlexmarkAnsiRenderer() {
-        this(Ansi.isEnabled());
+        this(AnsiSupport.isAutoEnabled());
     }
 
     /**
@@ -113,9 +122,26 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
                     new VisitHandler<>(OrderedListItem.class, this::visit),
                     new VisitHandler<>(BlockQuote.class, this::visit),
                     new VisitHandler<>(Link.class, this::visit),
+                    new VisitHandler<>(AutoLink.class, this::visit),
+                    new VisitHandler<>(MailLink.class, this::visit),
+                    new VisitHandler<>(Image.class, this::visit),
+                    new VisitHandler<>(HtmlEntity.class, this::visit),
+                    new VisitHandler<>(ThematicBreak.class, this::visit),
                     new VisitHandler<>(SoftLineBreak.class, this::visit),
                     new VisitHandler<>(HardLineBreak.class, this::visit),
-                    new VisitHandler<>(Text.class, this::visit));
+                    new VisitHandler<>(Text.class, this::visit)) {
+                @Override
+                protected void processNode(
+                        Node node,
+                        boolean withChildren,
+                        BiConsumer<Node, Visitor<Node>> processor) {
+                    if (withChildren && getHandler(node) == null && !node.hasChildren()) {
+                        append(node.getChars());
+                        return;
+                    }
+                    super.processNode(node, withChildren, processor);
+                }
+            };
         }
 
         String render(Node document) {
@@ -224,12 +250,41 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
 
         private void visit(Link link) {
             styled(LINK, () -> visitor.visitChildren(link));
-            String url = link.getUrl().toString();
+            String url = link.getUrl().unescape().toString();
             if (!url.isBlank() && !url.equals(link.getText().toString())) {
                 append(" (");
                 styled(LINK, () -> append(url));
                 append(")");
             }
+        }
+
+        private void visit(AutoLink link) {
+            styled(LINK, () -> append(link.getText().unescape()));
+        }
+
+        private void visit(MailLink link) {
+            styled(LINK, () -> append(link.getText().unescape()));
+        }
+
+        private void visit(Image image) {
+            String alt = image.getText().unescape().toString();
+            String url = image.getUrl().unescape().toString();
+            append(alt.isBlank() ? "image" : alt);
+            if (!url.isBlank() && !url.equals(alt)) {
+                append(" (");
+                styled(LINK, () -> append(url));
+                append(")");
+            }
+        }
+
+        private void visit(HtmlEntity entity) {
+            append(entity.getChars().unescape());
+        }
+
+        private void visit(ThematicBreak ignored) {
+            separateBlock();
+            append("────────");
+            endBlock();
         }
 
         private void visit(SoftLineBreak ignored) {
@@ -241,7 +296,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         }
 
         private void visit(Text text) {
-            append(text.getChars());
+            append(text.getChars().unescape());
         }
 
         private void renderCodeBlock(Node codeBlock, String content) {
@@ -303,12 +358,28 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
             lineStart = false;
         }
 
+        private void appendQuoteBlankLinePrefix() {
+            for (int depth = 0; depth < quoteDepth; depth++) {
+                output.append(styler.open(QUOTE_MARKER)).append("│").append(styler.reset());
+                if (depth + 1 < quoteDepth) {
+                    output.append(' ');
+                }
+                if (!styles.isEmpty()) {
+                    output.append(styler.open(styles.element()));
+                }
+            }
+            lineStart = false;
+        }
+
         private void separateBlock() {
             if (output.isEmpty()) {
                 return;
             }
             ensureNewline();
             if (trailingLineBreaks() < 2) {
+                if (quoteDepth > 0) {
+                    appendQuoteBlankLinePrefix();
+                }
                 output.append('\n');
                 lineStart = true;
             }

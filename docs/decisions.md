@@ -345,5 +345,28 @@ see [roadmap.md](roadmap.md); for stable repo context see
   *instances* by group/source changes and step-index resets, because the same file
   legitimately runs several times in one JVM.
 
+## Console Markdown logging
+
+- **Reusable Logback integration is a separate opt-in module.**
+  `inquisitor-logback-markdown` owns the `%mdMsg` converter, Flexmark renderer,
+  marker protocol, and bundled conversion rule without depending on Spring or
+  the harness. Consumers choose which console layout uses it; file and structured
+  appenders remain on `%msg`. This keeps presentation out of the harness and
+  makes the renderer reusable by unrelated applications.
+- **Flexmark core, not `flexmark-all`.** The initial renderer needs the parser,
+  core AST, and AST utilities only. Pulling every Flexmark extension and converter
+  into a published logging utility would inflate every consumer's runtime
+  classpath. Individual extensions, such as tables in task 15D, are added
+  narrowly when their behavior is implemented.
+- **Jansi emits styles but does not decide whether a destination is a terminal.**
+  Automatic mode requires an attached `System.console()`, honours `NO_COLOR`
+  and `TERM=dumb`, and respects Jansi's process disable property. Manual
+  `plain`/`ansi` converter options provide deterministic overrides. Spring
+  Boot's ANSI policy is separate and will be bridged by the optional starter,
+  rather than coupled into this Spring-free module.
+- **No Lombok in the small renderer module.** Its state is deliberately explicit
+  and per-render-call, and the handful of constructors/accessors do not justify
+  adding an annotation processor to this dependency-light published artifact.
+
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.
