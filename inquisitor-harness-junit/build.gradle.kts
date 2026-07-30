@@ -22,4 +22,8 @@ dependencies {
 
     // Assertions for the @RequiresLlm gate test (version from the Spring Boot BOM).
     testImplementation("org.assertj:assertj-core")
+
+    // Launcher discovery API for the @Scenario tag-selection test (the conventions
+    // already put the launcher on the test runtime classpath; this makes it compilable).
+    testImplementation("org.junit.platform:junit-platform-launcher")
 }

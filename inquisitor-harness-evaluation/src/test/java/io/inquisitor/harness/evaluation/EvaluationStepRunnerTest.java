@@ -76,11 +76,56 @@ class EvaluationStepRunnerTest {
         assertThat(request.getResponseContent())
                 .contains("PASS").contains("balance is 100").contains("HTTP 200");
 
-        // the score is recorded
+        // the score is recorded, with both sides of the audit
         assertThat(recorder.records()).singleElement().satisfies(record -> {
             assertThat(record.score()).isEqualTo(1.0);
             assertThat(record.category()).isEqualTo("GROUNDED");
+            assertThat(record.outcome()).isEqualTo(Outcome.PASS);
+            assertThat(record.toolCalls()).hasSize(2);
         });
+    }
+
+    @Test
+    void judgeFailureNeverFailsTheStep() {
+        val verdict = new StepVerdict(Outcome.PASS, "fine", List.of("HTTP 200"));
+        val delegate = (StepRunner) request -> new StepRun(verdict, List.of(), Duration.ZERO);
+        val evaluator = (Evaluator) request -> {
+            throw new IllegalStateException("judge timed out");
+        };
+        val recorder = new StepEvaluationRecorder();
+        val runner = new EvaluationStepRunner(delegate, evaluator, recorder);
+
+        val run = runner.run(StepRequest.of("conv-4", SCENARIO, SCENARIO.steps().get(0)));
+
+        // the judge is an observer: its failure must not propagate, the verdict stands
+        assertThat(run.verdict()).isSameAs(verdict);
+        assertThat(recorder.records()).singleElement().satisfies(record -> {
+            assertThat(record.category()).isEqualTo(StepEvaluationRecord.NOT_EVALUATED);
+            assertThat(record.feedback()).contains("judge call failed").contains("judge timed out");
+        });
+        assertThat(recorder.overallScore()).isEmpty();
+    }
+
+    @Test
+    void syntheticVerdictSkipsTheJudge() {
+        val verdict = new StepVerdict(Outcome.FAIL,
+                "The model returned an empty or unparseable response.", List.of());
+        val delegate = (StepRunner) request ->
+                new StepRun(verdict, List.of(), Duration.ZERO, true);
+        val evaluator = (Evaluator) request -> {
+            throw new AssertionError("the judge must not be called for a synthetic verdict");
+        };
+        val recorder = new StepEvaluationRecorder();
+        val runner = new EvaluationStepRunner(delegate, evaluator, recorder);
+
+        val run = runner.run(StepRequest.of("conv-3", SCENARIO, SCENARIO.steps().get(0)));
+
+        assertThat(run.verdict()).isSameAs(verdict);
+        assertThat(recorder.records()).singleElement().satisfies(record -> {
+            assertThat(record.category()).isEqualTo(StepEvaluationRecord.NOT_EVALUATED);
+            assertThat(record.evaluated()).isFalse();
+        });
+        assertThat(recorder.overallScore()).isEmpty();
     }
 
     @Test

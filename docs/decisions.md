@@ -254,5 +254,96 @@ see [roadmap.md](roadmap.md); for stable repo context see
   taking on the springdoc-on-Boot-4 dependency risk. This still exercises the
   headline live-fetch path deterministically; real consumers plug in springdoc.
 
+## Evaluation report (task-08 C2)
+
+- **File handoff, the JaCoCo pattern.** The `evaluate` task is a Gradle `Test` task,
+  so the evaluation data lives in the forked test JVM and Gradle sees only test
+  outcomes — there is no channel back to the build but files. The test JVM writes
+  `evaluation.json` + `evaluation.md`; the plugin's `evaluateReport` task only echoes
+  the Markdown headline (no parsing, no Jackson in the plugin). Rendering lives next
+  to the data.
+- **One flush point: a JUnit `LauncherSessionListener`** (ServiceLoader-registered in
+  `inquisitor-harness-evaluation`), firing once after the whole test plan — pass or
+  fail. Recorder beans live in cached Spring contexts the listener can't see, so the
+  starter registers each recorder in a static `EvaluationReportSession` the listener
+  drains. Deliberately the only static state in the module; the alternative
+  (`@PreDestroy` flush per context) runs in JVM-shutdown-hook ordering and needs
+  read-modify-write file merging. The listener no-ops unless `inquisitor.report.dir`
+  is set (only the plugin's `evaluate` task sets it), so ordinary test runs write
+  nothing even with evaluation enabled.
+- **The echo lives inside `evaluate` (root-suite `afterSuite`), not a finalizer
+  task.** Reporting should be implicit, like any `Test` task's HTML report — a
+  separate `evaluateReport` task was surface without substance (it never rendered
+  anything; rendering lives in the test JVM). A failing scenario run is exactly when
+  the report matters and `doLast` never runs when the test action throws — but
+  `TestListener.afterSuite` on the root descriptor fires after all tests *before*
+  the task fails, so the echo survives a red run without a second task.
+- **The judge is an observer — its failures never fail the step.** The second real
+  run had a judge call hang ~4 minutes and throw `InterruptedIOException`, which
+  failed the JUnit sub-test and desynced the sub-test↔step mapping (the execution
+  cursor hadn't advanced, so the next sub-test silently re-ran the step under the
+  wrong name and the last step never ran). Two fixes: `EvaluationStepRunner`
+  catches judge `RuntimeException`s and records `NOT_EVALUATED` with the error as
+  feedback (the verdict stands untouched — decorator transparency is the contract);
+  and the JUnit layer's `StepExecution` marks the scenario done when `next()`
+  throws, so a genuine infrastructure failure aborts cleanly instead of shifting
+  steps.
+- **Synthetic verdicts are not audited.** When the actor's response is empty or
+  unparseable, `LlmStepRunner` fabricates the FAIL (now marked `StepRun.synthetic`);
+  the first real run showed the judge "contradicting" such a verdict — technically
+  right, semantically noise, since there is no actor claim to audit. The evaluation
+  runner skips the judge and records `NOT_EVALUATED`, excluded from the mean score
+  but counted in the report (it is a run-health signal).
+- **The report's PASSED/FAILED is expectation-aware — JUnit's reading.** A scenario
+  is *PASSED* when its outcome matches `@Scenario(expect)`: an expected failure that
+  failed is PASSED; one that stayed green is *FAILED (missed detection)*. Success
+  rate aggregates passed scenarios (so a clean fault-suite run reads 100%, matching
+  the green JUnit report), while the raw actor verdicts stay visible per step on the
+  scenario pages. (Originally shipped as a separate "Matched" column beside a
+  step-based success rate; review showed that misleads — the JUnit reading is the
+  right primary status.)
+- **The deterministic gate is "outcome matches expectation", not "all PASS".**
+  Fault-detection suites (`@Scenario(expect = FAIL)`) are part of `evaluate` runs and
+  a detected fault is a success; a fully-green fault run is a *missed detection*. The
+  expectation travels on the core model (`Scenario.expectedOutcome`, default PASS,
+  set by the JUnit layer) because the evaluation module can't see JUnit annotations.
+  This is also the groundwork for task-07's deferred detection-%.
+- **Reporting is its own module (`inquisitor-harness-evaluation-report`).** Keeps the
+  judge module purely recorder + judge (the launcher and Jackson dependencies move
+  out), isolates the one piece of static state (`EvaluationReportSession`) and the
+  ServiceLoader listener, and gives renderer growth (C3: HTML, templates,
+  multi-config aggregation) a home. The starter ships it by default
+  (`implementation` dependency) with the registration bean
+  `@ConditionalOnClass`-guarded, so excluding the module degrades evaluation to
+  score-only — the OpenAPI-grade removal bar.
+- **Renderers are pluggable via `ServiceLoader`, selected by `--report`.**
+  `EvaluationReportRenderer` (`name()` + `render(report, dir) → List<Path>`) is the
+  format seam — a renderer owns its files, because the HTML report is multi-page
+  (Gradle-report-style: index → bucket pages → scenario pages). The module
+  contributes `html` (default), `markdown` and `json` through its own
+  `META-INF/services` entry; any jar on the test classpath can contribute more, and
+  the `evaluate` task's `--report=name,name` option (a `@Option` on the custom
+  `EvaluateTask`, passed as `inquisitor.report.formats`) selects by `name()` —
+  built-ins and user renderers alike; unknown names are warned and skipped.
+  `ServiceLoader` over Spring beans because the writing happens in the
+  `LauncherSessionListener`, outside any context.
+  Rendering by `StringBuilder`, not a template engine, for now: Markdown is
+  newline-sensitive and the document is ~100 lines of logic; a logic-less engine
+  (JMustache — not Groovy, which drags in a whole language runtime as a consumer-test
+  dependency) becomes attractive if C3's formats grow, and would slot in behind the
+  renderer interface.
+- **Report grouping: `Scenario.group` (the suite), source directory as fallback.**
+  Originally the report grouped by the parent directory of `Scenario.source` (the
+  style bucket), because the suite class name never reaches the evaluation layer
+  (dependency arrow: junit → harness → evaluation seam). Review showed source is the
+  wrong denominator — a suite may mix scenarios from any buckets, and the same file
+  runs under several suites with different expectations. So the caller now declares
+  the run context on the model: `Scenario.group`, set by the JUnit layer to the suite
+  class's simple name (`FaultDetectionSuiteTest`), optional for standalone runs, where
+  the report falls back to the source directory. The JUnit provider passes the full
+  location (not the bare filename) as `source`. Records are split into scenario
+  *instances* by group/source changes and step-index resets, because the same file
+  legitimately runs several times in one JVM.
+
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.
