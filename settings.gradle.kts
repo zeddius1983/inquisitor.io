@@ -21,6 +21,7 @@ dependencyResolutionManagement {
 includeBuild("inquisitor-harness-gradle-plugin")
 
 include(
+    "inquisitor-logback-markdown",
     "inquisitor-harness",
     "inquisitor-harness-starter",
     "inquisitor-harness-junit",

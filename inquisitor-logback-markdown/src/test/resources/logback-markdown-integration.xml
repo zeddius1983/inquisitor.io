@@ -1,0 +1,15 @@
+<configuration>
+    <include resource="io/inquisitor/logback/markdown.xml"/>
+
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${TEST_LOG}</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%mdMsg%n|RAW:%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

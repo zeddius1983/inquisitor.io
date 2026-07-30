@@ -77,6 +77,7 @@ plain CI build (see [Building](#building)).
 
 | Module | Role |
 |--------|------|
+| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` Logback converter for ANSI-styled console Markdown. |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness. |
 | `inquisitor-harness-junit` | JUnit 5 layer: `@Harness` on the class + one `@Scenario` method per scenario, each step a sub-test. |
@@ -222,7 +223,7 @@ database setup.
 
 ## Releasing to Maven Central
 
-The four library modules plus `inquisitor-bom` publish to Maven Central through
+The published library modules plus `inquisitor-bom` publish to Maven Central through
 the [Central Portal](https://central.sonatype.com) via the
 [Vanniktech maven-publish plugin](https://vanniktech.github.io/gradle-maven-publish-plugin/)
 (`inquisitor.publish-conventions`). The demo and the (unimplemented) mock modules

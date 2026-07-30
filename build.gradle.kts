@@ -19,6 +19,7 @@ tasks.named("check") {
 
 dependencies {
     constraints {
+        api(project(":inquisitor-logback-markdown"))
         api(project(":inquisitor-harness"))
         api(project(":inquisitor-harness-starter"))
         api(project(":inquisitor-harness-junit"))

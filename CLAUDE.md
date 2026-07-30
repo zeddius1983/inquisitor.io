@@ -17,6 +17,7 @@ Base package: `io.inquisitor`. Group: `io.inquisitor`.
 
 | Module | Role |
 |--------|------|
+| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` Logback converter for ANSI-styled Markdown console messages; manual integration, independent of the harness and Spring |
 | `buildSrc/` | Gradle convention plugins (`inquisitor.java-conventions`, `.spring-conventions`, `.publish-conventions`) |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness |
