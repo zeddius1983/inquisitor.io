@@ -83,22 +83,11 @@ common seam serves both `execute(...)` and JUnit's step-at-a-time path:
   result, then propagate unchanged;
 - successful and fail-fast executions produce exactly one completion event.
 
-## Configured and actual model information
+## Actual model information
 
-`ModelRegistry` stores non-sensitive configuration independently for actor and
-judge roles:
-
-- configured model and sanitized base URL;
-- temperature and top-p;
-- max tokens / max completion tokens;
-- reasoning effort;
-- first server-reported actual model.
-
-Actor settings come from `ChatModel.getOptions()` plus Spring OpenAI base-URL
-property precedence. Judge settings come from evaluation configuration. URL user
-info, query parameters, and fragments are removed; invalid sensitive URLs are
-replaced with a redacted sentinel. These settings remain registry metadata and
-are not rendered as a logging preamble.
+`ModelRegistry` stores only the first server-reported actual model name for each
+actor/judge role. Autoconfiguration does not copy configured model options, URLs,
+temperature, token limits, or reasoning settings into logging state.
 
 Actual metadata is not fetched at configuration time and no probe request is
 sent. `ModelMetadataAdvisor` observes the real actor and judge `ChatClient`

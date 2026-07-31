@@ -80,8 +80,9 @@ see [roadmap.md](roadmap.md); for stable repo context see
   rendered, and automatically rendered consoles remain consumer choices.
 - **Actual model metadata is observed, never probed.** A response advisor on each
   real actor/judge `ChatClient` call stores the first nonblank server-reported
-  model in a shared `ModelRegistry`. Configuration-time probe calls would add cost,
-  side effects, and could report a route different from the scenario request.
+  model in a shared `ModelRegistry`; no configured options or endpoints are copied
+  into logging state. Configuration-time probe calls would add cost, side effects,
+  and could report a route different from the scenario request.
   The Markdown actor logger reads the registry directly and puts the actual actor
   name first in step breadcrumbs once known. Provider-reported file paths are shown
   as the filename without `.gguf`. Before the first usable response, the model

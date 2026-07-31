@@ -73,9 +73,9 @@ class InquisitorEvaluationAutoConfigurationTest {
                     // The @Primary wrapper is what the executor resolves.
                     assertThat(context.getBean(StepRunner.class)).isInstanceOf(EvaluationStepRunner.class);
                     assertThat(context).hasSingleBean(ScenarioExecutor.class);
-                    assertThat(context.getBean(ModelRegistry.class).snapshots())
-                            .extracting(snapshot -> snapshot.configuration().role())
-                            .containsExactly(ModelRole.ACTOR, ModelRole.JUDGE);
+                    val models = context.getBean(ModelRegistry.class);
+                    assertThat(models.actualModel(ModelRole.ACTOR)).isEmpty();
+                    assertThat(models.actualModel(ModelRole.JUDGE)).isEmpty();
                 });
     }
 

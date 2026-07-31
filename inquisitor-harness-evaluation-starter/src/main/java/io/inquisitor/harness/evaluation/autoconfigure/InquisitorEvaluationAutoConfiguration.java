@@ -16,10 +16,6 @@
 
 package io.inquisitor.harness.evaluation.autoconfigure;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.Optional;
-
 import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.evaluation.EvaluationProperties;
@@ -34,12 +30,10 @@ import io.inquisitor.harness.evaluation.report.EvaluationReportSession;
 import io.inquisitor.harness.evaluation.report.EvaluationRunInfo;
 import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.StepRunner;
-import io.inquisitor.harness.logging.ModelConfiguration;
 import io.inquisitor.harness.logging.ModelMetadataAdvisor;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
 import lombok.val;
-import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.evaluation.Evaluator;
@@ -78,8 +72,6 @@ import org.springframework.util.Assert;
 @ConditionalOnProperty(prefix = "inquisitor.harness.evaluation", name = "enabled", havingValue = "true")
 @EnableConfigurationProperties(EvaluationProperties.class)
 public class InquisitorEvaluationAutoConfiguration {
-
-    private static final String REDACTED_URL = "[redacted invalid URL]";
 
     /**
      * Decorates every {@link ToolCallback} bean so each call is recorded into the per-step
@@ -172,12 +164,6 @@ public class InquisitorEvaluationAutoConfiguration {
                 .model(properties.model())
                 .temperature(0.0d)
                 .build();
-        models.configure(new ModelConfiguration(
-                ModelRole.JUDGE,
-                optionalText(properties.model()),
-                optionalText(safeBaseUrl(baseUrl)),
-                Optional.of(0.0d),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
 
         val judgeModel = OpenAiChatModel.builder()
                 .options(judgeOptions)
@@ -199,33 +185,5 @@ public class InquisitorEvaluationAutoConfiguration {
             EvaluationLoggerCallback loggerCallback) {
         val callback = recorder.andThen(loggerCallback);
         return new EvaluationStepRunner(llmStepRunner, evaluator, callback);
-    }
-
-    private static Optional<String> optionalText(@Nullable String value) {
-        return Optional.ofNullable(value).map(String::strip).filter(candidate -> !candidate.isBlank());
-    }
-
-    private static @Nullable String safeBaseUrl(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return value;
-        }
-        val candidate = value.strip();
-        try {
-            val uri = new URI(candidate);
-            if (uri.getRawUserInfo() == null
-                    && uri.getRawQuery() == null
-                    && uri.getRawFragment() == null) {
-                return candidate;
-            }
-            if (uri.getHost() == null) {
-                return REDACTED_URL;
-            }
-            return new URI(
-                    uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(),
-                    null, null).toString();
-        }
-        catch (URISyntaxException exception) {
-            return REDACTED_URL;
-        }
     }
 }

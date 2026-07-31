@@ -16,11 +16,8 @@
 
 package io.inquisitor.harness.autoconfigure;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import javax.sql.DataSource;
 
@@ -34,7 +31,6 @@ import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.logging.MarkdownLlmLogger;
 import io.inquisitor.harness.logging.MarkdownScenarioLogger;
-import io.inquisitor.harness.logging.ModelConfiguration;
 import io.inquisitor.harness.logging.ModelMetadataAdvisor;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
@@ -47,7 +43,6 @@ import io.inquisitor.harness.tool.HttpTarget;
 import io.inquisitor.harness.tool.HttpTargetRegistry;
 import io.inquisitor.harness.tool.SqlTool;
 import lombok.val;
-import org.jspecify.annotations.Nullable;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -55,8 +50,6 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.ChatOptions;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -67,7 +60,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.env.Environment;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
@@ -92,9 +84,6 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @EnableConfigurationProperties(InquisitorHarnessProperties.class)
 public class InquisitorHarnessAutoConfiguration {
 
-    private static final String OPENAI_CHAT_BASE_URL = "spring.ai.openai.chat.base-url";
-    private static final String OPENAI_BASE_URL = "spring.ai.openai.base-url";
-    private static final String REDACTED_URL = "[redacted invalid URL]";
     @Bean
     @ConditionalOnMissingBean
     ModelRegistry inquisitorModelRegistry() {
@@ -194,10 +183,7 @@ public class InquisitorHarnessAutoConfiguration {
             ObjectProvider<ToolCallback> toolCallbacks,
             ObjectProvider<ToolCallbackProvider> toolCallbackProviders,
             ObjectProvider<Advisor> advisors,
-            ModelRegistry models,
-            Environment environment) {
-
-        models.configure(modelConfiguration(ModelRole.ACTOR, chatModel.getOptions(), environment));
+            ModelRegistry models) {
 
         // Every tool the model may call, as ToolCallbacks: the built-in HTTP/SQL adapters,
         // any user-supplied ToolCallback beans, and any ToolCallbackProvider beans (e.g.
@@ -253,75 +239,5 @@ public class InquisitorHarnessAutoConfiguration {
             dataSource.setDriverClassName(properties.driverClassName());
         }
         return dataSource;
-    }
-
-    private static ModelConfiguration modelConfiguration(
-            ModelRole role,
-            @Nullable ChatOptions options,
-            Environment environment) {
-        val openAiOptions = options instanceof OpenAiChatOptions openAi ? openAi : null;
-        return new ModelConfiguration(
-                role,
-                optionalText(options == null ? null : options.getModel()),
-                optionalText(baseUrl(openAiOptions, environment)),
-                Optional.ofNullable(options == null ? null : options.getTemperature()),
-                Optional.ofNullable(options == null ? null : options.getTopP()),
-                Optional.ofNullable(options == null ? null : options.getMaxTokens()),
-                Optional.ofNullable(openAiOptions == null
-                        ? null
-                        : openAiOptions.getMaxCompletionTokens()),
-                optionalText(openAiOptions == null
-                        ? null
-                        : openAiOptions.getReasoningEffort()));
-    }
-
-    private static @Nullable String baseUrl(
-            @Nullable OpenAiChatOptions options,
-            Environment environment) {
-        if (options != null && hasText(options.getBaseUrl())) {
-            return safeBaseUrl(options.getBaseUrl());
-        }
-        val chatBaseUrl = environment.getProperty(OPENAI_CHAT_BASE_URL);
-        val configured = hasText(chatBaseUrl)
-                ? chatBaseUrl
-                : environment.getProperty(OPENAI_BASE_URL);
-        return safeBaseUrl(configured);
-    }
-
-    private static Optional<String> optionalText(@Nullable String value) {
-        return Optional.ofNullable(value).map(String::strip).filter(candidate -> !candidate.isBlank());
-    }
-
-    private static boolean hasText(@Nullable String value) {
-        return value != null && !value.isBlank();
-    }
-
-    private static @Nullable String safeBaseUrl(@Nullable String value) {
-        if (!hasText(value)) {
-            return value;
-        }
-        val candidate = value.strip();
-        try {
-            val uri = new URI(candidate);
-            if (uri.getRawUserInfo() == null
-                    && uri.getRawQuery() == null
-                    && uri.getRawFragment() == null) {
-                return candidate;
-            }
-            if (uri.getHost() == null) {
-                return REDACTED_URL;
-            }
-            return new URI(
-                    uri.getScheme(),
-                    null,
-                    uri.getHost(),
-                    uri.getPort(),
-                    uri.getPath(),
-                    null,
-                    null).toString();
-        }
-        catch (URISyntaxException exception) {
-            return REDACTED_URL;
-        }
     }
 }

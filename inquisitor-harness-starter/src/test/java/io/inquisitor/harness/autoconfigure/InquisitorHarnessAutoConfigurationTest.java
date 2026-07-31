@@ -18,7 +18,6 @@ package io.inquisitor.harness.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import javax.sql.DataSource;
 
@@ -32,7 +31,6 @@ import io.inquisitor.harness.logging.MarkdownLlmLogger;
 import io.inquisitor.harness.logging.MarkdownScenarioLogger;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
-import io.inquisitor.harness.logging.ModelSnapshot;
 import io.inquisitor.harness.logging.PlainLlmLogger;
 import io.inquisitor.harness.logging.PlainScenarioLogger;
 import io.inquisitor.harness.parser.ScenarioParser;
@@ -44,8 +42,6 @@ import lombok.val;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.ChatOptions;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -66,6 +62,7 @@ class InquisitorHarnessAutoConfigurationTest {
             assertThat(context).hasSingleBean(ChatClient.class);
             assertThat(context).hasSingleBean(ScenarioExecutor.class);
             assertThat(context).hasSingleBean(ModelRegistry.class);
+            assertThat(context.getBean(ModelRegistry.class).actualModel(ModelRole.ACTOR)).isEmpty();
             assertThat(context).hasSingleBean(LlmStepRunnerCallback.class);
             assertThat(context).hasSingleBean(ScenarioExecutionCallback.class);
         });
@@ -104,82 +101,6 @@ class InquisitorHarnessAutoConfigurationTest {
                     assertThat(context.getBean(ScenarioExecutionCallback.class))
                             .isSameAs(scenarioCallback);
                 });
-    }
-
-    @Test
-    void genericOptionsAreRegisteredForTheActor() {
-        val options = ChatOptions.builder()
-                .model("generic-model")
-                .temperature(0.25)
-                .topP(0.8)
-                .maxTokens(512)
-                .build();
-        val chatModel = mock(ChatModel.class);
-        when(chatModel.getOptions()).thenReturn(options);
-
-        runner.withBean(ChatModel.class, () -> chatModel)
-                .withPropertyValues(
-                        "spring.ai.openai.base-url=https://common.example/v1")
-                .run(context -> {
-                    val configuration = actor(context.getBean(ModelRegistry.class)).configuration();
-                    assertThat(configuration.configuredModel()).contains("generic-model");
-                    assertThat(configuration.baseUrl()).contains("https://common.example/v1");
-                    assertThat(configuration.temperature()).contains(0.25);
-                    assertThat(configuration.topP()).contains(0.8);
-                    assertThat(configuration.maxTokens()).contains(512);
-                    assertThat(configuration.maxCompletionTokens()).isEmpty();
-                    assertThat(configuration.reasoningEffort()).isEmpty();
-                });
-    }
-
-    @Test
-    void openAiOptionsRegisterReasoningAndMaxCompletionTokens() {
-        val options = OpenAiChatOptions.builder()
-                .baseUrl("https://programmatic.example/v1")
-                .model("openai-model")
-                .maxCompletionTokens(2048)
-                .reasoningEffort("high")
-                .build();
-        val chatModel = mock(ChatModel.class);
-        when(chatModel.getOptions()).thenReturn(options);
-
-        runner.withBean(ChatModel.class, () -> chatModel)
-                .withPropertyValues(
-                        "spring.ai.openai.chat.base-url=https://chat.example/v1",
-                        "spring.ai.openai.base-url=https://common.example/v1")
-                .run(context -> {
-                    val configuration = actor(context.getBean(ModelRegistry.class)).configuration();
-                    assertThat(configuration.baseUrl()).contains("https://programmatic.example/v1");
-                    assertThat(configuration.maxCompletionTokens()).contains(2048);
-                    assertThat(configuration.reasoningEffort()).contains("high");
-                });
-    }
-
-    @Test
-    void chatBaseUrlPropertyTakesPrecedenceOverTheCommonProperty() {
-        val chatModel = mock(ChatModel.class);
-        when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
-
-        runner.withBean(ChatModel.class, () -> chatModel)
-                .withPropertyValues(
-                        "spring.ai.openai.chat.base-url=https://chat.example/v1",
-                        "spring.ai.openai.base-url=https://common.example/v1")
-                .run(context -> assertThat(actor(context.getBean(ModelRegistry.class))
-                        .configuration().baseUrl()).contains("https://chat.example/v1"));
-    }
-
-    @Test
-    void configurationBannerDoesNotExposeUrlCredentialsOrQueryValues() {
-        val options = OpenAiChatOptions.builder()
-                .baseUrl("https://user:secret@example.test/v1?token=sensitive#fragment")
-                .model("openai-model")
-                .build();
-        val chatModel = mock(ChatModel.class);
-        when(chatModel.getOptions()).thenReturn(options);
-
-        runner.withBean(ChatModel.class, () -> chatModel)
-                .run(context -> assertThat(actor(context.getBean(ModelRegistry.class))
-                        .configuration().baseUrl()).contains("https://example.test/v1"));
     }
 
     @Test
@@ -233,12 +154,5 @@ class InquisitorHarnessAutoConfigurationTest {
             assertThat(context).hasSingleBean(ScenarioExecutionCallback.class);
             assertThat(context).hasSingleBean(ScenarioExecutor.class);
         });
-    }
-
-    private static ModelSnapshot actor(ModelRegistry registry) {
-        return registry.snapshots().stream()
-                .filter(snapshot -> snapshot.configuration().role() == ModelRole.ACTOR)
-                .findFirst()
-                .orElseThrow();
     }
 }

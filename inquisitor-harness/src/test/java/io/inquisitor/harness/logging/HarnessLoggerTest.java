@@ -22,7 +22,6 @@ import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -67,7 +66,6 @@ class HarnessLoggerTest {
                 new StepVerdict(Outcome.PASS, "verified\nwith evidence", List.of()),
                 List.of(), Duration.ofMillis(13_289));
         val registry = new ModelRegistry();
-        registry.configure(actorSnapshot().configuration());
 
         val events = capture(MarkdownLlmLogger.class, Level.DEBUG, () -> {
             val logger = new MarkdownLlmLogger(registry);
@@ -124,14 +122,6 @@ class HarnessLoggerTest {
                     .startsWith("Scenario START: Account lifecycle")
                     .contains("Open and fund Bob's account.");
         });
-    }
-
-    private static ModelSnapshot actorSnapshot() {
-        return new ModelSnapshot(new ModelConfiguration(
-                ModelRole.ACTOR,
-                Optional.of("actor-model"), Optional.of("https://example.test/v1"),
-                Optional.of(0.2), Optional.of(0.9), Optional.of(512),
-                Optional.empty(), Optional.of("medium")), Optional.empty());
     }
 
     private static void resolve(ModelRegistry registry, ModelRole role, String model) {

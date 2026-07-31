@@ -41,10 +41,7 @@ class ModelMetadataAdvisorTest {
         advisor.after(response("actual-model"), chain);
         advisor.after(response("ignored-later-model"), chain);
 
-        assertThat(registry.snapshots()).singleElement().satisfies(snapshot -> {
-            assertThat(snapshot.configuration().role()).isEqualTo(ModelRole.ACTOR);
-            assertThat(snapshot.actualModel()).contains("actual-model");
-        });
+        assertThat(registry.actualModel(ModelRole.ACTOR)).contains("actual-model");
     }
 
     @Test
@@ -54,7 +51,7 @@ class ModelMetadataAdvisorTest {
 
         advisor.after(ChatClientResponse.builder().build(), mock(AdvisorChain.class));
 
-        assertThat(registry.snapshots()).isEmpty();
+        assertThat(registry.actualModel(ModelRole.JUDGE)).isEmpty();
     }
 
     private static ChatClientResponse response(String model) {
