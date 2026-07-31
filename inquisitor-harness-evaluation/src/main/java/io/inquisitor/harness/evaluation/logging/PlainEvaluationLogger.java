@@ -16,6 +16,8 @@
 
 package io.inquisitor.harness.evaluation.logging;
 
+import java.time.Duration;
+
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
 import lombok.extern.slf4j.Slf4j;
@@ -54,7 +56,8 @@ public class PlainEvaluationLogger implements EvaluationLoggerCallback {
     public void evaluationCompleted(
             StepRequest request,
             StepRun actorRun,
-            EvaluationResponse response) {
+            EvaluationResponse response,
+            Duration elapsed) {
         val scenario = request.scenario();
         val step = request.step();
         val category = response.getMetadata() == null

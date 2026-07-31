@@ -52,9 +52,11 @@ a Powerlevel10k-style sequence of background-colored pills:
 
 Each transition uses the preceding segment's foreground color and the following
 segment's background color, producing a continuous Powerline join. The built-in
-palette cycles after four segments. Plain rendering preserves the same readable
-text without ANSI sequences, while headings without this exact shape retain the
-normal heading style.
+renderer colors known lifecycle and evaluation-result segments semantically:
+green for active/successful states, yellow for partial/skipped states, and red
+for failed/unsupported states. Other segments use the positional palette. Plain
+rendering preserves the same readable text without ANSI sequences, while headings
+without this exact shape retain the normal heading style.
 
 The classic `` and `` caps use the baseline Powerline glyphs supported by
 older patched fonts as well as current Nerd Fonts. Rounded ``/`` caps are not

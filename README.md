@@ -149,6 +149,9 @@ filename without the `.gguf` extension.
 Completion breadcrumbs add a human-scale duration segment (`842 ms`, `13.289 s`,
 `2 min 5.4 s`). Their classic Powerline glyphs require a patched Powerline or Nerd
 Font; the underlying Markdown remains readable when ANSI is disabled.
+When evaluation is enabled, judge starts use the same breadcrumb with `EVALUATION`.
+Judge results include the actual judge model, category, labeled score, and
+judge-call duration, followed by wrapped feedback in a Markdown blockquote.
 Choose how they appear:
 
 - add no rendering dependency to keep readable raw Markdown in ordinary logs;

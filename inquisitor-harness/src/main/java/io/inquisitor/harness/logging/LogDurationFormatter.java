@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import lombok.val;
 
 /** Human-oriented duration formatting for harness log messages. */
-final class LogDurationFormatter {
+public final class LogDurationFormatter {
 
     private static final long MILLIS_PER_SECOND = 1_000;
     private static final long MILLIS_PER_MINUTE = 60 * MILLIS_PER_SECOND;
@@ -31,7 +31,7 @@ final class LogDurationFormatter {
 
     private LogDurationFormatter() { }
 
-    static String format(Duration duration) {
+    public static String format(Duration duration) {
         val totalMillis = duration.toMillis();
         if (totalMillis < MILLIS_PER_SECOND) {
             return totalMillis + " ms";

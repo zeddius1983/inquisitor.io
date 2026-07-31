@@ -103,10 +103,11 @@ public class InquisitorEvaluationAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     EvaluationLoggerCallback inquisitorEvaluationLoggerCallback(
-            InquisitorHarnessProperties properties) {
+            InquisitorHarnessProperties properties,
+            ModelRegistry models) {
         return switch (properties.logging().format()) {
             case PLAIN -> new PlainEvaluationLogger();
-            case MARKDOWN -> new MarkdownEvaluationLogger();
+            case MARKDOWN -> new MarkdownEvaluationLogger(models);
         };
     }
 

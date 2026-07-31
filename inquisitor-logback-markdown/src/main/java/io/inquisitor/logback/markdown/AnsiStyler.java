@@ -108,9 +108,12 @@ final class AnsiStyler {
 
         static PowerlineStyle forSegment(int index, String text) {
             return switch (text.strip().toUpperCase(Locale.ROOT)) {
-                case "FAIL", "FAILED", "ERROR", "ABORTED" -> FAILURE;
-                case "SKIP", "SKIPPED" -> WARNING;
-                case "PASS", "PASSED", "SUCCESS", "RUNNING", "COMPLETED" -> STATUS;
+                case "FAIL", "FAILED", "ERROR", "ABORTED", "UNSUPPORTED",
+                        "CONTRADICTED" -> FAILURE;
+                case "SKIP", "SKIPPED", "NOT_EVALUATED",
+                        "PARTIALLY_GROUNDED" -> WARNING;
+                case "PASS", "PASSED", "SUCCESS", "RUN", "RUNNING", "EVALUATION",
+                        "EVALUATING", "GROUNDED", "COMPLETED" -> STATUS;
                 default -> at(index);
             };
         }

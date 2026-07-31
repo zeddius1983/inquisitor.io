@@ -16,6 +16,7 @@
 
 package io.inquisitor.harness.evaluation;
 
+import java.time.Duration;
 import java.util.Objects;
 
 import io.inquisitor.harness.executor.StepRequest;
@@ -35,11 +36,12 @@ public interface EvaluationStepRunnerCallback {
     /** Invoked when the judge call fails without affecting the actor result. */
     void evaluationFailed(StepRequest request, StepRun actorRun, Throwable cause);
 
-    /** Invoked after the judge produces its category and score. */
+    /** Invoked after the judge produces its category and score, with judge-call latency. */
     void evaluationCompleted(
             StepRequest request,
             StepRun actorRun,
-            EvaluationResponse response);
+            EvaluationResponse response,
+            Duration elapsed);
 
     /**
      * Returns a callback that invokes this callback followed by {@code after} for each
@@ -71,9 +73,10 @@ public interface EvaluationStepRunnerCallback {
             public void evaluationCompleted(
                     StepRequest request,
                     StepRun actorRun,
-                    EvaluationResponse response) {
-                before.evaluationCompleted(request, actorRun, response);
-                after.evaluationCompleted(request, actorRun, response);
+                    EvaluationResponse response,
+                    Duration elapsed) {
+                before.evaluationCompleted(request, actorRun, response, elapsed);
+                after.evaluationCompleted(request, actorRun, response, elapsed);
             }
         };
     }

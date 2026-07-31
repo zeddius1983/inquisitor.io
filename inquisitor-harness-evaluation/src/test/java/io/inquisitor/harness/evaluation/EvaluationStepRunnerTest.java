@@ -170,7 +170,7 @@ class EvaluationStepRunnerTest {
         callback.evaluationStarted(request, run);
         callback.evaluationSkipped(request, run, "not evaluated");
         callback.evaluationFailed(request, run, cause);
-        callback.evaluationCompleted(request, run, response);
+        callback.evaluationCompleted(request, run, response, Duration.ofMillis(9_807));
 
         assertThat(events).containsExactly(
                 "first:started", "second:started", "third:started",
@@ -211,7 +211,8 @@ class EvaluationStepRunnerTest {
         public void evaluationCompleted(
                 StepRequest request,
                 StepRun actorRun,
-                EvaluationResponse response) {
+                EvaluationResponse response,
+                Duration elapsed) {
             events.add("completed:" + response.getMetadata().get("category"));
         }
     }
@@ -243,7 +244,8 @@ class EvaluationStepRunnerTest {
         public void evaluationCompleted(
                 StepRequest request,
                 StepRun actorRun,
-                EvaluationResponse response) {
+                EvaluationResponse response,
+                Duration elapsed) {
             events.add(name + ":completed");
         }
     }

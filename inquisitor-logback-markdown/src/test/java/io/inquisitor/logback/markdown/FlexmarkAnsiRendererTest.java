@@ -29,6 +29,8 @@ import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class FlexmarkAnsiRendererTest {
 
@@ -286,6 +288,27 @@ class FlexmarkAnsiRendererTest {
                 stripAnsi(rendered));
         assertTrue(rendered.contains("\u001B[41"));
         assertTrue(rendered.contains("\u001B[40"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "RUN, 42",
+            "EVALUATION, 42",
+            "GROUNDED, 42",
+            "PARTIALLY_GROUNDED, 43",
+            "NOT_EVALUATED, 43",
+            "UNSUPPORTED, 41",
+            "CONTRADICTED, 41"
+    })
+    void rendersLifecycleAndEvaluationStatusesWithSemanticBackgrounds(
+            String status,
+            String backgroundCode) {
+        String rendered = new FlexmarkAnsiRenderer(true).render(
+                "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  "
+                        + status + " ");
+
+        assertTrue(rendered.contains("\u001B[" + backgroundCode));
+        assertFalse(rendered.contains("\u001B[40"));
     }
 
     @Test

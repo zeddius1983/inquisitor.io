@@ -16,28 +16,30 @@
 
 package io.inquisitor.harness.evaluation.logging;
 
+import java.time.Duration;
+
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
+import io.inquisitor.harness.logging.LogDurationFormatter;
 import io.inquisitor.harness.logging.MarkdownLogSupport;
+import io.inquisitor.harness.logging.MarkdownStepLogSupport;
+import io.inquisitor.harness.logging.ModelRegistry;
+import io.inquisitor.harness.logging.ModelRole;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.ai.evaluation.EvaluationResponse;
 
 /** Marker-tagged Markdown judge-evaluation diagnostics. */
 @Slf4j
+@RequiredArgsConstructor
 public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
+
+    private final ModelRegistry models;
 
     @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {
-        val scenario = request.scenario();
-        val step = request.step();
-        debug("""
-                ### Judge evaluation — step %d/%d
-
-                **Scenario:** %s
-                **Step:** %s
-                """.formatted(step.index(), scenario.steps().size(),
-                scenario.name(), step.title()));
+        debug("### " + breadcrumb(request, "EVALUATION"));
     }
 
     @Override
@@ -62,20 +64,33 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
     public void evaluationCompleted(
             StepRequest request,
             StepRun actorRun,
-            EvaluationResponse response) {
-        val scenario = request.scenario();
-        val step = request.step();
-        val category = response.getMetadata() == null
-                ? "—"
-                : String.valueOf(response.getMetadata().get("category"));
+            EvaluationResponse response,
+            Duration elapsed) {
+        val category = category(response);
+        val breadcrumb = breadcrumb(request, category,
+                "Score %.3f".formatted(response.getScore()),
+                "⧖ " + LogDurationFormatter.format(elapsed));
         debug("""
-                ### Judge result — %s
+                ### %s
 
-                - **Step:** `%d/%d`
-                - **Score:** `%.3f`
-                - **Feedback:** %s
-                """.formatted(category, step.index(), scenario.steps().size(),
-                response.getScore(), response.getFeedback()));
+                ### Feedback
+
+                %s
+                """.formatted(breadcrumb,
+                MarkdownStepLogSupport.blockquote(
+                        response.getFeedback(), breadcrumb.length())));
+    }
+
+    private String breadcrumb(StepRequest request, String... trailingSegments) {
+        return MarkdownStepLogSupport.breadcrumb(
+                request, models.actualModel(ModelRole.JUDGE), trailingSegments);
+    }
+
+    private static String category(EvaluationResponse response) {
+        val metadata = response.getMetadata();
+        return metadata == null || metadata.get("category") == null
+                ? "—"
+                : String.valueOf(metadata.get("category"));
     }
 
     private static void debug(String markdown) {

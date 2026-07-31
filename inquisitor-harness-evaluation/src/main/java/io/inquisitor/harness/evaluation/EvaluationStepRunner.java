@@ -16,6 +16,7 @@
 
 package io.inquisitor.harness.evaluation;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -71,17 +72,20 @@ public class EvaluationStepRunner implements StepRunner {
         val context = run.toolCalls().isEmpty()
                 ? List.<Document>of()
                 : List.of(new Document(renderTrace(run.toolCalls())));
+        val evaluationRequest = new EvaluationRequest(
+                request.userMessage(), context, renderVerdict(run.verdict()));
+        val startedNanos = System.nanoTime();
         EvaluationResponse evaluation;
         try {
-            evaluation = evaluator.evaluate(
-                    new EvaluationRequest(request.userMessage(), context, renderVerdict(run.verdict())));
+            evaluation = evaluator.evaluate(evaluationRequest);
         } catch (RuntimeException e) {
             // The judge is an observer: its infrastructure failures (timeouts, transport
             // errors) must never fail the actor's step. Record the gap and move on.
             callback.evaluationFailed(request, run, e);
             return run;
         }
-        callback.evaluationCompleted(request, run, evaluation);
+        val elapsed = Duration.ofNanos(System.nanoTime() - startedNanos);
+        callback.evaluationCompleted(request, run, evaluation, elapsed);
         return run;
     }
 

@@ -16,6 +16,7 @@
 
 package io.inquisitor.harness.evaluation;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -57,7 +58,8 @@ public class StepEvaluationRecorder implements EvaluationStepRunnerCallback {
     public void evaluationCompleted(
             StepRequest request,
             StepRun actorRun,
-            EvaluationResponse response) {
+            EvaluationResponse response,
+            Duration elapsed) {
         record(request, actorRun, response);
     }
 

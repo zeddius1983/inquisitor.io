@@ -82,7 +82,7 @@ class HarnessLoggerTest {
             assertThat(event.getFormattedMessage()).startsWith("\n\n").endsWith("\n");
         });
         assertThat(events.get(0).getFormattedMessage()).contains(
-                "###  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  Running ",
+                "###  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  RUN ",
                 "## Step 1 — Open account",
                 "Create Bob in USD.");
         assertThat(events.get(1).getFormattedMessage())
@@ -108,7 +108,39 @@ class HarnessLoggerTest {
 
         assertThat(events).singleElement().satisfies(event ->
                 assertThat(event.getFormattedMessage()).contains(
-                        " Import accounts  Import Bob  ▰▰▰▱▱ 2/4  Running "));
+                        " Import accounts  Import Bob  ▰▰▰▱▱ 2/4  RUN "));
+    }
+
+    @Test
+    void markdownActorReasoningWrapsToTheCompletionBreadcrumbWidth() {
+        val request = StepRequest.of("conversation", SCENARIO, SCENARIO.steps().getFirst());
+        val reasoning = "The request returned a 201 Created status. The response body contains "
+                + "three accounts: Alice USD, Bob EUR, and Carol GBP, where Carol's currency "
+                + "correctly defaulted to the value provided in the X-Default-Currency header.";
+        val run = new StepRun(
+                new StepVerdict(Outcome.PASS, reasoning, List.of()),
+                List.of(), Duration.ofSeconds(2));
+
+        val events = capture(MarkdownLlmLogger.class, Level.DEBUG,
+                () -> new MarkdownLlmLogger(new ModelRegistry()).stepCompleted(request, run));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            val lines = event.getFormattedMessage().lines().toList();
+            val breadcrumb = lines.stream()
+                    .filter(line -> line.startsWith("### "))
+                    .findFirst()
+                    .orElseThrow()
+                    .substring("### ".length());
+            val reasoningLines = lines.stream()
+                    .filter(line -> line.startsWith("> "))
+                    .toList();
+            assertThat(reasoningLines).hasSizeGreaterThan(1)
+                    .allSatisfy(line -> assertThat(line.length())
+                            .isLessThanOrEqualTo(breadcrumb.length()));
+            assertThat(String.join(" ", reasoningLines.stream()
+                    .map(line -> line.substring(2))
+                    .toList())).isEqualTo(reasoning);
+        });
     }
 
     @Test

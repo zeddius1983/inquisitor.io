@@ -38,7 +38,11 @@ a five-cell rounded `▰`/`▱` gauge followed by the current/total step counter
 Actor completion reuses the breadcrumb with the verdict as its status, followed
 by a dedicated `⧖` segment containing a human-scale duration in milliseconds,
 seconds, minutes, or hours. Reasoning remains in the body below the breadcrumb,
-rendered as a Markdown blockquote under a `### Reasoning` heading.
+rendered as a Markdown blockquote under a `### Reasoning` heading and wrapped to
+the completion breadcrumb width. Actor starts use the compact `RUN` status.
+Judge starts use the same breadcrumb with an `EVALUATION` status. Judge completion
+adds the actual judge model, evaluation category, labeled score, and judge-call
+duration; feedback is a wrapped blockquote under a `### Feedback` heading.
 
 ## Runner callback APIs
 
@@ -96,7 +100,8 @@ usable model per role. `MarkdownLlmLogger` receives `ModelRegistry` directly and
 puts the actual actor name first in its breadcrumb when available. Full model paths
 are reduced to their filename and a case-insensitive `.gguf` suffix is removed.
 The first step start usually omits it; the first completion and later breadcrumbs
-include it. No probe, model preamble, or pending/unresolved label is emitted.
+include it. `MarkdownEvaluationLogger` applies the same behavior to the actual
+judge model. No probe, model preamble, or pending/unresolved label is emitted.
 
 ## Starter wiring
 

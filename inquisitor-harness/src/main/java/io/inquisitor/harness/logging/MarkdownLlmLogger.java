@@ -28,11 +28,6 @@ import lombok.val;
 @RequiredArgsConstructor
 public class MarkdownLlmLogger implements LlmStepRunnerCallback {
 
-    private static final int GAUGE_WIDTH = 5;
-    private static final String GAUGE_FILLED = "▰";
-    private static final String GAUGE_EMPTY = "▱";
-    private static final String GGUF_EXTENSION = ".gguf";
-
     private final ModelRegistry models;
 
     @Override
@@ -42,7 +37,7 @@ public class MarkdownLlmLogger implements LlmStepRunnerCallback {
                 ### %s
 
                 ## %s%s
-                """.formatted(breadcrumb(request, "Running"), step.title(),
+                """.formatted(breadcrumb(request, "RUN"), step.title(),
                 body(step.instruction()))));
     }
 
@@ -59,84 +54,26 @@ public class MarkdownLlmLogger implements LlmStepRunnerCallback {
 
     @Override
     public void stepCompleted(StepRequest request, StepRun run) {
+        val breadcrumb = breadcrumb(request, run.verdict().outcome().name(),
+                "⧖ " + LogDurationFormatter.format(run.elapsed()));
         log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
                 ### %s
 
                 ### Reasoning
 
                 %s
-                """.formatted(breadcrumb(request, run.verdict().outcome().name(),
-                "⧖ " + LogDurationFormatter.format(run.elapsed())),
-                blockquote(run.verdict().reasoning()))));
+                """.formatted(breadcrumb,
+                MarkdownStepLogSupport.blockquote(
+                        run.verdict().reasoning(), breadcrumb.length()))));
     }
 
     private static String safeMessage(Throwable cause) {
         return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 
-    private static String blockquote(String value) {
-        return "> " + value.replace("\r\n", "\n")
-                .replace('\r', '\n')
-                .replace("\n", "\n> ");
-    }
-
-    private static String breadcrumbTitle(String title, int index) {
-        val prefix = "Step " + index;
-        if (!title.regionMatches(true, 0, prefix, 0, prefix.length())
-                || title.length() == prefix.length()) {
-            return title;
-        }
-        int cursor = prefix.length();
-        while (cursor < title.length() && Character.isWhitespace(title.charAt(cursor))) {
-            cursor++;
-        }
-        if (cursor == title.length() || !isHeadingSeparator(title.charAt(cursor))) {
-            return title;
-        }
-        cursor++;
-        while (cursor < title.length() && Character.isWhitespace(title.charAt(cursor))) {
-            cursor++;
-        }
-        return cursor == title.length() ? title : title.substring(cursor);
-    }
-
-    private static boolean isHeadingSeparator(char candidate) {
-        return candidate == '—' || candidate == '–' || candidate == '-' || candidate == ':';
-    }
-
     private String breadcrumb(StepRequest request, String... trailingSegments) {
-        val scenario = request.scenario();
-        val step = request.step();
-        val total = scenario.steps().size();
-        val tail = String.join("  ", trailingSegments);
-        val model = models.actualModel(ModelRole.ACTOR)
-                .map(MarkdownLlmLogger::displayModelName)
-                .map(name -> name + "  ")
-                .orElse("");
-        return " %s%s  %s  %s %d/%d  %s ".formatted(
-                model, scenario.name(), breadcrumbTitle(step.title(), step.index()),
-                progressGauge(step.index(), total), step.index(), total, tail);
-    }
-
-    private static String displayModelName(String reported) {
-        val separator = Math.max(reported.lastIndexOf('/'), reported.lastIndexOf('\\'));
-        val filename = separator >= 0 && separator + 1 < reported.length()
-                ? reported.substring(separator + 1)
-                : reported;
-        return filename.length() > GGUF_EXTENSION.length()
-                && filename.regionMatches(true, filename.length() - GGUF_EXTENSION.length(),
-                GGUF_EXTENSION, 0, GGUF_EXTENSION.length())
-                ? filename.substring(0, filename.length() - GGUF_EXTENSION.length())
-                : filename;
-    }
-
-    private static String progressGauge(int current, int total) {
-        if (total <= 0) {
-            return GAUGE_EMPTY.repeat(GAUGE_WIDTH);
-        }
-        val scaled = (long) current * GAUGE_WIDTH + total / 2L;
-        val filled = (int) Math.min(GAUGE_WIDTH, Math.max(0L, scaled / total));
-        return GAUGE_FILLED.repeat(filled) + GAUGE_EMPTY.repeat(GAUGE_WIDTH - filled);
+        return MarkdownStepLogSupport.breadcrumb(
+                request, models.actualModel(ModelRole.ACTOR), trailingSegments);
     }
 
     private static String body(String instruction) {
