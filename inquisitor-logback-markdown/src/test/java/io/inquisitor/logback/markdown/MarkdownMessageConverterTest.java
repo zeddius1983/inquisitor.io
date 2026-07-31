@@ -83,6 +83,19 @@ class MarkdownMessageConverterTest {
     }
 
     @Test
+    void programmaticMarkedModeDoesNotDependOnPatternOptions() {
+        MarkdownMessageConverter converter = new MarkdownMessageConverter(
+                new FlexmarkAnsiRenderer(false), true);
+        converter.start();
+        LoggingEvent marked = event("## rendered");
+        marked.addMarker(MarkdownMarkers.markdown());
+        String ordinary = "## ordinary";
+
+        assertEquals("rendered", converter.convert(marked));
+        assertEquals(ordinary, converter.convert(event(ordinary)));
+    }
+
+    @Test
     void preservesBlankMessagesAndNormalizesNullToEmpty() {
         MarkdownMessageConverter converter = converter(new FlexmarkAnsiRenderer(false));
         LoggingEvent nullMessage = new LoggingEvent();
@@ -96,6 +109,15 @@ class MarkdownMessageConverterTest {
     void fallsBackToRawMessageWhenRenderingFails() {
         MarkdownMessageConverter converter = converter(markdown -> {
             throw new IllegalStateException("renderer failed");
+        });
+
+        assertEquals("**raw**", converter.convert(event("**raw**")));
+    }
+
+    @Test
+    void fallsBackToRawMessageWhenRenderingOverflowsTheStack() {
+        MarkdownMessageConverter converter = converter(markdown -> {
+            throw new StackOverflowError("renderer recursed too deeply");
         });
 
         assertEquals("**raw**", converter.convert(event("**raw**")));

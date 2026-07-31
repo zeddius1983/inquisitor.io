@@ -42,12 +42,14 @@ import com.vladsch.flexmark.ast.HtmlEntity;
 import com.vladsch.flexmark.ast.Image;
 import com.vladsch.flexmark.ast.IndentedCodeBlock;
 import com.vladsch.flexmark.ast.Link;
+import com.vladsch.flexmark.ast.LinkRef;
 import com.vladsch.flexmark.ast.ListBlock;
 import com.vladsch.flexmark.ast.ListItem;
 import com.vladsch.flexmark.ast.MailLink;
 import com.vladsch.flexmark.ast.OrderedList;
 import com.vladsch.flexmark.ast.OrderedListItem;
 import com.vladsch.flexmark.ast.Paragraph;
+import com.vladsch.flexmark.ast.Reference;
 import com.vladsch.flexmark.ast.SoftLineBreak;
 import com.vladsch.flexmark.ast.StrongEmphasis;
 import com.vladsch.flexmark.ast.Text;
@@ -100,6 +102,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         private final StringBuilder output = new StringBuilder();
         private final Deque<AnsiStyler.TextStyle> styles = new ArrayDeque<>();
         private final Deque<ListState> lists = new ArrayDeque<>();
+        private final Deque<Integer> listItemContentIndents = new ArrayDeque<>();
         private final AnsiStyler styler;
         private final NodeVisitor visitor;
 
@@ -122,6 +125,8 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
                     new VisitHandler<>(OrderedListItem.class, this::visit),
                     new VisitHandler<>(BlockQuote.class, this::visit),
                     new VisitHandler<>(Link.class, this::visit),
+                    new VisitHandler<>(LinkRef.class, this::visit),
+                    new VisitHandler<>(Reference.class, this::visit),
                     new VisitHandler<>(AutoLink.class, this::visit),
                     new VisitHandler<>(MailLink.class, this::visit),
                     new VisitHandler<>(Image.class, this::visit),
@@ -222,20 +227,30 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
 
         private void renderListItem(ListItem item) {
             ensureLineStart();
-            append("  ".repeat(Math.max(0, lists.size() - 1)));
-            styled(LIST_MARKER, () -> append(lists.element().nextMarker()));
+            int itemIndent = listItemContentIndents.isEmpty()
+                    ? 0
+                    : listItemContentIndents.element();
+            append(" ".repeat(itemIndent));
+            String marker = lists.element().nextMarker();
+            styled(LIST_MARKER, () -> append(marker));
+            listItemContentIndents.push(itemIndent + marker.length());
 
             Node child = item.getFirstChild();
             boolean firstBlock = true;
-            while (child != null) {
-                Node next = child.getNext();
-                if (!firstBlock && child instanceof Paragraph) {
-                    ensureNewline();
-                    append("  ".repeat(lists.size()));
+            try {
+                while (child != null) {
+                    Node next = child.getNext();
+                    if (!firstBlock && child instanceof Paragraph) {
+                        ensureNewline();
+                        appendListItemContentIndent();
+                    }
+                    visitor.visit(child);
+                    firstBlock = false;
+                    child = next;
                 }
-                visitor.visit(child);
-                firstBlock = false;
-                child = next;
+            }
+            finally {
+                listItemContentIndents.pop();
             }
             ensureNewline();
         }
@@ -249,13 +264,34 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         }
 
         private void visit(Link link) {
-            styled(LINK, () -> visitor.visitChildren(link));
             String url = link.getUrl().unescape().toString();
-            if (!url.isBlank() && !url.equals(link.getText().toString())) {
-                append(" (");
-                styled(LINK, () -> append(url));
-                append(")");
+            renderLink(link, url, link.getText().unescape().toString());
+        }
+
+        private void visit(LinkRef link) {
+            Reference reference = link.getReferenceNode(link.getDocument());
+            if (reference == null) {
+                append(link.getChars());
+                return;
             }
+            String label = (link.isReferenceTextCombined()
+                    ? link.getReference()
+                    : link.getText()).unescape().toString();
+            renderLink(link, reference.getUrl().unescape().toString(), label);
+        }
+
+        private void visit(Reference ignored) {
+            // Reference definitions are Markdown metadata, not visible content.
+        }
+
+        private void renderLink(Node link, String url, String label) {
+            styled(LINK, () -> visitor.visitChildren(link));
+            if (url.isBlank() || url.equals(label)) {
+                return;
+            }
+            append(" (");
+            styled(LINK, () -> append(url));
+            append(")");
         }
 
         private void visit(AutoLink link) {
@@ -289,10 +325,12 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
 
         private void visit(SoftLineBreak ignored) {
             ensureNewline();
+            appendListItemContentIndent();
         }
 
         private void visit(HardLineBreak ignored) {
             ensureNewline();
+            appendListItemContentIndent();
         }
 
         private void visit(Text text) {
@@ -318,7 +356,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
                     ensureNewline();
                 }
                 if (nested) {
-                    append("  ".repeat(lists.size()));
+                    appendListItemContentIndent();
                 }
                 String line = lines[index];
                 styled(CODE_BLOCK, () -> append(line));
@@ -399,6 +437,12 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
             if (!lineStart) {
                 output.append('\n');
                 lineStart = true;
+            }
+        }
+
+        private void appendListItemContentIndent() {
+            if (!listItemContentIndents.isEmpty()) {
+                append(" ".repeat(listItemContentIndents.element()));
             }
         }
 

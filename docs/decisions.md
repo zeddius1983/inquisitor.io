@@ -362,8 +362,18 @@ see [roadmap.md](roadmap.md); for stable repo context see
   Automatic mode requires an attached `System.console()`, honours `NO_COLOR`
   and `TERM=dumb`, and respects Jansi's process disable property. Manual
   `plain`/`ansi` converter options provide deterministic overrides. Spring
-  Boot's ANSI policy is separate and will be bridged by the optional starter,
-  rather than coupled into this Spring-free module.
+  Boot's ANSI policy is separate and is bridged by the optional starter, rather
+  than coupled into this Spring-free module.
+- **Automatic installation mutates only compatible console layout instances.**
+  The starter waits until all singletons exist, discovers identity-deduplicated
+  console appenders through logger attachments and `AppenderAttachable`
+  composites, and updates each `PatternLayout#getInstanceConverterMap()` under
+  the `LoggerContext` configuration lock. It supplies a marker-only converter
+  for `m`, `msg`, and `message`; normal messages remain raw and file/JSON/custom
+  layouts are untouched. Dynamically created `SiftingAppender` children require
+  manual `%mdMsg{marked}` configuration because they do not exist during starter
+  installation and are not exposed as attached appenders. Global converter maps
+  and consumer logging configuration files remain owned by the application.
 - **No Lombok in the small renderer module.** Its state is deliberately explicit
   and per-render-call, and the handful of constructors/accessors do not justify
   adding an annotation processor to this dependency-light published artifact.

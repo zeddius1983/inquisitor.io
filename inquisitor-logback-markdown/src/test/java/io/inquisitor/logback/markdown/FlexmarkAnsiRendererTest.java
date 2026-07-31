@@ -148,6 +148,51 @@ class FlexmarkAnsiRendererTest {
     }
 
     @Test
+    void preservesUnresolvedReferenceSyntaxInLogContent() {
+        assertEquals("response {\"ids\":[\"a\",\"b\"]}",
+                plainRenderer.render("response {\"ids\":[\"a\",\"b\"]}"));
+        assertEquals("array [1,2,3] end", plainRenderer.render("array [1,2,3] end"));
+        assertEquals("log [main] INFO started",
+                plainRenderer.render("log [main] INFO started"));
+        assertEquals("see [ERROR] here", plainRenderer.render("see [ERROR] here"));
+        assertEquals("• [ ] todo", plainRenderer.render("- [ ] todo"));
+    }
+
+    @Test
+    void rendersReferenceLinksAndHidesTheirDefinitions() {
+        String rendered = plainRenderer.render("[text][ref]\n\n[ref]: https://e.test");
+
+        assertEquals("text (https://e.test)", rendered);
+    }
+
+    @Test
+    void alignsListContinuationsWithContentAfterTheActualMarkerWidth() {
+        String singleDigit = plainRenderer.render("""
+                1. one
+                2. two
+                   more text
+                3. three
+                """);
+        String doubleDigit = plainRenderer.render("""
+                10. ten
+                    continuation
+                    - nested
+                      nested continuation
+                """);
+
+        assertEquals("""
+                1. one
+                2. two
+                   more text
+                3. three""", singleDigit);
+        assertEquals("""
+                10. ten
+                    continuation
+                    • nested
+                      nested continuation""", doubleDigit);
+    }
+
+    @Test
     void prefixesBlankLinesInsideBlockQuotes() {
         String rendered = plainRenderer.render("""
                 > first paragraph

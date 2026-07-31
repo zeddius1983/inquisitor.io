@@ -16,6 +16,12 @@ dependencies {
 
 ## Shared console appender
 
+Spring Boot users who prefer zero XML configuration can instead depend on
+`inquisitor-logback-markdown-starter`. It installs marker-aware rendering into
+compatible pattern console appenders while leaving file, structured, and
+unsupported appenders unchanged. See the
+[starter README](../inquisitor-logback-markdown-starter/README.md).
+
 Include the bundled conversion rule and use `%mdMsg{marked}` in the console
 pattern. Only events carrying the `INQUISITOR_MARKDOWN` marker are rendered;
 all other messages remain byte-for-byte unchanged.

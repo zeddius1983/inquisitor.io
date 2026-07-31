@@ -34,12 +34,14 @@ public final class MarkdownMessageConverter extends MessageConverter {
     private static final String ANSI_OPTION = "ansi";
 
     private final @Nullable MarkdownRenderer configuredRenderer;
+    private final boolean configuredMarkedOnly;
     private volatile MarkdownRenderer renderer;
     private volatile boolean markedOnly;
 
     /** Creates a converter backed by the default Flexmark/Jansi renderer. */
     public MarkdownMessageConverter() {
         this.configuredRenderer = null;
+        this.configuredMarkedOnly = false;
         this.renderer = new FlexmarkAnsiRenderer();
     }
 
@@ -52,8 +54,23 @@ public final class MarkdownMessageConverter extends MessageConverter {
      * @param renderer custom Markdown renderer
      */
     public MarkdownMessageConverter(MarkdownRenderer renderer) {
+        this(renderer, false);
+    }
+
+    /**
+     * Creates a converter backed by a custom renderer with an explicit marker
+     * policy. This constructor is intended for programmatic layout integration;
+     * XML patterns should use {@code %mdMsg} or {@code %mdMsg{marked}}.
+     *
+     * @param renderer custom Markdown renderer
+     * @param markedOnly whether only {@link MarkdownMarkers#MARKER_NAME} events
+     *                   should be rendered
+     */
+    public MarkdownMessageConverter(MarkdownRenderer renderer, boolean markedOnly) {
         this.configuredRenderer = renderer;
+        this.configuredMarkedOnly = markedOnly;
         this.renderer = renderer;
+        this.markedOnly = markedOnly;
     }
 
     @Override
@@ -62,7 +79,7 @@ public final class MarkdownMessageConverter extends MessageConverter {
         if (options == null) {
             options = List.of();
         }
-        markedOnly = hasOption(options, MARKED_OPTION);
+        markedOnly = configuredMarkedOnly || hasOption(options, MARKED_OPTION);
         configureDefaultRenderer(options);
         super.start();
     }
@@ -82,7 +99,7 @@ public final class MarkdownMessageConverter extends MessageConverter {
         try {
             return renderer.render(rawMessage);
         }
-        catch (RuntimeException exception) {
+        catch (RuntimeException | StackOverflowError exception) {
             addWarn("Could not render Markdown log message; emitting the original message", exception);
             return rawMessage;
         }

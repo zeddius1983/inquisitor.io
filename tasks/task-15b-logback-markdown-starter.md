@@ -1,7 +1,9 @@
 # Task 15B — Automatic Logback Markdown starter
 
-> Status: **📝 planned.** Depends on task 15A's renderer/converter prototype
-> being complete and stable.
+> Status: **✅ done.** Implemented as the optional
+> `inquisitor-logback-markdown-starter` module with marker-only instance-local
+> converter installation, Spring Boot ANSI-policy bridging, compatibility
+> fallbacks, and focused autoconfiguration/Logback tests.
 
 Build `inquisitor-logback-markdown-starter`, an optional Spring Boot starter that
 installs task 15A's marker-aware Markdown conversion into compatible console
@@ -34,8 +36,8 @@ Instead, after Logback has initialized and before application/harness work runs,
 install the converter into the already-created compatible console layouts:
 
 1. obtain the active `LoggerContext`;
-2. discover console appenders reachable from root and named loggers, de-duplicated
-   by identity;
+2. discover console appenders reachable from root and named loggers, recursively
+   traverse `AppenderAttachable` composites, and de-duplicate by identity;
 3. select appenders backed by a Logback `PatternLayout`;
 4. add marker-aware converter suppliers to that layout instance for the standard
    message words (`m`, `msg`, and `message`);
@@ -55,13 +57,16 @@ The starter must bridge Spring Boot's ANSI policy explicitly. Manual
 `%mdMsg` uses task 15A's terminal detection and `plain`/`ansi` options, while
 Boot's `spring.output.ansi.enabled` controls a separate `AnsiOutput` state.
 When installing converter suppliers programmatically, construct the renderer
-from Boot's resolved policy (always/never/detect) rather than relying on Jansi's
-thread-local state. In detect mode, delegate to task 15A's conservative terminal
-detection.
+from Boot's resolved `AnsiOutput` policy (always/never/detect) rather than
+relying on Jansi's thread-local state. In detect mode, delegate to task 15A's
+conservative terminal detection.
 
 ## Compatibility and fallback
 
 - Plain `ConsoleAppender` + `PatternLayout` is the MVP supported surface.
+- Compatible consoles behind `AppenderAttachable` composites such as
+  `AsyncAppender` are supported; dynamically created `SiftingAppender` children
+  require manual converter configuration.
 - Skip structured JSON encoders: Markdown/ANSI has no place inside JSON output.
 - Skip unsupported custom encoders/layouts without replacing the user's
   appender.
@@ -93,8 +98,8 @@ than one stable presentation is useful.
 
 ## Tests
 
-- Application-context test with Spring Boot's default Logback console appender:
-  marked Markdown is rendered without user XML.
+- Application-context test with Logback's real `PatternLayoutEncoder` console
+  path: marked Markdown is rendered without user XML.
 - An existing custom console pattern keeps its timestamp/level/logger structure;
   only the message converter changes.
 - Unmarked messages are identical before and after installation.
@@ -105,13 +110,18 @@ than one stable presentation is useful.
 - `enabled=false` performs no mutation.
 - No Logback classes / an alternative backend: autoconfiguration backs off.
 - Repeated installation is idempotent and a shared appender is processed once.
-- End-to-end sample using the demo verifies ANSI output under Gradle's forced
-  `spring.output.ansi.enabled=always` setting.
 - `spring.output.ansi.enabled=never` produces no escape bytes, while `always`
   forces styles even when the test JVM has no console.
+- A simulated layout-recompile failure restores the original converter map and
+  does not escape the installer.
 
 Tests that mutate a real `LoggerContext` must restore it and any global ANSI
 state so parallel tests and later suites are not contaminated.
+
+The implementation injects a small internal logging-system provider into the
+startup callback. Production resolves `LoggerFactory.getILoggerFactory()`;
+tests supply an isolated `LoggerContext`, proving the lifecycle without
+mutating the JVM's real logging configuration.
 
 ## Documentation
 

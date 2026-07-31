@@ -78,6 +78,7 @@ plain CI build (see [Building](#building)).
 | Module | Role |
 |--------|------|
 | `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` Logback converter for ANSI-styled console Markdown. |
+| `inquisitor-logback-markdown-starter` | Automatic marker-aware Markdown rendering for compatible Spring Boot Logback consoles. |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness. |
 | `inquisitor-harness-junit` | JUnit 5 layer: `@Harness` on the class + one `@Scenario` method per scenario, each step a sub-test. |
