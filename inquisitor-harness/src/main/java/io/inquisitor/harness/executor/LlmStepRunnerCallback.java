@@ -16,6 +16,10 @@
 
 package io.inquisitor.harness.executor;
 
+import java.util.Objects;
+
+import lombok.val;
+
 /** Receives lifecycle events from an {@link LlmStepRunner}. */
 public interface LlmStepRunnerCallback {
 
@@ -27,4 +31,32 @@ public interface LlmStepRunnerCallback {
 
     /** Invoked after the actor step completes. */
     void stepCompleted(StepRequest request, StepRun run);
+
+    /**
+     * Returns a callback that invokes this callback followed by {@code after} for each
+     * lifecycle event. If this callback throws, {@code after} is not invoked.
+     */
+    default LlmStepRunnerCallback andThen(LlmStepRunnerCallback after) {
+        Objects.requireNonNull(after, "after");
+        val before = this;
+        return new LlmStepRunnerCallback() {
+            @Override
+            public void stepStarted(StepRequest request) {
+                before.stepStarted(request);
+                after.stepStarted(request);
+            }
+
+            @Override
+            public void responseUnparseable(StepRequest request, Throwable cause) {
+                before.responseUnparseable(request, cause);
+                after.responseUnparseable(request, cause);
+            }
+
+            @Override
+            public void stepCompleted(StepRequest request, StepRun run) {
+                before.stepCompleted(request, run);
+                after.stepCompleted(request, run);
+            }
+        };
+    }
 }

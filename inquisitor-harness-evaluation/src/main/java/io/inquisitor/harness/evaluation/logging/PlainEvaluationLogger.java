@@ -18,14 +18,13 @@ package io.inquisitor.harness.evaluation.logging;
 
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
-import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.ai.evaluation.EvaluationResponse;
 
 /** Conventional single-line judge-evaluation diagnostics. */
 @Slf4j
-public class PlainEvaluationLogger implements EvaluationStepRunnerCallback {
+public class PlainEvaluationLogger implements EvaluationLoggerCallback {
 
     @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {

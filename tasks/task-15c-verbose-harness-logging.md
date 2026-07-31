@@ -44,7 +44,8 @@ rendered as a Markdown blockquote under a `### Reasoning` heading.
 
 Core harness:
 
-- `LlmStepRunnerCallback`: `stepStarted`, `responseUnparseable`, `stepCompleted`;
+- `LlmStepRunnerCallback`: `stepStarted`, `responseUnparseable`, `stepCompleted`,
+  plus ordered `andThen` composition;
 - `ScenarioExecutionCallback`: `scenarioStarted`, `scenarioAborted`,
   `scenarioCompleted`;
 - `PlainLlmLogger` / `MarkdownLlmLogger`;
@@ -53,7 +54,10 @@ Core harness:
 Evaluation module:
 
 - `EvaluationStepRunnerCallback`: `evaluationStarted`, `evaluationSkipped`,
-  `evaluationFailed`, `evaluationCompleted`;
+  `evaluationFailed`, `evaluationCompleted`, plus ordered `andThen` composition;
+- `StepEvaluationRecorder` implements the generic callback and records terminal
+  evaluation events;
+- `EvaluationLoggerCallback` narrows the starter's replaceable logging seam;
 - `PlainEvaluationLogger` / `MarkdownEvaluationLogger`.
 
 The runners emit domain events only. Their generic callback collaborators can be
@@ -61,9 +65,8 @@ used for logging, metrics, tracing, or other observation; the shipped logger
 implementations own all text, Markdown, marker, and level decisions.
 `LlmStepRunnerCallback.stepStarted` combines the actor status breadcrumb with the
 complete step heading and instruction, avoiding a duplicate scenario event.
-Existing convenience constructors remain source-compatible; standalone
-`ScenarioExecutor(StepRunner)` stays silent while the starter supplies the selected
-callback implementation.
+Standalone `ScenarioExecutor(StepRunner)` stays silent while the starter supplies
+the selected callback implementation.
 
 ## Scenario lifecycle
 
@@ -114,9 +117,10 @@ include it. No probe, model preamble, or pending/unresolved label is emitted.
 injects the collaborators into `LlmStepRunner` and `ScenarioExecutor`.
 
 When evaluation is enabled, `inquisitor-harness-evaluation-starter` provides the
-matching `EvaluationStepRunnerCallback`, registers judge configuration, and
-attaches a judge metadata advisor to the bare judge client. Consumers can replace
-any callback with their own bean.
+matching `EvaluationLoggerCallback`, composes the `StepEvaluationRecorder` before
+it, registers judge configuration, and attaches a judge metadata advisor to the
+bare judge client. Consumers can replace the logging callback or recorder with
+their own bean.
 
 ## Rendering choices
 

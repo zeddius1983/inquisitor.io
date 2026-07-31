@@ -69,7 +69,10 @@ see [roadmap.md](roadmap.md); for stable repo context see
   `inquisitor.harness.logging.format=plain|markdown` selects implementations of
   `LlmStepRunnerCallback`, `EvaluationStepRunnerCallback`, and
   `ScenarioExecutionCallback`; the shipped loggers implement these generic
-  lifecycle seams while runners remain presentation-agnostic. Scenario lifecycle
+  lifecycle seams while runners remain presentation-agnostic. Step-runner callbacks
+  compose sequentially through `andThen`; `StepEvaluationRecorder` implements the
+  evaluation seam and is chained before the narrower `EvaluationLoggerCallback`.
+  Scenario lifecycle
   narration is centralized in `ScenarioExecution`; actor step narration is emitted
   once by `LlmStepRunnerCallback.stepStarted`, together with its running status. This preserves
   whole-run and JUnit step-at-a-time behavior without duplicate step messages.

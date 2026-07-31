@@ -137,8 +137,11 @@ Harness run narration uses `inquisitor.harness.logging.format=plain|markdown`
 (`plain` by default). Generic `LlmStepRunnerCallback`,
 `EvaluationStepRunnerCallback`, and `ScenarioExecutionCallback` seams keep
 formatting out of the runners; the shipped plain/Markdown loggers implement those
-callbacks. Markdown mode emits marker-tagged blocks, and rendering remains optional
-through either Logback Markdown module. A response advisor observes real actor/judge
+callbacks. Step-runner callbacks compose in order through `andThen`; the evaluation
+starter chains its `StepEvaluationRecorder` callback before the selected
+`EvaluationLoggerCallback`, leaving `EvaluationStepRunner` with one collaborator.
+Markdown mode emits marker-tagged blocks, and rendering remains optional through
+either Logback Markdown module. A response advisor observes real actor/judge
 calls and caches the first server-reported model per role. Markdown actor-step
 breadcrumbs put the cached actor name first, reducing model paths to a filename
 without `.gguf` and omitting that segment until it is resolved; the harness renders

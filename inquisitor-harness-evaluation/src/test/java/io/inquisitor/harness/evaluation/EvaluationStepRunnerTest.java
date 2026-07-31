@@ -17,6 +17,7 @@
 package io.inquisitor.harness.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -61,7 +62,7 @@ class EvaluationStepRunnerTest {
         };
         val recorder = new StepEvaluationRecorder();
         val logger = new RecordingEvaluationLogger();
-        val runner = new EvaluationStepRunner(delegate, evaluator, recorder, logger);
+        val runner = new EvaluationStepRunner(delegate, evaluator, recorder.andThen(logger));
 
         val run = runner.run(StepRequest.of("conv-1", SCENARIO, SCENARIO.steps().get(0)));
 
@@ -97,7 +98,7 @@ class EvaluationStepRunnerTest {
         };
         val recorder = new StepEvaluationRecorder();
         val logger = new RecordingEvaluationLogger();
-        val runner = new EvaluationStepRunner(delegate, evaluator, recorder, logger);
+        val runner = new EvaluationStepRunner(delegate, evaluator, recorder.andThen(logger));
 
         val run = runner.run(StepRequest.of("conv-4", SCENARIO, SCENARIO.steps().get(0)));
 
@@ -122,7 +123,7 @@ class EvaluationStepRunnerTest {
         };
         val recorder = new StepEvaluationRecorder();
         val logger = new RecordingEvaluationLogger();
-        val runner = new EvaluationStepRunner(delegate, evaluator, recorder, logger);
+        val runner = new EvaluationStepRunner(delegate, evaluator, recorder.andThen(logger));
 
         val run = runner.run(StepRequest.of("conv-3", SCENARIO, SCENARIO.steps().get(0)));
 
@@ -132,7 +133,8 @@ class EvaluationStepRunnerTest {
             assertThat(record.evaluated()).isFalse();
         });
         assertThat(recorder.overallScore()).isEmpty();
-        assertThat(logger.events).containsExactly("skipped:harness-synthesized verdict");
+        assertThat(logger.events).containsExactly(
+                "skipped:Harness-synthesized verdict (no actor claim to audit); not evaluated.");
     }
 
     @Test
@@ -149,6 +151,41 @@ class EvaluationStepRunnerTest {
         runner.run(StepRequest.of("conv-2", SCENARIO, SCENARIO.steps().get(0)));
 
         assertThat(captured.get().getDataList()).isEmpty();
+    }
+
+    @Test
+    void callbackCompositionInvokesCallbacksInOrderAndStopsOnFailure() {
+        val events = new ArrayList<String>();
+        val first = new OrderedEvaluationCallback("first", events, false);
+        val second = new OrderedEvaluationCallback("second", events, false);
+        val third = new OrderedEvaluationCallback("third", events, false);
+        val callback = first.andThen(second).andThen(third);
+        val request = StepRequest.of("conv", SCENARIO, SCENARIO.steps().getFirst());
+        val run = new StepRun(
+                new StepVerdict(Outcome.PASS, "done", List.of()), List.of(), Duration.ZERO);
+        val cause = new IllegalStateException("judge failed");
+        val response = new EvaluationResponse(
+                true, 1.0f, "grounded", Map.of("category", "GROUNDED"));
+
+        callback.evaluationStarted(request, run);
+        callback.evaluationSkipped(request, run, "not evaluated");
+        callback.evaluationFailed(request, run, cause);
+        callback.evaluationCompleted(request, run, response);
+
+        assertThat(events).containsExactly(
+                "first:started", "second:started", "third:started",
+                "first:skipped", "second:skipped", "third:skipped",
+                "first:failed", "second:failed", "third:failed",
+                "first:completed", "second:completed", "third:completed");
+
+        events.clear();
+        val failing = new OrderedEvaluationCallback("failing", events, true)
+                .andThen(new OrderedEvaluationCallback("after", events, false));
+
+        assertThatThrownBy(() -> failing.evaluationStarted(request, run))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("callback failed");
+        assertThat(events).containsExactly("failing:started");
     }
 
     private static final class RecordingEvaluationLogger implements EvaluationStepRunnerCallback {
@@ -176,6 +213,38 @@ class EvaluationStepRunnerTest {
                 StepRun actorRun,
                 EvaluationResponse response) {
             events.add("completed:" + response.getMetadata().get("category"));
+        }
+    }
+
+    private record OrderedEvaluationCallback(
+            String name,
+            List<String> events,
+            boolean failOnStart) implements EvaluationStepRunnerCallback {
+
+        @Override
+        public void evaluationStarted(StepRequest request, StepRun actorRun) {
+            events.add(name + ":started");
+            if (failOnStart) {
+                throw new IllegalStateException("callback failed");
+            }
+        }
+
+        @Override
+        public void evaluationSkipped(StepRequest request, StepRun actorRun, String reason) {
+            events.add(name + ":skipped");
+        }
+
+        @Override
+        public void evaluationFailed(StepRequest request, StepRun actorRun, Throwable cause) {
+            events.add(name + ":failed");
+        }
+
+        @Override
+        public void evaluationCompleted(
+                StepRequest request,
+                StepRun actorRun,
+                EvaluationResponse response) {
+            events.add(name + ":completed");
         }
     }
 }

@@ -18,7 +18,6 @@ package io.inquisitor.harness.evaluation.logging;
 
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
-import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
 import io.inquisitor.harness.logging.MarkdownLogSupport;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -26,7 +25,7 @@ import org.springframework.ai.evaluation.EvaluationResponse;
 
 /** Marker-tagged Markdown judge-evaluation diagnostics. */
 @Slf4j
-public class MarkdownEvaluationLogger implements EvaluationStepRunnerCallback {
+public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
 
     @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {

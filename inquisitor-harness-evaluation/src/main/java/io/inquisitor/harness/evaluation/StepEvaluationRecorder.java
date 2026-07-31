@@ -32,9 +32,34 @@ import org.springframework.ai.evaluation.EvaluationResponse;
  * Collects one {@link StepEvaluationRecord} per evaluated step, in execution order, and
  * aggregates the suite-level evaluation score. Thread-safe.
  */
-public class StepEvaluationRecorder {
+public class StepEvaluationRecorder implements EvaluationStepRunnerCallback {
 
     private final List<StepEvaluationRecord> records = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void evaluationStarted(StepRequest request, StepRun actorRun) {
+        // Nothing to record until evaluation finishes or is abandoned.
+    }
+
+    @Override
+    public void evaluationSkipped(StepRequest request, StepRun actorRun, String reason) {
+        recordNotEvaluated(request, actorRun, reason);
+    }
+
+    @Override
+    public void evaluationFailed(StepRequest request, StepRun actorRun, Throwable cause) {
+        recordNotEvaluated(request, actorRun,
+                "The judge call failed (" + cause.getClass().getSimpleName() + ": "
+                        + cause.getMessage() + "); not evaluated.");
+    }
+
+    @Override
+    public void evaluationCompleted(
+            StepRequest request,
+            StepRun actorRun,
+            EvaluationResponse response) {
+        record(request, actorRun, response);
+    }
 
     /** Records the evaluator's result for one step. */
     public void record(StepRequest request, StepRun run, EvaluationResponse response) {

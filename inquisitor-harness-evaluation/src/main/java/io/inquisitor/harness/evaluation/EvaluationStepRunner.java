@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
 import io.inquisitor.harness.executor.StepRunner;
-import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
 import io.inquisitor.harness.model.StepVerdict;
 import io.inquisitor.harness.model.ToolCallRecord;
 import lombok.val;
@@ -41,23 +40,19 @@ import org.springframework.ai.evaluation.Evaluator;
  */
 public class EvaluationStepRunner implements StepRunner {
 
+    private static final String SYNTHETIC_VERDICT_REASON =
+            "Harness-synthesized verdict (no actor claim to audit); not evaluated.";
+
     private final StepRunner delegate;
     private final Evaluator evaluator;
-    private final StepEvaluationRecorder recorder;
     private final EvaluationStepRunnerCallback callback;
-
-    public EvaluationStepRunner(StepRunner delegate, Evaluator evaluator, StepEvaluationRecorder recorder) {
-        this(delegate, evaluator, recorder, new PlainEvaluationLogger());
-    }
 
     public EvaluationStepRunner(
             StepRunner delegate,
             Evaluator evaluator,
-            StepEvaluationRecorder recorder,
             EvaluationStepRunnerCallback callback) {
         this.delegate = delegate;
         this.evaluator = evaluator;
-        this.recorder = recorder;
         this.callback = callback;
     }
 
@@ -68,9 +63,7 @@ public class EvaluationStepRunner implements StepRunner {
         if (run.synthetic()) {
             // The harness fabricated this verdict (empty/unparseable model response) —
             // there is no actor claim to audit, so judging it would only produce noise.
-            callback.evaluationSkipped(request, run, "harness-synthesized verdict");
-            recorder.recordNotEvaluated(request, run,
-                    "Harness-synthesized verdict (no actor claim to audit); not evaluated.");
+            callback.evaluationSkipped(request, run, SYNTHETIC_VERDICT_REASON);
             return run;
         }
         callback.evaluationStarted(request, run);
@@ -86,13 +79,8 @@ public class EvaluationStepRunner implements StepRunner {
             // The judge is an observer: its infrastructure failures (timeouts, transport
             // errors) must never fail the actor's step. Record the gap and move on.
             callback.evaluationFailed(request, run, e);
-            recorder.recordNotEvaluated(request, run,
-                    "The judge call failed (" + e.getClass().getSimpleName() + ": " + e.getMessage()
-                            + "); not evaluated.");
             return run;
         }
-        recorder.record(request, run, evaluation);
-
         callback.evaluationCompleted(request, run, evaluation);
         return run;
     }

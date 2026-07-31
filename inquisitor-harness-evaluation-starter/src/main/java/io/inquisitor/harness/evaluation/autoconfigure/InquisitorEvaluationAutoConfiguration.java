@@ -24,10 +24,10 @@ import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.evaluation.EvaluationProperties;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
-import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
 import io.inquisitor.harness.evaluation.RecordingToolCallback;
 import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
 import io.inquisitor.harness.evaluation.StepEvaluator;
+import io.inquisitor.harness.evaluation.logging.EvaluationLoggerCallback;
 import io.inquisitor.harness.evaluation.logging.MarkdownEvaluationLogger;
 import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
 import io.inquisitor.harness.evaluation.report.EvaluationReportSession;
@@ -110,7 +110,7 @@ public class InquisitorEvaluationAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    EvaluationStepRunnerCallback inquisitorEvaluationStepRunnerCallback(
+    EvaluationLoggerCallback inquisitorEvaluationLoggerCallback(
             InquisitorHarnessProperties properties) {
         return switch (properties.logging().format()) {
             case PLAIN -> new PlainEvaluationLogger();
@@ -196,8 +196,9 @@ public class InquisitorEvaluationAutoConfiguration {
             LlmStepRunner llmStepRunner,
             Evaluator evaluator,
             StepEvaluationRecorder recorder,
-            EvaluationStepRunnerCallback callback) {
-        return new EvaluationStepRunner(llmStepRunner, evaluator, recorder, callback);
+            EvaluationLoggerCallback loggerCallback) {
+        val callback = recorder.andThen(loggerCallback);
+        return new EvaluationStepRunner(llmStepRunner, evaluator, callback);
     }
 
     private static Optional<String> optionalText(@Nullable String value) {

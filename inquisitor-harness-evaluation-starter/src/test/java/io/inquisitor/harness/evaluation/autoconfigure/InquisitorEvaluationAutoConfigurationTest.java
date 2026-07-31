@@ -23,6 +23,7 @@ import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
 import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
 import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
+import io.inquisitor.harness.evaluation.logging.EvaluationLoggerCallback;
 import io.inquisitor.harness.evaluation.logging.MarkdownEvaluationLogger;
 import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
 import io.inquisitor.harness.executor.LlmStepRunner;
@@ -30,6 +31,7 @@ import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
+import lombok.val;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.evaluation.Evaluator;
@@ -63,8 +65,11 @@ class InquisitorEvaluationAutoConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasSingleBean(StepEvaluationRecorder.class);
                     assertThat(context).hasSingleBean(Evaluator.class);
-                    assertThat(context.getBean(EvaluationStepRunnerCallback.class))
+                    assertThat(context).hasSingleBean(EvaluationLoggerCallback.class);
+                    assertThat(context.getBean(EvaluationLoggerCallback.class))
                             .isInstanceOf(PlainEvaluationLogger.class);
+                    assertThat(context.getBeansOfType(EvaluationStepRunnerCallback.class))
+                            .hasSize(2);
                     // The @Primary wrapper is what the executor resolves.
                     assertThat(context.getBean(StepRunner.class)).isInstanceOf(EvaluationStepRunner.class);
                     assertThat(context).hasSingleBean(ScenarioExecutor.class);
@@ -82,8 +87,22 @@ class InquisitorEvaluationAutoConfigurationTest {
                         "inquisitor.harness.evaluation.model=judge-model",
                         "inquisitor.harness.evaluation.base-url=http://localhost:9999",
                         "inquisitor.harness.evaluation.api-key=test-key")
-                .run(context -> assertThat(context.getBean(EvaluationStepRunnerCallback.class))
+                .run(context -> assertThat(context.getBean(EvaluationLoggerCallback.class))
                         .isInstanceOf(MarkdownEvaluationLogger.class));
+    }
+
+    @Test
+    void backsOffForACustomEvaluationLoggerCallback() {
+        val callback = mock(EvaluationLoggerCallback.class);
+
+        runner.withBean(EvaluationLoggerCallback.class, () -> callback)
+                .withPropertyValues(
+                        "inquisitor.harness.evaluation.enabled=true",
+                        "inquisitor.harness.evaluation.model=judge-model",
+                        "inquisitor.harness.evaluation.base-url=http://localhost:9999",
+                        "inquisitor.harness.evaluation.api-key=test-key")
+                .run(context -> assertThat(context.getBean(EvaluationLoggerCallback.class))
+                        .isSameAs(callback));
     }
 
     @Test

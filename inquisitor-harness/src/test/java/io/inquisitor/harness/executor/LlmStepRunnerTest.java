@@ -17,7 +17,9 @@
 package io.inquisitor.harness.executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -25,6 +27,7 @@ import java.util.List;
 import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.Step;
+import io.inquisitor.harness.model.StepVerdict;
 import lombok.val;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -69,6 +72,37 @@ class LlmStepRunnerTest {
                 .containsExactly("started:Step", "unparseable:Step", "completed:FAIL");
     }
 
+    @Test
+    void callbackCompositionInvokesCallbacksInOrderAndStopsOnFailure() {
+        val events = new java.util.ArrayList<String>();
+        val first = new OrderedLlmCallback("first", events, false);
+        val second = new OrderedLlmCallback("second", events, false);
+        val third = new OrderedLlmCallback("third", events, false);
+        val callback = first.andThen(second).andThen(third);
+        val request = request();
+        val run = new StepRun(
+                new StepVerdict(Outcome.PASS, "done", List.of()), List.of(), Duration.ZERO);
+        val cause = new IllegalArgumentException("bad response");
+
+        callback.stepStarted(request);
+        callback.responseUnparseable(request, cause);
+        callback.stepCompleted(request, run);
+
+        assertThat(events).containsExactly(
+                "first:started", "second:started", "third:started",
+                "first:unparseable", "second:unparseable", "third:unparseable",
+                "first:completed", "second:completed", "third:completed");
+
+        events.clear();
+        val failing = new OrderedLlmCallback("failing", events, true)
+                .andThen(new OrderedLlmCallback("after", events, false));
+
+        assertThatThrownBy(() -> failing.stepStarted(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("callback failed");
+        assertThat(events).containsExactly("failing:started");
+    }
+
     private static LlmStepRunner runner(ChatModel model, LlmStepRunnerCallback callback) {
         return new LlmStepRunner(ChatClient.builder(model).build(), callback);
     }
@@ -102,6 +136,30 @@ class LlmStepRunnerTest {
         public void stepCompleted(StepRequest request, StepRun run) {
             completedRun = run;
             events.add("completed:" + run.verdict().outcome());
+        }
+    }
+
+    private record OrderedLlmCallback(
+            String name,
+            List<String> events,
+            boolean failOnStart) implements LlmStepRunnerCallback {
+
+        @Override
+        public void stepStarted(StepRequest request) {
+            events.add(name + ":started");
+            if (failOnStart) {
+                throw new IllegalStateException("callback failed");
+            }
+        }
+
+        @Override
+        public void responseUnparseable(StepRequest request, Throwable cause) {
+            events.add(name + ":unparseable");
+        }
+
+        @Override
+        public void stepCompleted(StepRequest request, StepRun run) {
+            events.add(name + ":completed");
         }
     }
 
