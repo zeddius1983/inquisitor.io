@@ -24,7 +24,15 @@ log.info(markdown(), "## Step 1\n\n**Intent:** create an account");
 ```
 
 Only marked events are parsed. Ordinary Spring, SQL, and application messages
-remain unchanged.
+remain unchanged. Each non-empty rendered Markdown line receives four spaces of
+left padding, making multiline blocks visually distinct from their Logback prefix
+and surrounding conventional messages. List markers receive one additional space.
+ANSI code blocks use the base renderer's equal-width background panels and
+language-aware highlighting; plain output remains unframed and readable.
+
+The harness emits the same marker for scenario, step, actor, and judge events when
+`inquisitor.harness.logging.format=markdown`; adding this starter renders them
+without any logging XML changes.
 
 ## Configuration
 

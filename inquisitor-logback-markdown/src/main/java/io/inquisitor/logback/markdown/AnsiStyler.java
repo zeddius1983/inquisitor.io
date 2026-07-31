@@ -16,6 +16,7 @@
 
 package io.inquisitor.logback.markdown;
 
+import java.util.Locale;
 import java.util.function.Consumer;
 
 import org.jline.jansi.Ansi;
@@ -41,12 +42,94 @@ final class AnsiStyler {
         return enabled ? new Ansi().reset().toString() : "";
     }
 
+    String open(PowerlineStyle style) {
+        if (!enabled) {
+            return "";
+        }
+        Ansi ansi = new Ansi().bg(style.background);
+        if (style.brightForeground) {
+            ansi.fgBright(style.foreground);
+        }
+        else {
+            ansi.fg(style.foreground);
+        }
+        return ansi.bold().toString();
+    }
+
+    String powerlineCap(PowerlineStyle style, String glyph) {
+        return enabled
+                ? new Ansi().reset().fg(style.background).a(glyph).reset().toString()
+                : glyph;
+    }
+
+    String powerlineTransition(
+            PowerlineStyle current,
+            PowerlineStyle next,
+            String glyph) {
+        return enabled
+                ? new Ansi().fg(current.background).bg(next.background)
+                        .a(glyph).reset().toString()
+                : glyph;
+    }
+
+    boolean isEnabled() {
+        return enabled;
+    }
+
+    enum PowerlineStyle {
+        SCENARIO(Ansi.Color.BLUE, Ansi.Color.WHITE, true),
+        STEP(Ansi.Color.CYAN, Ansi.Color.BLACK, false),
+        PROGRESS(Ansi.Color.MAGENTA, Ansi.Color.WHITE, true),
+        STATUS(Ansi.Color.GREEN, Ansi.Color.BLACK, false),
+        DURATION(Ansi.Color.BLACK, Ansi.Color.WHITE, true),
+        FAILURE(Ansi.Color.RED, Ansi.Color.WHITE, true),
+        WARNING(Ansi.Color.YELLOW, Ansi.Color.BLACK, false);
+
+        private static final PowerlineStyle[] PALETTE = {
+                SCENARIO, STEP, PROGRESS, STATUS, DURATION
+        };
+
+        private final Ansi.Color background;
+        private final Ansi.Color foreground;
+        private final boolean brightForeground;
+
+        PowerlineStyle(
+                Ansi.Color background,
+                Ansi.Color foreground,
+                boolean brightForeground) {
+            this.background = background;
+            this.foreground = foreground;
+            this.brightForeground = brightForeground;
+        }
+
+        static PowerlineStyle at(int index) {
+            return PALETTE[index % PALETTE.length];
+        }
+
+        static PowerlineStyle forSegment(int index, String text) {
+            return switch (text.strip().toUpperCase(Locale.ROOT)) {
+                case "FAIL", "FAILED", "ERROR", "ABORTED" -> FAILURE;
+                case "SKIP", "SKIPPED" -> WARNING;
+                case "PASS", "PASSED", "SUCCESS", "RUNNING", "COMPLETED" -> STATUS;
+                default -> at(index);
+            };
+        }
+    }
+
     enum TextStyle {
         HEADING(ansi -> ansi.fgCyan().bold()),
         STRONG(ansi -> ansi.fgYellow().bold()),
         EMPHASIS(ansi -> ansi.a(Ansi.Attribute.ITALIC)),
         INLINE_CODE(Ansi::fgMagenta),
-        CODE_BLOCK(Ansi::fgBrightBlack),
+        CODE_BLOCK(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBright(Ansi.Color.WHITE)),
+        CODE_KEYWORD(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightMagenta().bold()),
+        CODE_STRING(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightGreen()),
+        CODE_NUMBER(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightCyan()),
+        CODE_COMMENT(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightBlack()
+                .a(Ansi.Attribute.ITALIC)),
+        CODE_PROPERTY(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightBlue()),
+        CODE_VARIABLE(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightYellow()),
+        CODE_OPERATOR(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBright(Ansi.Color.WHITE)),
         LIST_MARKER(ansi -> ansi.fgGreen().bold()),
         QUOTE_MARKER(Ansi::fgBlue),
         LINK(Ansi::fgBlue);

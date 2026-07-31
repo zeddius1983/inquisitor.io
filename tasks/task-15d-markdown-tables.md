@@ -1,7 +1,7 @@
 # Task 15D — Rich-style Markdown tables in terminal logs
 
 > Status: **📝 planned.** Depends on task 15A's reusable renderer. It is
-> independent of the task 15B starter and task 15C harness verbose mode: every
+> independent of the task 15B starter and task 15C semantic harness logging: every
 > Markdown message rendered by `%mdMsg` can benefit from table support.
 
 Extend `inquisitor-logback-markdown` so standard pipe-delimited Markdown tables

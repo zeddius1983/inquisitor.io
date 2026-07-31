@@ -16,17 +16,30 @@
 
 package io.inquisitor.harness.evaluation.autoconfigure;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Optional;
+
 import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
+import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.evaluation.EvaluationProperties;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
+import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
 import io.inquisitor.harness.evaluation.RecordingToolCallback;
 import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
 import io.inquisitor.harness.evaluation.StepEvaluator;
+import io.inquisitor.harness.evaluation.logging.MarkdownEvaluationLogger;
+import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
 import io.inquisitor.harness.evaluation.report.EvaluationReportSession;
 import io.inquisitor.harness.evaluation.report.EvaluationRunInfo;
 import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.StepRunner;
+import io.inquisitor.harness.logging.ModelConfiguration;
+import io.inquisitor.harness.logging.ModelMetadataAdvisor;
+import io.inquisitor.harness.logging.ModelRegistry;
+import io.inquisitor.harness.logging.ModelRole;
 import lombok.val;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.evaluation.Evaluator;
@@ -66,6 +79,8 @@ import org.springframework.util.Assert;
 @EnableConfigurationProperties(EvaluationProperties.class)
 public class InquisitorEvaluationAutoConfiguration {
 
+    private static final String REDACTED_URL = "[redacted invalid URL]";
+
     /**
      * Decorates every {@link ToolCallback} bean so each call is recorded into the per-step
      * ledger the judge audits against — the built-in HTTP/SQL adapters and any
@@ -91,6 +106,16 @@ public class InquisitorEvaluationAutoConfiguration {
     @ConditionalOnMissingBean
     StepEvaluationRecorder inquisitorStepEvaluationRecorder() {
         return new StepEvaluationRecorder();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    EvaluationStepRunnerCallback inquisitorEvaluationStepRunnerCallback(
+            InquisitorHarnessProperties properties) {
+        return switch (properties.logging().format()) {
+            case PLAIN -> new PlainEvaluationLogger();
+            case MARKDOWN -> new MarkdownEvaluationLogger();
+        };
     }
 
     /**
@@ -124,7 +149,10 @@ public class InquisitorEvaluationAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    Evaluator inquisitorStepEvaluator(EvaluationProperties properties, Environment environment) {
+    Evaluator inquisitorStepEvaluator(
+            EvaluationProperties properties,
+            Environment environment,
+            ModelRegistry models) {
         val baseUrl = properties.baseUrl() != null
                 ? properties.baseUrl()
                 : environment.getProperty("spring.ai.openai.base-url");
@@ -138,24 +166,65 @@ public class InquisitorEvaluationAutoConfiguration {
         Assert.hasText(apiKey, "No judge API key: set inquisitor.harness.evaluation.api-key "
                 + "or spring.ai.openai.api-key");
 
+        val judgeOptions = OpenAiChatOptions.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .model(properties.model())
+                .temperature(0.0d)
+                .build();
+        models.configure(new ModelConfiguration(
+                ModelRole.JUDGE,
+                optionalText(properties.model()),
+                optionalText(safeBaseUrl(baseUrl)),
+                Optional.of(0.0d),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
+
         val judgeModel = OpenAiChatModel.builder()
-                .options(OpenAiChatOptions.builder()
-                        .baseUrl(baseUrl)
-                        .apiKey(apiKey)
-                        .model(properties.model())
-                        .temperature(0.0d)
-                        .build())
+                .options(judgeOptions)
                 .build();
         // A bare judge: no harness system prompt, no chat memory, no tools — it rules on
         // the trace it is given, nothing else.
-        return new StepEvaluator(ChatClient.builder(judgeModel).build());
+        return new StepEvaluator(ChatClient.builder(judgeModel)
+                .defaultAdvisors(new ModelMetadataAdvisor(ModelRole.JUDGE, models))
+                .build());
     }
 
     @Bean
     @Primary
     @ConditionalOnBean(LlmStepRunner.class)
     StepRunner inquisitorEvaluationStepRunner(
-            LlmStepRunner llmStepRunner, Evaluator evaluator, StepEvaluationRecorder recorder) {
-        return new EvaluationStepRunner(llmStepRunner, evaluator, recorder);
+            LlmStepRunner llmStepRunner,
+            Evaluator evaluator,
+            StepEvaluationRecorder recorder,
+            EvaluationStepRunnerCallback callback) {
+        return new EvaluationStepRunner(llmStepRunner, evaluator, recorder, callback);
+    }
+
+    private static Optional<String> optionalText(@Nullable String value) {
+        return Optional.ofNullable(value).map(String::strip).filter(candidate -> !candidate.isBlank());
+    }
+
+    private static @Nullable String safeBaseUrl(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        val candidate = value.strip();
+        try {
+            val uri = new URI(candidate);
+            if (uri.getRawUserInfo() == null
+                    && uri.getRawQuery() == null
+                    && uri.getRawFragment() == null) {
+                return candidate;
+            }
+            if (uri.getHost() == null) {
+                return REDACTED_URL;
+            }
+            return new URI(
+                    uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(),
+                    null, null).toString();
+        }
+        catch (URISyntaxException exception) {
+            return REDACTED_URL;
+        }
     }
 }

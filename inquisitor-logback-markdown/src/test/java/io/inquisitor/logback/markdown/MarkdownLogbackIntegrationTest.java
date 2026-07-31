@@ -55,6 +55,6 @@ class MarkdownLogbackIntegrationTest {
 
         String output = Files.readString(logFile).replace("\r\n", "\n");
         assertEquals(-1, output.indexOf('\u001B'));
-        assertEquals("Integrated Markdown\n|RAW:# Integrated **Markdown**\n", output);
+        assertEquals("    Integrated Markdown\n|RAW:# Integrated **Markdown**\n", output);
     }
 }

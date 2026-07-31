@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
@@ -64,9 +65,9 @@ class FlexmarkAnsiRendererTest {
                 │ quoted
                 │ continuation
 
-                • first
-                  3) nested
-                • second
+                 • first
+                   3) nested
+                 • second
 
                 **not emphasis**
 
@@ -88,9 +89,9 @@ class FlexmarkAnsiRendererTest {
         assertEquals("""
                 Before.
 
-                • parent
-                  • child
-                • sibling
+                 • parent
+                   • child
+                 • sibling
 
                 After.""", rendered);
     }
@@ -105,6 +106,52 @@ class FlexmarkAnsiRendererTest {
                 """);
 
         assertEquals("# not a heading\n**not strong** and `not inline code`", rendered);
+    }
+
+    @Test
+    void ansiCodeBlocksUseAnEqualWidthBackgroundPanelAndSyntaxColors() {
+        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(true);
+
+        String rendered = renderer.render("""
+                ```json
+                {"a":1}
+
+                {}
+                ```
+                """);
+        String plain = stripAnsi(rendered);
+
+        assertTrue(rendered.contains("\u001B[100"));
+        assertTrue(rendered.contains("\u001B["));
+        assertEquals(" {\"a\":1} \n         \n {}      ", plain);
+        assertTrue(plain.lines().mapToInt(String::length).distinct().count() == 1);
+    }
+
+    @Test
+    void customHighlighterReceivesFenceLanguageAndCannotCorruptCode() {
+        AtomicReference<String> language = new AtomicReference<>();
+        SyntaxHighlighter corrupting = (receivedLanguage, source) -> {
+            language.set(receivedLanguage);
+            return List.of(new SyntaxHighlighter.Span("different", SyntaxHighlighter.Style.KEYWORD));
+        };
+        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(true, corrupting);
+
+        String rendered = renderer.render("```custom option\noriginal\n```");
+
+        assertEquals("custom", language.get());
+        assertEquals(" original ", stripAnsi(rendered));
+    }
+
+    @Test
+    void failingCustomHighlighterFallsBackToUnchangedCode() {
+        SyntaxHighlighter failing = (language, source) -> {
+            throw new IllegalStateException("broken grammar");
+        };
+
+        String rendered = new FlexmarkAnsiRenderer(true, failing)
+                .render("```custom\nsource\n```");
+
+        assertEquals(" source ", stripAnsi(rendered));
     }
 
     @Test
@@ -155,7 +202,7 @@ class FlexmarkAnsiRendererTest {
         assertEquals("log [main] INFO started",
                 plainRenderer.render("log [main] INFO started"));
         assertEquals("see [ERROR] here", plainRenderer.render("see [ERROR] here"));
-        assertEquals("• [ ] todo", plainRenderer.render("- [ ] todo"));
+        assertEquals(" • [ ] todo", plainRenderer.render("- [ ] todo"));
     }
 
     @Test
@@ -180,16 +227,9 @@ class FlexmarkAnsiRendererTest {
                       nested continuation
                 """);
 
-        assertEquals("""
-                1. one
-                2. two
-                   more text
-                3. three""", singleDigit);
-        assertEquals("""
-                10. ten
-                    continuation
-                    • nested
-                      nested continuation""", doubleDigit);
+        assertEquals(" 1. one\n 2. two\n    more text\n 3. three", singleDigit);
+        assertEquals(" 10. ten\n     continuation\n     • nested\n       nested continuation",
+                doubleDigit);
     }
 
     @Test
@@ -212,6 +252,40 @@ class FlexmarkAnsiRendererTest {
 
         assertEquals("Heading with strong text", rendered);
         assertFalse(rendered.contains("\u001B["));
+    }
+
+    @Test
+    void rendersPowerlineHeadingsAsBackgroundColoredPills() {
+        String markdown = "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ";
+
+        String rendered = new FlexmarkAnsiRenderer(true).render(markdown);
+
+        assertEquals(" actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ",
+                stripAnsi(rendered));
+        assertTrue(rendered.contains("\u001B[44"));
+        assertTrue(rendered.contains("\u001B[46"));
+        assertTrue(rendered.contains("\u001B[45"));
+        assertTrue(rendered.contains("\u001B[42"));
+    }
+
+    @Test
+    void leavesPowerlineHeadingsReadableWhenAnsiIsDisabled() {
+        String rendered = plainRenderer.render(
+                "###  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ");
+
+        assertEquals(" Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ",
+                rendered);
+    }
+
+    @Test
+    void rendersFailedPowerlineStatusWithFailureBackground() {
+        String rendered = new FlexmarkAnsiRenderer(true).render(
+                "###  Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ");
+
+        assertEquals(" Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ",
+                stripAnsi(rendered));
+        assertTrue(rendered.contains("\u001B[41"));
+        assertTrue(rendered.contains("\u001B[40"));
     }
 
     @Test
@@ -248,7 +322,7 @@ class FlexmarkAnsiRendererTest {
                     .toList();
 
             IntStream.range(0, results.size()).forEach(index -> assertEquals(
-                    "Scenario " + index + "\n\n• step " + index, results.get(index)));
+                    "Scenario " + index + "\n\n • step " + index, results.get(index)));
         }
     }
 

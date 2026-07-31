@@ -30,6 +30,8 @@ dependencies {
     // Optional step evaluation (LLM-as-judge), exercised by ScenarioTests when
     // INQUISITOR_EVAL=true. Inert otherwise (autoconfig gated on the enabled flag).
     testImplementation(project(":inquisitor-harness-evaluation-starter"))
+    // Render the harness's marker-tagged Markdown in the streamed test console.
+    testRuntimeOnly(project(":inquisitor-logback-markdown-starter"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

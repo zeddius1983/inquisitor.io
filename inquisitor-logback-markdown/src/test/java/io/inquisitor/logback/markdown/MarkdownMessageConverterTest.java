@@ -33,7 +33,7 @@ class MarkdownMessageConverterTest {
     void defaultModeRendersEveryMessage() {
         MarkdownMessageConverter converter = converter(new FlexmarkAnsiRenderer(false));
 
-        assertEquals("rendered", converter.convert(event("**rendered**")));
+        assertEquals("    rendered", converter.convert(event("**rendered**")));
     }
 
     @Test
@@ -55,8 +55,8 @@ class MarkdownMessageConverterTest {
         LoggingEvent nested = event("## nested");
         nested.addMarker(parent);
 
-        assertEquals("direct", converter.convert(direct));
-        assertEquals("nested", converter.convert(nested));
+        assertEquals("    direct", converter.convert(direct));
+        assertEquals("    nested", converter.convert(nested));
     }
 
     @Test
@@ -78,7 +78,7 @@ class MarkdownMessageConverterTest {
 
         String rendered = converter.convert(marked);
 
-        assertEquals("rendered", rendered);
+        assertEquals("    rendered", rendered);
         assertFalse(rendered.contains("\u001B["));
     }
 
@@ -91,7 +91,7 @@ class MarkdownMessageConverterTest {
         marked.addMarker(MarkdownMarkers.markdown());
         String ordinary = "## ordinary";
 
-        assertEquals("rendered", converter.convert(marked));
+        assertEquals("    rendered", converter.convert(marked));
         assertEquals(ordinary, converter.convert(event(ordinary)));
     }
 
@@ -103,6 +103,24 @@ class MarkdownMessageConverterTest {
         assertEquals("", converter.convert(nullMessage));
         assertEquals("", converter.convert(event("")));
         assertEquals("  \t", converter.convert(event("  \t")));
+    }
+
+    @Test
+    void preservesRequestedOuterLineBreaksAroundRenderedBlocks() {
+        MarkdownMessageConverter converter = markedConverter(new FlexmarkAnsiRenderer(false));
+        LoggingEvent block = event("\n\n## rendered\r\n");
+        block.addMarker(MarkdownMarkers.markdown());
+
+        assertEquals(System.lineSeparator().repeat(2)
+                        + "    rendered" + System.lineSeparator(),
+                converter.convert(block));
+    }
+
+    @Test
+    void padsEveryNonEmptyRenderedLineWithoutAddingWhitespaceToBlankLines() {
+        MarkdownMessageConverter converter = converter(ignored -> "first\n\n  already indented");
+
+        assertEquals("    first\n\n      already indented", converter.convert(event("markdown")));
     }
 
     @Test

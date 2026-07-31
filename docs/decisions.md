@@ -59,10 +59,31 @@ see [roadmap.md](roadmap.md); for stable repo context see
   beans are aggregated and passed through the single unified entry point; the
   `defaultToolCallbacks(...)` overloads are deprecated for removal in Spring AI
   2.0.0-RC1.
-- **Model-dependent beans degrade gracefully.** `ChatClient`/executor beans are
-  `@ConditionalOnBean(ChatModel.class)` and the autoconfig is ordered
-  `afterName` the OpenAI chat autoconfig, so the context still starts (just
-  without the harness) when no model is configured.
+- **Model-dependent beans degrade gracefully.** `ChatClient`/`LlmStepRunner`
+  beans are `@ConditionalOnBean(ChatModel.class)` and the autoconfig is ordered
+  `afterName` the OpenAI chat autoconfig, so the context still starts when no
+  model is configured. The semantic loggers and model registry are always available,
+  and a user-supplied
+  `StepRunner` can still obtain a `ScenarioExecutor` without a `ChatModel`.
+- **Harness logging is semantic and presentation-selectable.**
+  `inquisitor.harness.logging.format=plain|markdown` selects implementations of
+  `LlmStepRunnerCallback`, `EvaluationStepRunnerCallback`, and
+  `ScenarioExecutionCallback`; the shipped loggers implement these generic
+  lifecycle seams while runners remain presentation-agnostic. Scenario lifecycle
+  narration is centralized in `ScenarioExecution`; actor step narration is emitted
+  once by `LlmStepRunnerCallback.stepStarted`, together with its running status. This preserves
+  whole-run and JUnit step-at-a-time behavior without duplicate step messages.
+  Markdown events use the `INQUISITOR_MARKDOWN` SLF4J marker; raw, manually
+  rendered, and automatically rendered consoles remain consumer choices.
+- **Actual model metadata is observed, never probed.** A response advisor on each
+  real actor/judge `ChatClient` call stores the first nonblank server-reported
+  model in a shared `ModelRegistry`. Configuration-time probe calls would add cost,
+  side effects, and could report a route different from the scenario request.
+  The Markdown actor logger reads the registry directly and puts the actual actor
+  name first in step breadcrumbs once known. Provider-reported file paths are shown
+  as the filename without `.gguf`. Before the first usable response, the model
+  segment is omitted; there is no model preamble or unresolved placeholder.
+  Credentials, prompts, tool arguments, and default headers are excluded.
 - **Dense local model, temperature 0.** `gemma-4-31B-it-QAT-Q4_0`; MoE models
   shortcut multi-step scenarios by answering from chat memory instead of calling
   the tool, producing hallucinated PASSes.
@@ -377,6 +398,18 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **No Lombok in the small renderer module.** Its state is deliberately explicit
   and per-render-call, and the handful of constructors/accessors do not justify
   adding an annotation processor to this dependency-light published artifact.
+- **Code highlighting is bounded, pluggable, and source-preserving.** ANSI code
+  blocks use equal-width background panels and a small built-in tokenizer for the
+  harness's common JSON/SQL/HTTP/Java/shell fences. `SyntaxHighlighter` remains a
+  public seam for other grammars. Highlighting is skipped for large blocks, and
+  output that does not reconstruct the exact source line falls back to the base
+  code style; a debugging renderer must never mutate logged payloads.
+- **Powerline breadcrumbs are a renderer convention, not embedded ANSI.** A
+  heading shaped as ` segment  segment … ` renders as background-colored
+  Powerlevel10k-style pills. The classic baseline Powerline caps are preferred
+  over rounded extra-symbol glyphs for broader patched-font support. The source
+  remains readable Markdown, plain output remains escape-free, and the harness
+  stays independent of Logback/Jansi.
 
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.

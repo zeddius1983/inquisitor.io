@@ -133,6 +133,17 @@ suite (`ScenarioSuite`, bound to a style bucket by each subclass —
 for the natural-language bucket). Oracle calibration runs through `FaultDetectionTests`
 (see below).
 
+Harness run narration uses `inquisitor.harness.logging.format=plain|markdown`
+(`plain` by default). Generic `LlmStepRunnerCallback`,
+`EvaluationStepRunnerCallback`, and `ScenarioExecutionCallback` seams keep
+formatting out of the runners; the shipped plain/Markdown loggers implement those
+callbacks. Markdown mode emits marker-tagged blocks, and rendering remains optional
+through either Logback Markdown module. A response advisor observes real actor/judge
+calls and caches the first server-reported model per role. Markdown actor-step
+breadcrumbs put the cached actor name first, reducing model paths to a filename
+without `.gguf` and omitting that segment until it is resolved; the harness renders
+no separate model preamble.
+
 Demo scenarios live under `src/test/resources/scenarios/`, split by authoring style:
 `explicit/` (prescriptive: fenced requests + bulleted asserts), `cucumber/` (Gherkin
 Given/When/Then), and `intent/` (natural-language only), to gauge how a model copes

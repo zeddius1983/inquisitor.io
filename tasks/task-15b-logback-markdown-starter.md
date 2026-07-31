@@ -139,7 +139,7 @@ Markdown and emits ANSI-styled terminal text.
 
 ## Non-goals
 
-- No harness verbose mode or model metadata — task 15C.
+- No semantic harness logging or model metadata — task 15C.
 - No takeover of the root logger, console pattern, `logging.config`, or consumer
   logging files.
 - No ANSI rendering in file or structured appenders.

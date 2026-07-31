@@ -122,6 +122,46 @@ under `src/test/resources/scenarios/`. The scenario file is resolved from the
 method name (`transferBetweenAccounts()` → `transfer-between-accounts.md`) or set
 explicitly with `@Scenario("classpath:scenarios/custom.md")`.
 
+## Harness logging
+
+The harness logs an INFO-level run narrative without requiring framework-wide
+DEBUG logging. Choose plain text (the default) or marker-tagged Markdown:
+
+```yaml
+inquisitor:
+  harness:
+    logging:
+      format: markdown # plain | markdown
+```
+
+The harness logs each scenario and step immediately before it runs. The first
+nonblank actor-model name reported by real response metadata is cached without a
+probe request. In Markdown mode, it becomes a step-breadcrumb segment as soon as
+it is available: normally on the first completion and every later step event.
+Before that, the model segment is simply omitted—no unresolved placeholder is
+printed.
+
+In `markdown` format, events use the portable `INQUISITOR_MARKDOWN` SLF4J marker.
+With the optional renderer, actor step starts and completions use a
+Powerlevel10k-style pill breadcrumb for actual model (when resolved), scenario,
+step, progress, and status. Provider-reported model file paths are reduced to the
+filename without the `.gguf` extension.
+Completion breadcrumbs add a human-scale duration segment (`842 ms`, `13.289 s`,
+`2 min 5.4 s`). Their classic Powerline glyphs require a patched Powerline or Nerd
+Font; the underlying Markdown remains readable when ANSI is disabled.
+Choose how they appear:
+
+- add no rendering dependency to keep readable raw Markdown in ordinary logs;
+- add [`inquisitor-logback-markdown`](inquisitor-logback-markdown/README.md) and
+  configure `%mdMsg{marked}` for manual Logback control;
+- add
+  [`inquisitor-logback-markdown-starter`](inquisitor-logback-markdown-starter/README.md)
+  for automatic rendering in compatible Spring Boot console layouts.
+
+The harness itself depends on neither optional Markdown module and remains
+portable to other SLF4J backends. Actor and judge invocation diagnostics remain
+at DEBUG under their respective logger implementations.
+
 ## Optional: OpenAPI discovery
 
 By default a scenario tells the model which endpoints to call. If your app exposes an

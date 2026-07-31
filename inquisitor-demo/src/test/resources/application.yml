@@ -21,6 +21,10 @@ spring:
 
 inquisitor:
   harness:
+    logging:
+      # Render scenario, step, actor, and judge lifecycle events through the
+      # optional inquisitor-logback-markdown-starter on the test runtime.
+      format: markdown
     evaluation:
       # Optional step evaluation (LLM-as-judge): scores each verdict against the real
       # tool trace. The module default is off; this demo test profile turns it on so
@@ -35,5 +39,7 @@ inquisitor:
 
 logging:
   level:
+    io.inquisitor.harness.logging: DEBUG
+    io.inquisitor.harness.evaluation.logging: DEBUG
     # Trace each harness tool call (inputs and outputs) during scenario runs.
     io.inquisitor.harness.tool: DEBUG

@@ -17,6 +17,13 @@
 package io.inquisitor.logback.markdown;
 
 import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_BLOCK;
+import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_COMMENT;
+import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_KEYWORD;
+import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_NUMBER;
+import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_OPERATOR;
+import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_PROPERTY;
+import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_STRING;
+import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.CODE_VARIABLE;
 import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.EMPHASIS;
 import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.HEADING;
 import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.INLINE_CODE;
@@ -26,8 +33,12 @@ import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.QUOTE_MARKER;
 import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.STRONG;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Deque;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 import com.vladsch.flexmark.ast.AutoLink;
 import com.vladsch.flexmark.ast.BlockQuote;
@@ -63,16 +74,23 @@ import com.vladsch.flexmark.util.ast.Visitor;
 /** Renders a practical Markdown subset as ANSI-styled terminal text. */
 public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
 
+    private static final int LIST_LEFT_INDENT = 1;
+    private static final int MAX_HIGHLIGHTED_CODE_CHARS = 16_384;
+    private static final String POWERLINE_LEFT_CAP = "";
+    private static final String POWERLINE_SEPARATOR = "";
+    private static final String POWERLINE_RIGHT_CAP = "";
+
     private static final Parser PARSER = Parser.builder().build();
 
     private final AnsiStyler styler;
+    private final SyntaxHighlighter syntaxHighlighter;
 
     /**
      * Creates a renderer that emits ANSI only when an interactive, color-capable
      * terminal is detected.
      */
     public FlexmarkAnsiRenderer() {
-        this(AnsiSupport.isAutoEnabled());
+        this(AnsiSupport.isAutoEnabled(), BuiltinSyntaxHighlighter.INSTANCE);
     }
 
     /**
@@ -81,7 +99,20 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
      * @param ansiEnabled whether ANSI style sequences should be emitted
      */
     public FlexmarkAnsiRenderer(boolean ansiEnabled) {
+        this(ansiEnabled, BuiltinSyntaxHighlighter.INSTANCE);
+    }
+
+    /**
+     * Creates a renderer with explicit ANSI and syntax-highlighting policies.
+     *
+     * @param ansiEnabled whether ANSI style sequences should be emitted
+     * @param syntaxHighlighter thread-safe code-fence highlighter
+     */
+    public FlexmarkAnsiRenderer(
+            boolean ansiEnabled,
+            SyntaxHighlighter syntaxHighlighter) {
         this.styler = new AnsiStyler(ansiEnabled);
+        this.syntaxHighlighter = syntaxHighlighter;
     }
 
     /**
@@ -94,7 +125,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
     @Override
     public String render(String markdown) {
         Node document = PARSER.parse(markdown);
-        return new RenderingContext(styler).render(document);
+        return new RenderingContext(styler, syntaxHighlighter).render(document);
     }
 
     private static final class RenderingContext {
@@ -104,13 +135,15 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         private final Deque<ListState> lists = new ArrayDeque<>();
         private final Deque<Integer> listItemContentIndents = new ArrayDeque<>();
         private final AnsiStyler styler;
+        private final SyntaxHighlighter syntaxHighlighter;
         private final NodeVisitor visitor;
 
         private int quoteDepth;
         private boolean lineStart = true;
 
-        RenderingContext(AnsiStyler styler) {
+        RenderingContext(AnsiStyler styler, SyntaxHighlighter syntaxHighlighter) {
             this.styler = styler;
+            this.syntaxHighlighter = syntaxHighlighter;
             this.visitor = new NodeVisitor(
                     new VisitHandler<>(Heading.class, this::visit),
                     new VisitHandler<>(Paragraph.class, this::visit),
@@ -159,8 +192,58 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
 
         private void visit(Heading heading) {
             separateBlock();
-            styled(HEADING, () -> visitor.visitChildren(heading));
+            Optional<List<String>> powerline = powerlineSegments(heading);
+            if (styler.isEnabled() && powerline.isPresent()) {
+                renderPowerline(powerline.orElseThrow());
+            }
+            else {
+                styled(HEADING, () -> visitor.visitChildren(heading));
+            }
             endBlock();
+        }
+
+        private void renderPowerline(List<String> segments) {
+            AnsiStyler.PowerlineStyle first = powerlineStyle(segments, 0);
+            append(styler.powerlineCap(first, POWERLINE_LEFT_CAP));
+            for (int index = 0; index < segments.size(); index++) {
+                AnsiStyler.PowerlineStyle style = powerlineStyle(segments, index);
+                if (index > 0) {
+                    AnsiStyler.PowerlineStyle previous =
+                            powerlineStyle(segments, index - 1);
+                    append(styler.powerlineTransition(
+                            previous, style, POWERLINE_SEPARATOR));
+                }
+                append(styler.open(style));
+                append(" " + segments.get(index) + " ");
+                append(styler.reset());
+            }
+            AnsiStyler.PowerlineStyle last =
+                    powerlineStyle(segments, segments.size() - 1);
+            append(styler.powerlineCap(last, POWERLINE_RIGHT_CAP));
+        }
+
+        private static AnsiStyler.PowerlineStyle powerlineStyle(
+                List<String> segments,
+                int index) {
+            return AnsiStyler.PowerlineStyle.forSegment(
+                    index, segments.get(index));
+        }
+
+        private static Optional<List<String>> powerlineSegments(Heading heading) {
+            String text = heading.getText().unescape().toString().strip();
+            if (!text.startsWith(POWERLINE_LEFT_CAP)
+                    || !text.endsWith(POWERLINE_RIGHT_CAP)) {
+                return Optional.empty();
+            }
+            String content = text.substring(
+                    POWERLINE_LEFT_CAP.length(),
+                    text.length() - POWERLINE_RIGHT_CAP.length());
+            List<String> segments = Arrays.stream(content.split(POWERLINE_SEPARATOR, -1))
+                    .map(String::strip)
+                    .toList();
+            return segments.size() > 1 && segments.stream().noneMatch(String::isEmpty)
+                    ? Optional.of(segments)
+                    : Optional.empty();
         }
 
         private void visit(Paragraph paragraph) {
@@ -186,11 +269,14 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         }
 
         private void visit(FencedCodeBlock codeBlock) {
-            renderCodeBlock(codeBlock, codeBlock.getContentChars().toString());
+            String language = codeBlock.getInfo().unescape().toString().strip();
+            int separator = firstWhitespace(language);
+            renderCodeBlock(codeBlock, codeBlock.getContentChars().toString(),
+                    separator < 0 ? language : language.substring(0, separator));
         }
 
         private void visit(IndentedCodeBlock codeBlock) {
-            renderCodeBlock(codeBlock, codeBlock.getContentChars().toString());
+            renderCodeBlock(codeBlock, codeBlock.getContentChars().toString(), "");
         }
 
         private void visit(BulletList list) {
@@ -228,7 +314,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         private void renderListItem(ListItem item) {
             ensureLineStart();
             int itemIndent = listItemContentIndents.isEmpty()
-                    ? 0
+                    ? LIST_LEFT_INDENT
                     : listItemContentIndents.element();
             append(" ".repeat(itemIndent));
             String marker = lists.element().nextMarker();
@@ -337,7 +423,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
             append(text.getChars().unescape());
         }
 
-        private void renderCodeBlock(Node codeBlock, String content) {
+        private void renderCodeBlock(Node codeBlock, String content, String language) {
             boolean nested = codeBlock.getParent() instanceof ListItem;
             if (nested) {
                 ensureNewline();
@@ -351,6 +437,11 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
                 normalized = normalized.substring(0, normalized.length() - 1);
             }
             String[] lines = normalized.split("\n", -1);
+            int panelWidth = styler.isEnabled()
+                    ? Arrays.stream(lines).mapToInt(String::length).max().orElse(0)
+                    : 0;
+            boolean highlight = styler.isEnabled()
+                    && normalized.length() <= MAX_HIGHLIGHTED_CODE_CHARS;
             for (int index = 0; index < lines.length; index++) {
                 if (index > 0) {
                     ensureNewline();
@@ -359,9 +450,70 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
                     appendListItemContentIndent();
                 }
                 String line = lines[index];
-                styled(CODE_BLOCK, () -> append(line));
+                if (!styler.isEnabled()) {
+                    append(line);
+                    continue;
+                }
+                List<SyntaxHighlighter.Span> spans = highlight
+                        ? highlighted(language, line)
+                        : plainCode(line);
+                styled(CODE_BLOCK, () -> {
+                    append(" ");
+                    spans.forEach(this::appendCodeSpan);
+                    append(" ".repeat(panelWidth - line.length() + 1));
+                });
             }
             endBlock();
+        }
+
+        private List<SyntaxHighlighter.Span> highlighted(String language, String source) {
+            try {
+                List<SyntaxHighlighter.Span> spans = List.copyOf(
+                        syntaxHighlighter.highlight(language, source));
+                String renderedSource = spans.stream()
+                        .map(SyntaxHighlighter.Span::text)
+                        .collect(Collectors.joining());
+                return renderedSource.equals(source) ? spans : plainCode(source);
+            }
+            catch (RuntimeException | StackOverflowError exception) {
+                return plainCode(source);
+            }
+        }
+
+        private void appendCodeSpan(SyntaxHighlighter.Span span) {
+            if (span.style() == SyntaxHighlighter.Style.PLAIN) {
+                append(span.text());
+                return;
+            }
+            styled(codeStyle(span.style()), () -> append(span.text()));
+        }
+
+        private static int firstWhitespace(String value) {
+            for (int index = 0; index < value.length(); index++) {
+                if (Character.isWhitespace(value.charAt(index))) {
+                    return index;
+                }
+            }
+            return -1;
+        }
+
+        private static List<SyntaxHighlighter.Span> plainCode(String source) {
+            return source.isEmpty()
+                    ? List.of()
+                    : List.of(new SyntaxHighlighter.Span(source, SyntaxHighlighter.Style.PLAIN));
+        }
+
+        private static AnsiStyler.TextStyle codeStyle(SyntaxHighlighter.Style style) {
+            return switch (style) {
+                case PLAIN -> CODE_BLOCK;
+                case KEYWORD -> CODE_KEYWORD;
+                case STRING -> CODE_STRING;
+                case NUMBER -> CODE_NUMBER;
+                case COMMENT -> CODE_COMMENT;
+                case PROPERTY -> CODE_PROPERTY;
+                case VARIABLE -> CODE_VARIABLE;
+                case OPERATOR -> CODE_OPERATOR;
+            };
         }
 
         private void styled(AnsiStyler.TextStyle style, Runnable content) {

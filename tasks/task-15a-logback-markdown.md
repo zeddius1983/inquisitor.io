@@ -16,6 +16,8 @@ and use the converter in a Logback pattern.
   chain.
 - Expose a Logback conversion word (`%mdMsg`) for manual integration.
 - Preserve the original formatted message as a safe fallback.
+- Add four spaces of left padding to each non-empty rendered line, after parsing.
+- Indent list markers by one additional space while preserving continuation alignment.
 - Keep rendering local to appenders that opt into the converter; file and
   structured appenders can continue using `%msg` unchanged.
 - Establish a small, tested rendering surface before the harness emits any new
@@ -97,7 +99,7 @@ Initial supported nodes:
 Unknown nodes should degrade to readable child text rather than fail the event.
 Exact Rich/Glow parity, images, and syntax-highlighted code are not required for
 the prototype. Rich-style terminal table layout is a separate follow-on in task
-15D.
+15D; code panels and highlighting follow in task 15E.
 
 ## ANSI behavior
 

@@ -39,15 +39,22 @@ import lombok.val;
 public class ScenarioExecution {
 
     private final StepRunner runner;
+    private final ScenarioExecutionCallback callback;
     private final Scenario scenario;
     private final String conversationId = UUID.randomUUID().toString();
     private final List<StepResult> results = new ArrayList<>();
 
     private int cursor = 0;
+    private boolean started = false;
     private boolean failed = false;
+    private boolean completed = false;
 
-    ScenarioExecution(StepRunner runner, Scenario scenario) {
+    ScenarioExecution(
+            StepRunner runner,
+            ScenarioExecutionCallback callback,
+            Scenario scenario) {
         this.runner = runner;
+        this.callback = callback;
         this.scenario = scenario;
     }
 
@@ -61,13 +68,29 @@ public class ScenarioExecution {
         if (!hasNext()) {
             throw new NoSuchElementException("No further steps to execute for scenario: " + scenario.name());
         }
+        if (!started) {
+            callback.scenarioStarted(scenario);
+            started = true;
+        }
         val step = scenario.steps().get(cursor);
-        val run = runner.run(StepRequest.of(conversationId, scenario, step));
+        StepRun run;
+        try {
+            run = runner.run(StepRequest.of(conversationId, scenario, step));
+        }
+        catch (RuntimeException exception) {
+            failed = true;
+            callback.scenarioAborted(result(), exception);
+            throw exception;
+        }
         val result = new StepResult(step, run.verdict(), run.elapsed());
         results.add(result);
         cursor++;
         if (!run.verdict().passed()) {
             failed = true;
+        }
+        if (!hasNext() && !completed) {
+            completed = true;
+            callback.scenarioCompleted(result());
         }
         return result;
     }

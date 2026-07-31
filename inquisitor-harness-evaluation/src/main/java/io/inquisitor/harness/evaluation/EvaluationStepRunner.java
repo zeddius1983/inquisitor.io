@@ -22,9 +22,9 @@ import java.util.stream.Collectors;
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
 import io.inquisitor.harness.executor.StepRunner;
+import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
 import io.inquisitor.harness.model.StepVerdict;
 import io.inquisitor.harness.model.ToolCallRecord;
-import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationRequest;
@@ -39,36 +39,41 @@ import org.springframework.ai.evaluation.Evaluator;
  * transparent to the verdict — it returns the delegate's {@link StepRun} unchanged and
  * only observes — so enabling evaluation never changes whether a step passes.
  */
-@Slf4j
 public class EvaluationStepRunner implements StepRunner {
 
     private final StepRunner delegate;
     private final Evaluator evaluator;
     private final StepEvaluationRecorder recorder;
+    private final EvaluationStepRunnerCallback callback;
 
     public EvaluationStepRunner(StepRunner delegate, Evaluator evaluator, StepEvaluationRecorder recorder) {
+        this(delegate, evaluator, recorder, new PlainEvaluationLogger());
+    }
+
+    public EvaluationStepRunner(
+            StepRunner delegate,
+            Evaluator evaluator,
+            StepEvaluationRecorder recorder,
+            EvaluationStepRunnerCallback callback) {
         this.delegate = delegate;
         this.evaluator = evaluator;
         this.recorder = recorder;
+        this.callback = callback;
     }
 
     @Override
     public StepRun run(StepRequest request) {
         val run = delegate.run(request);
 
-        val scenario = request.scenario();
-        val step = request.step();
         if (run.synthetic()) {
             // The harness fabricated this verdict (empty/unparseable model response) —
             // there is no actor claim to audit, so judging it would only produce noise.
-            log.debug("[{}] step {}/{} - NOT_EVALUATED: harness-synthesized verdict",
-                    scenario.name(), step.index(), scenario.steps().size());
+            callback.evaluationSkipped(request, run, "harness-synthesized verdict");
             recorder.recordNotEvaluated(request, run,
                     "Harness-synthesized verdict (no actor claim to audit); not evaluated.");
             return run;
         }
-        log.debug("[{}] step {}/{} - EVALUATE: {}",
-                scenario.name(), step.index(), scenario.steps().size(), step.title());
+        callback.evaluationStarted(request, run);
 
         val context = run.toolCalls().isEmpty()
                 ? List.<Document>of()
@@ -80,8 +85,7 @@ public class EvaluationStepRunner implements StepRunner {
         } catch (RuntimeException e) {
             // The judge is an observer: its infrastructure failures (timeouts, transport
             // errors) must never fail the actor's step. Record the gap and move on.
-            log.warn("[{}] step {}/{} - NOT_EVALUATED: the judge call failed",
-                    scenario.name(), step.index(), scenario.steps().size(), e);
+            callback.evaluationFailed(request, run, e);
             recorder.recordNotEvaluated(request, run,
                     "The judge call failed (" + e.getClass().getSimpleName() + ": " + e.getMessage()
                             + "); not evaluated.");
@@ -89,10 +93,7 @@ public class EvaluationStepRunner implements StepRunner {
         }
         recorder.record(request, run, evaluation);
 
-        val category = evaluation.getMetadata() == null ? null : evaluation.getMetadata().get("category");
-        log.debug("[{}] step {}/{} - {}: score {}",
-                scenario.name(), step.index(), scenario.steps().size(),
-                category, evaluation.getScore());
+        callback.evaluationCompleted(request, run, evaluation);
         return run;
     }
 

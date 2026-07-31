@@ -17,6 +17,7 @@
 package io.inquisitor.logback.markdown;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 import ch.qos.logback.classic.pattern.MessageConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -28,6 +29,9 @@ import org.slf4j.Marker;
  * optional {@code plain}/{@code ansi} output policies.
  */
 public final class MarkdownMessageConverter extends MessageConverter {
+
+    private static final String LEFT_PADDING = "    ";
+    private static final Pattern NON_EMPTY_LINE_START = Pattern.compile("(?m)^(?=.)");
 
     private static final String MARKED_OPTION = "marked";
     private static final String PLAIN_OPTION = "plain";
@@ -97,7 +101,7 @@ public final class MarkdownMessageConverter extends MessageConverter {
             return rawMessage;
         }
         try {
-            return renderer.render(rawMessage);
+            return preserveOuterLineBreaks(rawMessage, pad(renderer.render(rawMessage)));
         }
         catch (RuntimeException | StackOverflowError exception) {
             addWarn("Could not render Markdown log message; emitting the original message", exception);
@@ -131,5 +135,58 @@ public final class MarkdownMessageConverter extends MessageConverter {
     private static boolean isMarkdown(@Nullable List<Marker> markers) {
         return markers != null && markers.stream()
                 .anyMatch(marker -> marker.contains(MarkdownMarkers.MARKER_NAME));
+    }
+
+    private static String preserveOuterLineBreaks(String source, String rendered) {
+        String lineSeparator = System.lineSeparator();
+        return lineSeparator.repeat(leadingLineBreaks(source))
+                + rendered
+                + lineSeparator.repeat(trailingLineBreaks(source));
+    }
+
+    private static int leadingLineBreaks(String source) {
+        int count = 0;
+        int index = 0;
+        while (index < source.length()) {
+            char character = source.charAt(index);
+            if (character == '\n') {
+                count++;
+                index++;
+            }
+            else if (character == '\r') {
+                count++;
+                index += index + 1 < source.length() && source.charAt(index + 1) == '\n'
+                        ? 2
+                        : 1;
+            }
+            else {
+                break;
+            }
+        }
+        return count;
+    }
+
+    private static int trailingLineBreaks(String source) {
+        int count = 0;
+        int index = source.length() - 1;
+        while (index >= 0) {
+            char character = source.charAt(index);
+            if (character == '\n') {
+                count++;
+                index -= index > 0 && source.charAt(index - 1) == '\r' ? 2 : 1;
+            }
+            else if (character == '\r') {
+                count++;
+                index--;
+            }
+            else {
+                break;
+            }
+        }
+        return count;
+    }
+
+    private static String pad(String rendered) {
+        return NON_EMPTY_LINE_START.matcher(rendered).replaceAll(LEFT_PADDING);
     }
 }

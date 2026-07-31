@@ -72,7 +72,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
             assertThat(context).hasBean("inquisitorLogbackMarkdownInstallation");
 
             assertThat(console.layout().doLayout(marked("## rendered")))
-                    .isEqualTo("prefix [INFO] rendered");
+                    .isEqualTo("prefix [INFO]     rendered");
             assertThat(console.layout().doLayout(event("## ordinary")))
                     .isEqualTo("prefix [INFO] ## ordinary");
         });
@@ -106,7 +106,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
-        assertThat(console.layout().doLayout(marked("## rendered"))).isEqualTo("rendered");
+        assertThat(console.layout().doLayout(marked("## rendered"))).isEqualTo("    rendered");
         assertThat(fileLayout.doLayout(marked("## raw"))).isEqualTo("## raw");
     }
 
@@ -146,7 +146,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(installer.install(loggerContext)).isZero();
-        assertThat(console.layout().doLayout(marked("## once"))).isEqualTo("once");
+        assertThat(console.layout().doLayout(marked("## once"))).isEqualTo("    once");
     }
 
     @Test
@@ -163,7 +163,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
-        assertThat(console.layout().doLayout(marked("## rendered"))).isEqualTo("rendered");
+        assertThat(console.layout().doLayout(marked("## rendered"))).isEqualTo("    rendered");
     }
 
     @Test
@@ -186,7 +186,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(layout.stopped).isFalse();
         assertThat(layout.recompiledWhileStarted).isTrue();
-        assertThat(layout.doLayout(marked("## rendered"))).isEqualTo("rendered");
+        assertThat(layout.doLayout(marked("## rendered"))).isEqualTo("    rendered");
     }
 
     @Test
@@ -220,9 +220,9 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
 
         assertThat(installer.install(loggerContext)).isEqualTo(3);
-        assertThat(shortWord.layout().doLayout(marked("## short"))).isEqualTo("short");
-        assertThat(normalWord.layout().doLayout(marked("## normal"))).isEqualTo("normal");
-        assertThat(longWord.layout().doLayout(marked("## long"))).isEqualTo("long");
+        assertThat(shortWord.layout().doLayout(marked("## short"))).isEqualTo("    short");
+        assertThat(normalWord.layout().doLayout(marked("## normal"))).isEqualTo("    normal");
+        assertThat(longWord.layout().doLayout(marked("## long"))).isEqualTo("    long");
     }
 
     @Test

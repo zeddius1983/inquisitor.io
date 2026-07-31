@@ -5,6 +5,64 @@ Logback pattern layouts. It renders headings, emphasis, code, lists, quotes, and
 links as terminal-oriented text with ANSI styling. It has no dependency on the
 Inquisitor harness or Spring.
 
+Every non-empty rendered line receives four spaces of left padding. Padding is
+applied after Markdown parsing, so it visually separates Markdown from ordinary
+log lines without turning the source into a Markdown code block. Blank lines
+remain empty and unmarked messages remain byte-for-byte unchanged. List markers
+receive one additional space, for a five-space total indent in converted output;
+continuation and nested-list content remains aligned with its marker.
+Leading and trailing source line breaks are preserved by count, so callers can
+request a genuine blank line between the conventional Logback prefix and a
+rendered Markdown block.
+
+## Code blocks
+
+When ANSI is enabled, fenced and indented code blocks render as dark background
+panels. Every row receives one inner space on each side and is padded to the
+longest source line, so blank and short lines retain the same rectangular frame.
+When ANSI is disabled, code remains ordinary unframed text.
+
+The default renderer reads the first fenced-code info word and highlights:
+
+- `json` / `jsonc`;
+- `sql`, including PostgreSQL and MySQL aliases;
+- `http` / `https` request and response snippets;
+- `java`;
+- `bash`, `sh`, `shell`, and `zsh`.
+
+Unknown languages use the normal code style. Highlighting is capped for large
+blocks, operates without an additional runtime dependency, and never controls
+whether the log message succeeds. The renderer verifies that highlighted spans
+reconstruct the exact source line; invalid output or a highlighter exception
+falls back to unhighlighted code.
+
+Applications can supply a thread-safe custom `SyntaxHighlighter` through
+`new FlexmarkAnsiRenderer(ansiEnabled, highlighter)`. The programmatic renderer
+can then be passed to `MarkdownMessageConverter`; Spring Boot applications can
+replace the starter's `MarkdownRenderer` bean.
+
+## Powerline breadcrumbs
+
+An ANSI-rendered heading that uses Powerline caps and separators is displayed as
+a Powerlevel10k-style sequence of background-colored pills:
+
+```markdown
+###  Accounts scenario  Verify balances  ▰▰▰▰▰ 4/4  PASS  ⧖ 13.289 s 
+```
+
+Each transition uses the preceding segment's foreground color and the following
+segment's background color, producing a continuous Powerline join. The built-in
+palette cycles after four segments. Plain rendering preserves the same readable
+text without ANSI sequences, while headings without this exact shape retain the
+normal heading style.
+
+The classic `` and `` caps use the baseline Powerline glyphs supported by
+older patched fonts as well as current Nerd Fonts. Rounded ``/`` caps are not
+used because they come from the less widely supported extra-symbol range.
+The harness uses a five-cell `▰`/`▱` gauge, rounded to the nearest cell, before
+the current/total step counter. Completion breadcrumbs add the verdict and a
+human-readable `⧖` duration segment.
+
 ## Dependency
 
 ```kotlin
@@ -25,6 +83,11 @@ unsupported appenders unchanged. See the
 Include the bundled conversion rule and use `%mdMsg{marked}` in the console
 pattern. Only events carrying the `INQUISITOR_MARKDOWN` marker are rendered;
 all other messages remain byte-for-byte unchanged.
+
+The harness emits that marker automatically when
+`inquisitor.harness.logging.format=markdown`, so its scenario, step, actor, and
+judge Markdown works with the same configuration without coupling the harness
+to this module.
 
 For Spring Boot, use `logback-spring.xml`:
 
