@@ -133,6 +133,8 @@ final class AnsiStyler {
         CODE_PROPERTY(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightBlue()),
         CODE_VARIABLE(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBrightYellow()),
         CODE_OPERATOR(ansi -> ansi.bgBright(Ansi.Color.BLACK).fgBright(Ansi.Color.WHITE)),
+        TABLE_BORDER(ansi -> ansi.fgBrightBlack().a(Ansi.Attribute.INTENSITY_FAINT)),
+        TABLE_HEADER(ansi -> ansi.fgCyan().bold()),
         LIST_MARKER(ansi -> ansi.fgGreen().bold()),
         QUOTE_MARKER(Ansi::fgBlue),
         LINK(Ansi::fgBlue);

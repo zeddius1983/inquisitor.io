@@ -383,6 +383,12 @@ see [roadmap.md](roadmap.md); for stable repo context see
   into a published logging utility would inflate every consumer's runtime
   classpath. Individual extensions, such as tables in task 15D, are added
   narrowly when their behavior is implemented.
+- **Table layout is measured before ANSI emission.** The narrow Flexmark tables
+  extension supplies structural rows/cells/alignment; those nodes are collected
+  into an immutable internal model before a dedicated terminal renderer measures,
+  allocates, wraps, and emits them. Display width ignores ANSI and combining marks
+  and accounts for common wide Unicode/emoji. This keeps colour independent from
+  geometry and per-render mutable state isolated for concurrent logging.
 - **Jansi emits styles but does not decide whether a destination is a terminal.**
   Automatic mode requires an attached `System.console()`, honours `NO_COLOR`
   and `TERM=dumb`, and respects Jansi's process disable property. Manual
@@ -398,7 +404,10 @@ see [roadmap.md](roadmap.md); for stable repo context see
   layouts are untouched. Dynamically created `SiftingAppender` children require
   manual `%mdMsg{marked}` configuration because they do not exist during starter
   installation and are not exposed as attached appenders. Global converter maps
-  and consumer logging configuration files remain owned by the application.
+  and consumer logging configuration files remain owned by the application. The
+  Logback configuration lock serializes configuration changes, not active event
+  formatting, so this mutation is deliberately startup-only; applications should
+  not invoke the installer later while background threads are logging.
 - **No Lombok in the small renderer module.** Its state is deliberately explicit
   and per-render-call, and the handful of constructors/accessors do not justify
   adding an annotation processor to this dependency-light published artifact.

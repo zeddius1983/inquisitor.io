@@ -18,6 +18,10 @@ package io.inquisitor.harness.evaluation.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import java.time.Duration;
+import java.util.List;
 
 import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
@@ -28,15 +32,22 @@ import io.inquisitor.harness.evaluation.logging.MarkdownEvaluationLogger;
 import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
 import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.ScenarioExecutor;
+import io.inquisitor.harness.executor.StepRequest;
+import io.inquisitor.harness.executor.StepRun;
 import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
+import io.inquisitor.harness.model.Outcome;
+import io.inquisitor.harness.model.Scenario;
+import io.inquisitor.harness.model.Step;
+import io.inquisitor.harness.model.StepVerdict;
 import lombok.val;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.evaluation.Evaluator;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class InquisitorEvaluationAutoConfigurationTest {
 
@@ -103,6 +114,36 @@ class InquisitorEvaluationAutoConfigurationTest {
                         "inquisitor.harness.evaluation.api-key=test-key")
                 .run(context -> assertThat(context.getBean(EvaluationLoggerCallback.class))
                         .isSameAs(callback));
+    }
+
+    @Test
+    void composesContributedEvaluationCallbackBetweenRecorderAndLogger() {
+        val observer = mock(EvaluationStepRunnerCallback.class);
+
+        runner.withBean("evaluationObserver", EvaluationStepRunnerCallback.class, () -> observer)
+                .withPropertyValues(
+                        "inquisitor.harness.evaluation.enabled=true",
+                        "inquisitor.harness.evaluation.model=judge-model",
+                        "inquisitor.harness.evaluation.base-url=http://localhost:9999",
+                        "inquisitor.harness.evaluation.api-key=test-key")
+                .run(context -> {
+                    assertThat(context.getBeansOfType(EvaluationStepRunnerCallback.class))
+                            .hasSize(3);
+                    val stepRunner = context.getBean(EvaluationStepRunner.class);
+                    val callback = (EvaluationStepRunnerCallback) ReflectionTestUtils
+                            .getField(stepRunner, "callback");
+                    val scenario = new Scenario("Scenario", "", List.of(
+                            new Step(1, "Step", "Run it")), null);
+                    val request = StepRequest.of(
+                            "conversation", scenario, scenario.steps().getFirst());
+                    val actorRun = new StepRun(
+                            new StepVerdict(Outcome.PASS, "done", List.of()),
+                            List.of(), Duration.ZERO);
+
+                    callback.evaluationStarted(request, actorRun);
+
+                    verify(observer).evaluationStarted(request, actorRun);
+                });
     }
 
     @Test

@@ -39,7 +39,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record InquisitorHarnessProperties(
         Map<String, Target> targets,
         Map<String, Datasource> datasources,
-        @DefaultValue Logging logging) {
+        Logging logging) {
 
     @ConstructorBinding
     public InquisitorHarnessProperties {

@@ -50,6 +50,7 @@ Core harness:
 
 - `LlmStepRunnerCallback`: `stepStarted`, `responseUnparseable`, `stepCompleted`,
   plus ordered `andThen` composition;
+- `LlmLoggerCallback`: narrows the starter's replaceable actor-logging seam;
 - `ScenarioExecutionCallback`: `scenarioStarted`, `scenarioAborted`,
   `scenarioCompleted`;
 - `PlainLlmLogger` / `MarkdownLlmLogger`;
@@ -67,6 +68,11 @@ Evaluation module:
 The runners emit domain events only. Their generic callback collaborators can be
 used for logging, metrics, tracing, or other observation; the shipped logger
 implementations own all text, Markdown, marker, and level decisions.
+The harness starter composes every contributed `LlmStepRunnerCallback` bean in
+Spring order together with the selected `LlmLoggerCallback`. The evaluation
+starter guarantees recorder first and logger last, with contributed generic
+`EvaluationStepRunnerCallback` beans composed between them. Supplying a custom
+logging-specific callback replaces only the corresponding shipped logger.
 `LlmStepRunnerCallback.stepStarted` combines the actor status breadcrumb with the
 complete step heading and instruction, avoiding a duplicate scenario event.
 Standalone `ScenarioExecutor(StepRunner)` stays silent while the starter supplies
@@ -87,6 +93,11 @@ common seam serves both `execute(...)` and JUnit's step-at-a-time path:
   result, then propagate unchanged;
 - successful and fail-fast executions produce exactly one completion event.
 
+Lifecycle events are drive-based rather than scope-based: if a caller abandons
+a step-at-a-time `ScenarioExecution` before a terminal `next()` call, no
+completion or abort event is synthesized. A zero-step scenario likewise emits
+no lifecycle event because execution never starts.
+
 ## Actual model information
 
 `ModelRegistry` stores only the first server-reported actual model name for each
@@ -106,15 +117,17 @@ judge model. No probe, model preamble, or pending/unresolved label is emitted.
 ## Starter wiring
 
 `inquisitor-harness-starter` always provides replaceable `ModelRegistry`,
-`LlmStepRunnerCallback`, and `ScenarioExecutionCallback` beans. It selects implementations from
+`LlmLoggerCallback`, and `ScenarioExecutionCallback` beans. It selects implementations from
 `inquisitor.harness.logging.format`, attaches the actor metadata advisor, and
-injects the collaborators into `LlmStepRunner` and `ScenarioExecutor`.
+composes all generic actor callback contributions into `LlmStepRunner` while
+injecting the scenario callback into `ScenarioExecutor`.
 
 When evaluation is enabled, `inquisitor-harness-evaluation-starter` provides the
-matching `EvaluationLoggerCallback`, composes the `StepEvaluationRecorder` before
-it, registers judge configuration, and attaches a judge metadata advisor to the
-bare judge client. Consumers can replace the logging callback or recorder with
-their own bean.
+matching `EvaluationLoggerCallback`, composes the `StepEvaluationRecorder`, other
+generic evaluation callback contributions, and the logger in that order,
+registers judge configuration, and attaches a judge metadata advisor to the bare
+judge client. Consumers can replace the logging callback or recorder with their
+own bean.
 
 ## Rendering choices
 

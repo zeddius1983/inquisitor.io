@@ -97,9 +97,10 @@ Initial supported nodes:
 - plain text.
 
 Unknown nodes should degrade to readable child text rather than fail the event.
-Exact Rich/Glow parity, images, and syntax-highlighted code are not required for
-the prototype. Rich-style terminal table layout is a separate follow-on in task
-15D; code panels and highlighting follow in task 15E.
+Exact Rich/Glow parity and images are not required for the prototype. Rich-style
+terminal table layout is implemented by
+[task 15D](task-15d-markdown-tables.md); code panels and highlighting are owned by
+task 15E.
 
 ## ANSI behavior
 
@@ -180,7 +181,7 @@ make the whole suite brittle.
 
 - No Spring Boot autoconfiguration — task 15B owns automatic installation.
 - No harness logging changes — task 15C owns scenario/model observability.
-- No Markdown table layout — task 15D owns Rich-style terminal tables.
+- Table layout remains owned by task 15D rather than this task's original scope.
 - No global mutation of Logback's static converter map.
 - No library-owned root `logback.xml`/`logback-spring.xml` that could take over a
   consumer application's logging configuration.

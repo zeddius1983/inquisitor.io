@@ -19,7 +19,13 @@ package io.inquisitor.harness.executor;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.ScenarioResult;
 
-/** Receives lifecycle events from a {@link ScenarioExecution}. */
+/**
+ * Receives lifecycle events from a {@link ScenarioExecution}.
+ *
+ * <p>Events follow calls that drive execution. Abandoning a step-at-a-time
+ * execution before its terminal {@link ScenarioExecution#next()} call does not
+ * synthesize completion or abort, and a scenario with no steps emits no event.
+ */
 public interface ScenarioExecutionCallback {
 
     /** Silent callback used when scenario lifecycle observation is not configured. */

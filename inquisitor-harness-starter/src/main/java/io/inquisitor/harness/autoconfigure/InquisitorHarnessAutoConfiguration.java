@@ -31,6 +31,7 @@ import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.logging.MarkdownLlmLogger;
 import io.inquisitor.harness.logging.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.LlmLoggerCallback;
 import io.inquisitor.harness.logging.ModelMetadataAdvisor;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
@@ -91,8 +92,8 @@ public class InquisitorHarnessAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean
-    LlmStepRunnerCallback inquisitorLlmStepRunnerCallback(
+    @ConditionalOnMissingBean(LlmLoggerCallback.class)
+    LlmLoggerCallback inquisitorLlmLoggerCallback(
             InquisitorHarnessProperties properties,
             ModelRegistry models) {
         return switch (properties.logging().format()) {
@@ -219,7 +220,9 @@ public class InquisitorHarnessAutoConfiguration {
     @ConditionalOnMissingBean
     LlmStepRunner inquisitorLlmStepRunner(
             ChatClient chatClient,
-            LlmStepRunnerCallback callback) {
+            ObjectProvider<LlmStepRunnerCallback> callbacks) {
+        val callback = callbacks.orderedStream()
+                .reduce(LlmStepRunnerCallback.NO_OP, LlmStepRunnerCallback::andThen);
         return new LlmStepRunner(chatClient, callback);
     }
 

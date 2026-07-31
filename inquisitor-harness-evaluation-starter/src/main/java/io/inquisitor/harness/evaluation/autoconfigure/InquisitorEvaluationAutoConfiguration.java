@@ -20,6 +20,7 @@ import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.evaluation.EvaluationProperties;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
+import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
 import io.inquisitor.harness.evaluation.RecordingToolCallback;
 import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
 import io.inquisitor.harness.evaluation.StepEvaluator;
@@ -35,6 +36,7 @@ import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
 import lombok.val;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.evaluation.Evaluator;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -183,8 +185,13 @@ public class InquisitorEvaluationAutoConfiguration {
             LlmStepRunner llmStepRunner,
             Evaluator evaluator,
             StepEvaluationRecorder recorder,
-            EvaluationLoggerCallback loggerCallback) {
-        val callback = recorder.andThen(loggerCallback);
+            EvaluationLoggerCallback loggerCallback,
+            ObjectProvider<EvaluationStepRunnerCallback> callbacks) {
+        val first = (EvaluationStepRunnerCallback) recorder;
+        val callback = callbacks.orderedStream()
+                .filter(candidate -> candidate != recorder && candidate != loggerCallback)
+                .reduce(first, EvaluationStepRunnerCallback::andThen)
+                .andThen(loggerCallback);
         return new EvaluationStepRunner(llmStepRunner, evaluator, callback);
     }
 }

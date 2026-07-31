@@ -115,6 +115,19 @@ class MarkdownEvaluationLoggerTest {
         });
     }
 
+    @Test
+    void toleratesMissingFeedbackFromACustomEvaluator() {
+        val response = new EvaluationResponse(
+                true, 1.0f, null, Map.of("category", "GROUNDED"));
+
+        val events = capture(() -> new MarkdownEvaluationLogger(new ModelRegistry())
+                .evaluationCompleted(request(), actorRun(), response, Duration.ofSeconds(1)));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .contains("GROUNDED", "### Feedback", "\n\n>"));
+    }
+
     private static StepRequest request() {
         return StepRequest.of("conversation", SCENARIO, STEPS.getFirst());
     }

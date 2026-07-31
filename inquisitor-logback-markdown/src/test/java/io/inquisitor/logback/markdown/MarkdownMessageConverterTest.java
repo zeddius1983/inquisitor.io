@@ -22,8 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 
@@ -61,13 +64,46 @@ class MarkdownMessageConverterTest {
 
     @Test
     void markedAndAnsiOptionsAreOrderIndependent() {
-        MarkdownMessageConverter converter = defaultConverter("ansi", "marked");
+        MarkdownMessageConverter converter = defaultConverter(
+                "tableWidth=100", "ansi", "marked");
         LoggingEvent marked = event("## rendered");
         marked.addMarker(MarkdownMarkers.markdown());
         String ordinary = "## ordinary";
 
         assertTrue(converter.convert(marked).contains("\u001B["));
         assertEquals(ordinary, converter.convert(event(ordinary)));
+    }
+
+    @Test
+    void tableWidthOptionWrapsTablesWithinTheConfiguredMessageBodyWidth() {
+        MarkdownMessageConverter converter = defaultConverter("plain", "tableWidth=24");
+        String rendered = converter.convert(event("""
+                | Key | Value |
+                |---|---|
+                | notes | alpha beta gamma delta |
+                """));
+
+        assertTrue(rendered.lines().allMatch(line ->
+                UnicodeDisplayWidth.INSTANCE.width(line) <= 24));
+        assertTrue(rendered.contains("alpha"));
+        assertTrue(rendered.contains("beta"));
+        assertTrue(rendered.contains("gamma"));
+        assertTrue(rendered.contains("delta"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"tableWidth", "tableWidth=", "tableWidth=nope",
+            "tableWidth=19", "tableWidth=1001"})
+    void malformedTableWidthFallsBackAndReportsAStatusWarning(String option) {
+        LoggerContext context = new LoggerContext();
+        MarkdownMessageConverter converter = new MarkdownMessageConverter();
+        converter.setContext(context);
+        converter.setOptionList(List.of("plain", option));
+
+        converter.start();
+
+        assertTrue(context.getStatusManager().getCopyOfStatusList().stream()
+                .anyMatch(status -> status.getMessage().contains("default tableWidth=120")));
     }
 
     @Test

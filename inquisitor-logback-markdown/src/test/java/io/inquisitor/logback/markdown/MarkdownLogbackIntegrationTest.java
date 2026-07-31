@@ -38,6 +38,36 @@ class MarkdownLogbackIntegrationTest {
     @Test
     void bundledRuleRegistersMdMsgWithoutChangingMsg() throws Exception {
         Path logFile = tempDir.resolve("integration.log");
+        String output = log(logFile, "# Integrated **Markdown**");
+
+        assertEquals(-1, output.indexOf('\u001B'));
+        assertEquals("    Integrated Markdown\n|RAW:# Integrated **Markdown**\n", output);
+    }
+
+    @Test
+    void bundledRuleRendersTablesWhileMsgKeepsTheRawMarkdown() throws Exception {
+        Path logFile = tempDir.resolve("table.log");
+        String markdown = """
+                | A | B |
+                |---|---:|
+                | x | 2 |""";
+
+        String output = log(logFile, markdown);
+
+        assertEquals(-1, output.indexOf('\u001B'));
+        assertEquals("""
+                    ┌───┬───┐
+                    │ A │ B │
+                    ├───┼───┤
+                    │ x │ 2 │
+                    └───┴───┘
+                |RAW:| A | B |
+                |---|---:|
+                | x | 2 |
+                """, output);
+    }
+
+    private String log(Path logFile, String message) throws Exception {
         LoggerContext context = new LoggerContext();
         context.setMDCAdapter(new LogbackMDCAdapter());
         context.putProperty("TEST_LOG", logFile.toString());
@@ -50,11 +80,9 @@ class MarkdownLogbackIntegrationTest {
         context.start();
 
         Logger logger = context.getLogger("integration");
-        logger.info(MarkdownMarkers.markdown(), "# Integrated **Markdown**");
+        logger.info(MarkdownMarkers.markdown(), message);
         context.stop();
 
-        String output = Files.readString(logFile).replace("\r\n", "\n");
-        assertEquals(-1, output.indexOf('\u001B'));
-        assertEquals("    Integrated Markdown\n|RAW:# Integrated **Markdown**\n", output);
+        return Files.readString(logFile).replace("\r\n", "\n");
     }
 }

@@ -36,6 +36,7 @@ public final class MarkdownMessageConverter extends MessageConverter {
     private static final String MARKED_OPTION = "marked";
     private static final String PLAIN_OPTION = "plain";
     private static final String ANSI_OPTION = "ansi";
+    private static final String TABLE_WIDTH_OPTION = "tableWidth";
 
     private final @Nullable MarkdownRenderer configuredRenderer;
     private final boolean configuredMarkedOnly;
@@ -52,8 +53,9 @@ public final class MarkdownMessageConverter extends MessageConverter {
     /**
      * Creates a converter backed by a custom renderer.
      *
-     * <p>The {@code plain} and {@code ansi} pattern options apply only to the
-     * default renderer; a supplied renderer owns its own output policy.
+     * <p>The {@code plain}, {@code ansi}, and {@code tableWidth} pattern options
+     * apply only to the default renderer; a supplied renderer owns its own
+     * output policy.
      *
      * @param renderer custom Markdown renderer
      */
@@ -118,7 +120,50 @@ public final class MarkdownMessageConverter extends MessageConverter {
         if (plain && ansi) {
             addWarn("Both 'plain' and 'ansi' were configured for %mdMsg; using plain output");
         }
-        renderer = new FlexmarkAnsiRenderer(ansiEnabled(plain, ansi));
+        renderer = new FlexmarkAnsiRenderer(
+                ansiEnabled(plain, ansi),
+                new MarkdownRendererOptions(tableWidth(options))
+                        .withTableIndent(LEFT_PADDING.length()));
+    }
+
+    private int tableWidth(List<String> options) {
+        List<String> configured = options.stream()
+                .map(String::strip)
+                .filter(MarkdownMessageConverter::isTableWidthOption)
+                .toList();
+        if (configured.isEmpty()) {
+            return MarkdownRendererOptions.DEFAULT_TABLE_WIDTH;
+        }
+        if (configured.size() > 1) {
+            addWarn("Multiple tableWidth options were configured for %mdMsg; using the last one");
+        }
+        String option = configured.getLast();
+        int separator = option.indexOf('=');
+        if (separator < 0 || option.substring(separator + 1).strip().isEmpty()) {
+            return invalidTableWidth(option);
+        }
+        try {
+            int width = Integer.parseInt(option.substring(separator + 1).strip());
+            if (!MarkdownRendererOptions.isValidTableWidth(width)) {
+                return invalidTableWidth(option);
+            }
+            return width;
+        }
+        catch (NumberFormatException exception) {
+            return invalidTableWidth(option);
+        }
+    }
+
+    private int invalidTableWidth(String option) {
+        addWarn("Invalid %mdMsg option '" + option + "'; using the default tableWidth="
+                + MarkdownRendererOptions.DEFAULT_TABLE_WIDTH);
+        return MarkdownRendererOptions.DEFAULT_TABLE_WIDTH;
+    }
+
+    private static boolean isTableWidthOption(String option) {
+        int separator = option.indexOf('=');
+        String name = separator < 0 ? option : option.substring(0, separator).strip();
+        return TABLE_WIDTH_OPTION.equalsIgnoreCase(name);
     }
 
     private static boolean hasOption(List<String> options, String expected) {

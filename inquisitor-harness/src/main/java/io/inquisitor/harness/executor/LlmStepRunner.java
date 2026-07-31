@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import io.inquisitor.harness.logging.PlainLlmLogger;
 import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.StepVerdict;
 import io.inquisitor.harness.model.ToolCallRecord;
@@ -55,8 +54,9 @@ public class LlmStepRunner implements StepRunner {
     private final ChatClient chatClient;
     private final LlmStepRunnerCallback callback;
 
+    /** Creates a standalone runner without lifecycle observation or narration. */
     public LlmStepRunner(ChatClient chatClient) {
-        this(chatClient, new PlainLlmLogger());
+        this(chatClient, LlmStepRunnerCallback.NO_OP);
     }
 
     public LlmStepRunner(ChatClient chatClient, LlmStepRunnerCallback callback) {
@@ -73,13 +73,12 @@ public class LlmStepRunner implements StepRunner {
         var synthetic = false;
         StepVerdict verdict;
         try {
-            val response = chatClient.prompt()
+            verdict = chatClient.prompt()
                     .user(request.userMessage())
                     .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, request.conversationId()))
                     .toolContext(Map.of(TraceKeys.LEDGER, ledger))
                     .call()
-                    .responseEntity(StepVerdict.class);
-            verdict = response.entity();
+                    .entity(StepVerdict.class);
         } catch (JacksonException e) {
             // A flaky model can return an empty or malformed completion; the structured-output
             // converter then throws. Degrade to a FAIL at this step so the scenario keeps its

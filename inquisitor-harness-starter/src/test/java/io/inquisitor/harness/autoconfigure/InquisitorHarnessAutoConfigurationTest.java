@@ -18,21 +18,29 @@ package io.inquisitor.harness.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import java.util.List;
 
 import javax.sql.DataSource;
 
 import io.inquisitor.harness.config.HarnessLoggingFormat;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.executor.LlmStepRunnerCallback;
+import io.inquisitor.harness.executor.LlmStepRunner;
+import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.ScenarioExecutionCallback;
 import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.logging.MarkdownLlmLogger;
 import io.inquisitor.harness.logging.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.LlmLoggerCallback;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
 import io.inquisitor.harness.logging.PlainLlmLogger;
 import io.inquisitor.harness.logging.PlainScenarioLogger;
+import io.inquisitor.harness.model.Scenario;
+import io.inquisitor.harness.model.Step;
 import io.inquisitor.harness.parser.ScenarioParser;
 import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
@@ -45,6 +53,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class InquisitorHarnessAutoConfigurationTest {
 
@@ -91,15 +100,37 @@ class InquisitorHarnessAutoConfigurationTest {
 
     @Test
     void allowsSemanticLoggersToBeReplaced() {
-        val llmCallback = mock(LlmStepRunnerCallback.class);
+        val llmCallback = mock(LlmLoggerCallback.class);
         val scenarioCallback = mock(ScenarioExecutionCallback.class);
 
-        runner.withBean(LlmStepRunnerCallback.class, () -> llmCallback)
+        runner.withBean(LlmLoggerCallback.class, () -> llmCallback)
                 .withBean(ScenarioExecutionCallback.class, () -> scenarioCallback)
                 .run(context -> {
-                    assertThat(context.getBean(LlmStepRunnerCallback.class)).isSameAs(llmCallback);
+                    assertThat(context.getBean(LlmLoggerCallback.class)).isSameAs(llmCallback);
                     assertThat(context.getBean(ScenarioExecutionCallback.class))
                             .isSameAs(scenarioCallback);
+                });
+    }
+
+    @Test
+    void composesContributedActorCallbackWithSelectedLogger() {
+        val observer = mock(LlmStepRunnerCallback.class);
+
+        runner.withBean(ChatModel.class, () -> mock(ChatModel.class))
+                .withBean("actorObserver", LlmStepRunnerCallback.class, () -> observer)
+                .run(context -> {
+                    assertThat(context.getBeansOfType(LlmStepRunnerCallback.class)).hasSize(2);
+                    val llmStepRunner = context.getBean(LlmStepRunner.class);
+                    val callback = (LlmStepRunnerCallback) ReflectionTestUtils
+                            .getField(llmStepRunner, "callback");
+                    val scenario = new Scenario("Scenario", "", List.of(
+                            new Step(1, "Step", "Run it")), null);
+                    val request = StepRequest.of(
+                            "conversation", scenario, scenario.steps().getFirst());
+
+                    callback.stepStarted(request);
+
+                    verify(observer).stepStarted(request);
                 });
     }
 

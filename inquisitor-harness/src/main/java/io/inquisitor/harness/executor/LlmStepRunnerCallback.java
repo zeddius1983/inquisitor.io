@@ -23,6 +23,13 @@ import lombok.val;
 /** Receives lifecycle events from an {@link LlmStepRunner}. */
 public interface LlmStepRunnerCallback {
 
+    /** Silent callback for standalone runners without lifecycle observers. */
+    LlmStepRunnerCallback NO_OP = new LlmStepRunnerCallback() {
+        @Override public void stepStarted(StepRequest request) { }
+        @Override public void responseUnparseable(StepRequest request, Throwable cause) { }
+        @Override public void stepCompleted(StepRequest request, StepRun run) { }
+    };
+
     /** Invoked before the actor model starts a step. */
     void stepStarted(StepRequest request);
 

@@ -25,6 +25,7 @@ import io.inquisitor.harness.executor.StepRun;
 import io.inquisitor.harness.executor.StepRunner;
 import io.inquisitor.harness.model.StepVerdict;
 import io.inquisitor.harness.model.ToolCallRecord;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.evaluation.EvaluationRequest;
@@ -39,6 +40,7 @@ import org.springframework.ai.evaluation.Evaluator;
  * transparent to the verdict — it returns the delegate's {@link StepRun} unchanged and
  * only observes — so enabling evaluation never changes whether a step passes.
  */
+@Slf4j
 public class EvaluationStepRunner implements StepRunner {
 
     private static final String SYNTHETIC_VERDICT_REASON =
@@ -64,10 +66,11 @@ public class EvaluationStepRunner implements StepRunner {
         if (run.synthetic()) {
             // The harness fabricated this verdict (empty/unparseable model response) —
             // there is no actor claim to audit, so judging it would only produce noise.
-            callback.evaluationSkipped(request, run, SYNTHETIC_VERDICT_REASON);
+            notifyCallback("skipped", () ->
+                    callback.evaluationSkipped(request, run, SYNTHETIC_VERDICT_REASON));
             return run;
         }
-        callback.evaluationStarted(request, run);
+        notifyCallback("started", () -> callback.evaluationStarted(request, run));
 
         val context = run.toolCalls().isEmpty()
                 ? List.<Document>of()
@@ -81,12 +84,23 @@ public class EvaluationStepRunner implements StepRunner {
         } catch (RuntimeException e) {
             // The judge is an observer: its infrastructure failures (timeouts, transport
             // errors) must never fail the actor's step. Record the gap and move on.
-            callback.evaluationFailed(request, run, e);
+            notifyCallback("failed", () -> callback.evaluationFailed(request, run, e));
             return run;
         }
         val elapsed = Duration.ofNanos(System.nanoTime() - startedNanos);
-        callback.evaluationCompleted(request, run, evaluation, elapsed);
+        notifyCallback("completed", () ->
+                callback.evaluationCompleted(request, run, evaluation, elapsed));
         return run;
+    }
+
+    private static void notifyCallback(String event, Runnable notification) {
+        try {
+            notification.run();
+        }
+        catch (RuntimeException exception) {
+            log.warn("Evaluation {} callback failed; the actor result remains unchanged",
+                    event, exception);
+        }
     }
 
     private static String renderTrace(List<ToolCallRecord> toolCalls) {

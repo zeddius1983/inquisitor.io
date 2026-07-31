@@ -33,6 +33,7 @@ import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.QUOTE_MARKER;
 import static io.inquisitor.logback.markdown.AnsiStyler.TextStyle.STRONG;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
@@ -65,6 +66,12 @@ import com.vladsch.flexmark.ast.SoftLineBreak;
 import com.vladsch.flexmark.ast.StrongEmphasis;
 import com.vladsch.flexmark.ast.Text;
 import com.vladsch.flexmark.ast.ThematicBreak;
+import com.vladsch.flexmark.ext.tables.TableBlock;
+import com.vladsch.flexmark.ext.tables.TableBody;
+import com.vladsch.flexmark.ext.tables.TableCell;
+import com.vladsch.flexmark.ext.tables.TableHead;
+import com.vladsch.flexmark.ext.tables.TableRow;
+import com.vladsch.flexmark.ext.tables.TablesExtension;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.ast.Node;
 import com.vladsch.flexmark.util.ast.NodeVisitor;
@@ -80,17 +87,28 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
     private static final String POWERLINE_SEPARATOR = "";
     private static final String POWERLINE_RIGHT_CAP = "";
 
-    private static final Parser PARSER = Parser.builder().build();
+    private static final Parser PARSER = tableParser();
 
     private final AnsiStyler styler;
     private final SyntaxHighlighter syntaxHighlighter;
+    private final MarkdownRendererOptions options;
+
+    private static Parser tableParser() {
+        Parser.Builder builder = Parser.builder()
+                .extensions(List.of(TablesExtension.create()));
+        builder.set(TablesExtension.COLUMN_SPANS, false);
+        builder.set(TablesExtension.DISCARD_EXTRA_COLUMNS, false);
+        builder.set(TablesExtension.APPEND_MISSING_COLUMNS, false);
+        return builder.build();
+    }
 
     /**
      * Creates a renderer that emits ANSI only when an interactive, color-capable
      * terminal is detected.
      */
     public FlexmarkAnsiRenderer() {
-        this(AnsiSupport.isAutoEnabled(), BuiltinSyntaxHighlighter.INSTANCE);
+        this(AnsiSupport.isAutoEnabled(), BuiltinSyntaxHighlighter.INSTANCE,
+                new MarkdownRendererOptions());
     }
 
     /**
@@ -99,7 +117,26 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
      * @param ansiEnabled whether ANSI style sequences should be emitted
      */
     public FlexmarkAnsiRenderer(boolean ansiEnabled) {
-        this(ansiEnabled, BuiltinSyntaxHighlighter.INSTANCE);
+        this(ansiEnabled, BuiltinSyntaxHighlighter.INSTANCE, new MarkdownRendererOptions());
+    }
+
+    /**
+     * Creates a renderer with automatic ANSI detection and explicit layout options.
+     *
+     * @param options terminal layout options
+     */
+    public FlexmarkAnsiRenderer(MarkdownRendererOptions options) {
+        this(AnsiSupport.isAutoEnabled(), BuiltinSyntaxHighlighter.INSTANCE, options);
+    }
+
+    /**
+     * Creates a renderer with explicit ANSI and layout policies.
+     *
+     * @param ansiEnabled whether ANSI style sequences should be emitted
+     * @param options terminal layout options
+     */
+    public FlexmarkAnsiRenderer(boolean ansiEnabled, MarkdownRendererOptions options) {
+        this(ansiEnabled, BuiltinSyntaxHighlighter.INSTANCE, options);
     }
 
     /**
@@ -111,8 +148,23 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
     public FlexmarkAnsiRenderer(
             boolean ansiEnabled,
             SyntaxHighlighter syntaxHighlighter) {
+        this(ansiEnabled, syntaxHighlighter, new MarkdownRendererOptions());
+    }
+
+    /**
+     * Creates a renderer with explicit ANSI, highlighting, and layout policies.
+     *
+     * @param ansiEnabled whether ANSI style sequences should be emitted
+     * @param syntaxHighlighter thread-safe code-fence highlighter
+     * @param options terminal layout options
+     */
+    public FlexmarkAnsiRenderer(
+            boolean ansiEnabled,
+            SyntaxHighlighter syntaxHighlighter,
+            MarkdownRendererOptions options) {
         this.styler = new AnsiStyler(ansiEnabled);
         this.syntaxHighlighter = syntaxHighlighter;
+        this.options = options;
     }
 
     /**
@@ -125,7 +177,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
     @Override
     public String render(String markdown) {
         Node document = PARSER.parse(markdown);
-        return new RenderingContext(styler, syntaxHighlighter).render(document);
+        return new RenderingContext(styler, syntaxHighlighter, options).render(document);
     }
 
     private static final class RenderingContext {
@@ -136,14 +188,21 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         private final Deque<Integer> listItemContentIndents = new ArrayDeque<>();
         private final AnsiStyler styler;
         private final SyntaxHighlighter syntaxHighlighter;
+        private final MarkdownRendererOptions options;
+        private final TerminalTableRenderer tableRenderer;
         private final NodeVisitor visitor;
 
         private int quoteDepth;
         private boolean lineStart = true;
 
-        RenderingContext(AnsiStyler styler, SyntaxHighlighter syntaxHighlighter) {
+        RenderingContext(
+                AnsiStyler styler,
+                SyntaxHighlighter syntaxHighlighter,
+                MarkdownRendererOptions options) {
             this.styler = styler;
             this.syntaxHighlighter = syntaxHighlighter;
+            this.options = options;
+            this.tableRenderer = new TerminalTableRenderer(styler, UnicodeDisplayWidth.INSTANCE);
             this.visitor = new NodeVisitor(
                     new VisitHandler<>(Heading.class, this::visit),
                     new VisitHandler<>(Paragraph.class, this::visit),
@@ -167,6 +226,7 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
                     new VisitHandler<>(ThematicBreak.class, this::visit),
                     new VisitHandler<>(SoftLineBreak.class, this::visit),
                     new VisitHandler<>(HardLineBreak.class, this::visit),
+                    new VisitHandler<>(TableBlock.class, this::visit),
                     new VisitHandler<>(Text.class, this::visit)) {
                 @Override
                 protected void processNode(
@@ -417,6 +477,216 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
         private void visit(HardLineBreak ignored) {
             ensureNewline();
             appendListItemContentIndent();
+        }
+
+        private void visit(TableBlock tableBlock) {
+            boolean nested = tableBlock.getParent() instanceof ListItem;
+            if (nested) {
+                ensureNewline();
+            }
+            else {
+                separateBlock();
+            }
+
+            int listIndent = nested && !listItemContentIndents.isEmpty()
+                    ? listItemContentIndents.element()
+                    : 0;
+            int availableWidth = Math.max(1,
+                    options.tableWidth() - options.tableIndent()
+                            - quoteDepth * 2 - listIndent);
+            List<String> lines = tableRenderer.render(collectTable(tableBlock), availableWidth);
+            for (int index = 0; index < lines.size(); index++) {
+                if (index > 0) {
+                    ensureNewline();
+                }
+                if (nested) {
+                    appendListItemContentIndent();
+                }
+                append(lines.get(index));
+            }
+            endBlock();
+        }
+
+        private TerminalTable collectTable(TableBlock tableBlock) {
+            List<TerminalTable.Row> headerRows = new ArrayList<>();
+            List<TerminalTable.Row> bodyRows = new ArrayList<>();
+            List<TerminalTable.Alignment> alignments = new ArrayList<>();
+            for (Node child = tableBlock.getFirstChild(); child != null; child = child.getNext()) {
+                if (child instanceof TableHead) {
+                    collectRows(child, headerRows, alignments);
+                }
+                else if (child instanceof TableBody) {
+                    collectRows(child, bodyRows, alignments);
+                }
+            }
+            return new TerminalTable(headerRows, bodyRows, alignments);
+        }
+
+        private void collectRows(
+                Node section,
+                List<TerminalTable.Row> rows,
+                List<TerminalTable.Alignment> alignments) {
+            for (Node child = section.getFirstChild(); child != null; child = child.getNext()) {
+                if (!(child instanceof TableRow row)) {
+                    continue;
+                }
+                List<TerminalTable.Cell> cells = new ArrayList<>();
+                int column = 0;
+                for (Node cellNode = row.getFirstChild(); cellNode != null;
+                        cellNode = cellNode.getNext()) {
+                    if (!(cellNode instanceof TableCell cell)) {
+                        continue;
+                    }
+                    cells.add(collectCell(cell));
+                    while (alignments.size() <= column) {
+                        alignments.add(TerminalTable.Alignment.LEFT);
+                    }
+                    if (cell.getAlignment() != null) {
+                        alignments.set(column, alignment(cell.getAlignment()));
+                    }
+                    column++;
+                }
+                rows.add(new TerminalTable.Row(cells));
+            }
+        }
+
+        private TerminalTable.Cell collectCell(TableCell cell) {
+            List<TerminalTable.Fragment> fragments = new ArrayList<>();
+            for (Node child = cell.getFirstChild(); child != null; child = child.getNext()) {
+                collectInline(child, List.of(), fragments);
+            }
+            return new TerminalTable.Cell(fragments);
+        }
+
+        private void collectInline(
+                Node node,
+                List<AnsiStyler.TextStyle> inlineStyles,
+                List<TerminalTable.Fragment> fragments) {
+            if (node instanceof Text text) {
+                appendFragment(fragments, text.getChars().unescape().toString(), inlineStyles);
+                return;
+            }
+            if (node instanceof HtmlEntity entity) {
+                appendFragment(fragments, entity.getChars().unescape().toString(), inlineStyles);
+                return;
+            }
+            if (node instanceof Code code) {
+                appendFragment(fragments, code.getText().toString(),
+                        withStyle(inlineStyles, INLINE_CODE));
+                return;
+            }
+            if (node instanceof StrongEmphasis) {
+                collectInlineChildren(node, withStyle(inlineStyles, STRONG), fragments);
+                return;
+            }
+            if (node instanceof Emphasis) {
+                collectInlineChildren(node, withStyle(inlineStyles, EMPHASIS), fragments);
+                return;
+            }
+            if (node instanceof Link link) {
+                List<AnsiStyler.TextStyle> linkStyles = withStyle(inlineStyles, LINK);
+                collectInlineChildren(link, linkStyles, fragments);
+                appendLinkDestination(fragments, link.getUrl().unescape().toString(),
+                        link.getText().unescape().toString(), linkStyles);
+                return;
+            }
+            if (node instanceof LinkRef link) {
+                Reference reference = link.getReferenceNode(link.getDocument());
+                if (reference == null) {
+                    appendFragment(fragments, link.getChars().unescape().toString(), inlineStyles);
+                    return;
+                }
+                List<AnsiStyler.TextStyle> linkStyles = withStyle(inlineStyles, LINK);
+                collectInlineChildren(link, linkStyles, fragments);
+                String label = (link.isReferenceTextCombined()
+                        ? link.getReference()
+                        : link.getText()).unescape().toString();
+                appendLinkDestination(fragments,
+                        reference.getUrl().unescape().toString(), label, linkStyles);
+                return;
+            }
+            if (node instanceof AutoLink link) {
+                appendFragment(fragments, link.getText().unescape().toString(),
+                        withStyle(inlineStyles, LINK));
+                return;
+            }
+            if (node instanceof MailLink link) {
+                appendFragment(fragments, link.getText().unescape().toString(),
+                        withStyle(inlineStyles, LINK));
+                return;
+            }
+            if (node instanceof Image image) {
+                String alt = image.getText().unescape().toString();
+                String url = image.getUrl().unescape().toString();
+                appendFragment(fragments, alt.isBlank() ? "image" : alt, inlineStyles);
+                appendLinkDestination(fragments, url, alt,
+                        withStyle(inlineStyles, LINK));
+                return;
+            }
+            if (node instanceof SoftLineBreak || node instanceof HardLineBreak) {
+                appendFragment(fragments, " ", inlineStyles);
+                return;
+            }
+            if (node.hasChildren()) {
+                collectInlineChildren(node, inlineStyles, fragments);
+                return;
+            }
+            appendFragment(fragments, node.getChars().unescape().toString(), inlineStyles);
+        }
+
+        private void collectInlineChildren(
+                Node parent,
+                List<AnsiStyler.TextStyle> inlineStyles,
+                List<TerminalTable.Fragment> fragments) {
+            for (Node child = parent.getFirstChild(); child != null; child = child.getNext()) {
+                collectInline(child, inlineStyles, fragments);
+            }
+        }
+
+        private static void appendLinkDestination(
+                List<TerminalTable.Fragment> fragments,
+                String url,
+                String label,
+                List<AnsiStyler.TextStyle> styles) {
+            if (url.isBlank() || url.equals(label)) {
+                return;
+            }
+            appendFragment(fragments, " (" + url + ")", styles);
+        }
+
+        private static List<AnsiStyler.TextStyle> withStyle(
+                List<AnsiStyler.TextStyle> styles,
+                AnsiStyler.TextStyle style) {
+            List<AnsiStyler.TextStyle> nested = new ArrayList<>(styles.size() + 1);
+            nested.addAll(styles);
+            nested.add(style);
+            return List.copyOf(nested);
+        }
+
+        private static void appendFragment(
+                List<TerminalTable.Fragment> fragments,
+                String text,
+                List<AnsiStyler.TextStyle> styles) {
+            if (text.isEmpty()) {
+                return;
+            }
+            if (!fragments.isEmpty()) {
+                TerminalTable.Fragment last = fragments.getLast();
+                if (last.styles().equals(styles)) {
+                    fragments.set(fragments.size() - 1,
+                            new TerminalTable.Fragment(last.text() + text, styles));
+                    return;
+                }
+            }
+            fragments.add(new TerminalTable.Fragment(text, styles));
+        }
+
+        private static TerminalTable.Alignment alignment(TableCell.Alignment alignment) {
+            return switch (alignment) {
+                case LEFT -> TerminalTable.Alignment.LEFT;
+                case CENTER -> TerminalTable.Alignment.CENTER;
+                case RIGHT -> TerminalTable.Alignment.RIGHT;
+            };
         }
 
         private void visit(Text text) {

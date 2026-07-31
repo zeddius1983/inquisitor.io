@@ -22,14 +22,11 @@ import java.util.Optional;
 
 import io.inquisitor.harness.executor.StepRequest;
 import lombok.val;
+import org.jspecify.annotations.Nullable;
 
 /** Shared Markdown formatting for actor and judge step diagnostics. */
 public final class MarkdownStepLogSupport {
 
-    private static final int GAUGE_WIDTH = 5;
-    private static final String GAUGE_FILLED = "▰";
-    private static final String GAUGE_EMPTY = "▱";
-    private static final String GGUF_EXTENSION = ".gguf";
     private static final int BLOCKQUOTE_PREFIX_WIDTH = 2;
 
     private MarkdownStepLogSupport() { }
@@ -39,23 +36,15 @@ public final class MarkdownStepLogSupport {
             StepRequest request,
             Optional<String> reportedModel,
             String... trailingSegments) {
-        val scenario = request.scenario();
-        val step = request.step();
-        val total = scenario.steps().size();
-        val tail = String.join("  ", trailingSegments);
-        val model = reportedModel
-                .map(MarkdownStepLogSupport::displayModelName)
-                .map(name -> name + "  ")
-                .orElse("");
-        return " %s%s  %s  %s %d/%d  %s ".formatted(
-                model, scenario.name(), breadcrumbTitle(step.title(), step.index()),
-                progressGauge(step.index(), total), step.index(), total, tail);
+        return MarkdownBreadcrumbs.step(request, reportedModel, trailingSegments);
     }
 
     /** Renders and wraps text as a Markdown blockquote within the given line width. */
-    public static String blockquote(String value, int lineWidth) {
+    public static String blockquote(@Nullable String value, int lineWidth) {
         val contentWidth = Math.max(1, lineWidth - BLOCKQUOTE_PREFIX_WIDTH);
-        val normalized = value.replace("\r\n", "\n").replace('\r', '\n');
+        val normalized = (value == null ? "" : value)
+                .replace("\r\n", "\n")
+                .replace('\r', '\n');
         val wrapped = new ArrayList<String>();
         for (String line : normalized.split("\n", -1)) {
             wrapped.addAll(wrapLine(line, contentWidth));
@@ -89,48 +78,4 @@ public final class MarkdownStepLogSupport {
         return List.copyOf(wrapped);
     }
 
-    private static String breadcrumbTitle(String title, int index) {
-        val prefix = "Step " + index;
-        if (!title.regionMatches(true, 0, prefix, 0, prefix.length())
-                || title.length() == prefix.length()) {
-            return title;
-        }
-        int cursor = prefix.length();
-        while (cursor < title.length() && Character.isWhitespace(title.charAt(cursor))) {
-            cursor++;
-        }
-        if (cursor == title.length() || !isHeadingSeparator(title.charAt(cursor))) {
-            return title;
-        }
-        cursor++;
-        while (cursor < title.length() && Character.isWhitespace(title.charAt(cursor))) {
-            cursor++;
-        }
-        return cursor == title.length() ? title : title.substring(cursor);
-    }
-
-    private static boolean isHeadingSeparator(char candidate) {
-        return candidate == '—' || candidate == '–' || candidate == '-' || candidate == ':';
-    }
-
-    private static String displayModelName(String reported) {
-        val separator = Math.max(reported.lastIndexOf('/'), reported.lastIndexOf('\\'));
-        val filename = separator >= 0 && separator + 1 < reported.length()
-                ? reported.substring(separator + 1)
-                : reported;
-        return filename.length() > GGUF_EXTENSION.length()
-                && filename.regionMatches(true, filename.length() - GGUF_EXTENSION.length(),
-                GGUF_EXTENSION, 0, GGUF_EXTENSION.length())
-                ? filename.substring(0, filename.length() - GGUF_EXTENSION.length())
-                : filename;
-    }
-
-    private static String progressGauge(int current, int total) {
-        if (total <= 0) {
-            return GAUGE_EMPTY.repeat(GAUGE_WIDTH);
-        }
-        val scaled = (long) current * GAUGE_WIDTH + total / 2L;
-        val filled = (int) Math.min(GAUGE_WIDTH, Math.max(0L, scaled / total));
-        return GAUGE_FILLED.repeat(filled) + GAUGE_EMPTY.repeat(GAUGE_WIDTH - filled);
-    }
 }

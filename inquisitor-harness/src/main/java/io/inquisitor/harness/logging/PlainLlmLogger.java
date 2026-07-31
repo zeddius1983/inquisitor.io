@@ -18,13 +18,12 @@ package io.inquisitor.harness.logging;
 
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
-import io.inquisitor.harness.executor.LlmStepRunnerCallback;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
 /** Conventional single-line actor-model diagnostics. */
 @Slf4j
-public class PlainLlmLogger implements LlmStepRunnerCallback {
+public class PlainLlmLogger implements LlmLoggerCallback {
 
     @Override
     public void stepStarted(StepRequest request) {

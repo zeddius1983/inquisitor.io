@@ -29,7 +29,7 @@ The authoritative status is git history + this table.
 | 15A | Reusable Logback Markdown renderer — `%mdMsg` / `%mdMsg{marked}` | ✅ done (`tasks/task-15a-logback-markdown.md`) |
 | 15B | Automatic Logback Markdown Spring Boot starter | ✅ done (`tasks/task-15b-logback-markdown-starter.md`) |
 | 15C | Semantic plain/Markdown harness lifecycle and model logging | ✅ done (`tasks/task-15c-verbose-harness-logging.md`) |
-| 15D | Rich-style Markdown table rendering in terminal logs | 📝 planned (`tasks/task-15d-markdown-tables.md`) |
+| 15D | Rich-style Markdown table rendering in terminal logs | ✅ done (`tasks/task-15d-markdown-tables.md`) |
 | 15E | ANSI code-block panels and pluggable syntax highlighting | ✅ done (`tasks/task-15e-code-block-highlighting.md`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` — LLM-authored dependency mocks | 🧭 design outlined, not started (`tasks/task-06`) |
 

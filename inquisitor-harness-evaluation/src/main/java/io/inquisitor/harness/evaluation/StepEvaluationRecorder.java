@@ -81,7 +81,7 @@ public class StepEvaluationRecorder implements EvaluationStepRunnerCallback {
     }
 
     private static StepEvaluationRecord build(StepRequest request, StepRun run,
-            double score, @Nullable String category, String feedback) {
+            double score, @Nullable String category, @Nullable String feedback) {
         val scenario = request.scenario();
         val step = request.step();
         val verdict = run.verdict();
@@ -94,13 +94,13 @@ public class StepEvaluationRecorder implements EvaluationStepRunnerCallback {
                 .stepCount(scenario.steps().size())
                 .stepTitle(step.title())
                 .outcome(verdict.outcome())
-                .reasoning(verdict.reasoning())
+                .reasoning(verdict.reasoning() == null ? "" : verdict.reasoning())
                 .evidence(verdict.evidence())
                 .toolCalls(run.toolCalls().stream().map(ToolCallRecord::describe).toList())
                 .elapsedMillis(run.elapsed().toMillis())
                 .score(score)
                 .category(category)
-                .feedback(feedback)
+                .feedback(feedback == null ? "" : feedback)
                 .build();
     }
 

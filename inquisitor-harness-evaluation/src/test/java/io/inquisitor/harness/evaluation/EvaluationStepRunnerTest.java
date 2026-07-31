@@ -113,6 +113,29 @@ class EvaluationStepRunnerTest {
     }
 
     @Test
+    void callbackFailureNeverFailsTheActorStep() {
+        val verdict = new StepVerdict(Outcome.PASS, "fine", List.of());
+        val delegate = (StepRunner) request -> new StepRun(verdict, List.of(), Duration.ZERO);
+        val evaluator = (Evaluator) request ->
+                new EvaluationResponse(true, 1.0f, "grounded", Map.of());
+        val callback = new RecordingEvaluationLogger() {
+            @Override
+            public void evaluationCompleted(
+                    StepRequest request,
+                    StepRun actorRun,
+                    EvaluationResponse response,
+                    Duration elapsed) {
+                throw new IllegalStateException("observer failed");
+            }
+        };
+        val runner = new EvaluationStepRunner(delegate, evaluator, callback);
+
+        val run = runner.run(StepRequest.of("conv-5", SCENARIO, SCENARIO.steps().getFirst()));
+
+        assertThat(run.verdict()).isSameAs(verdict);
+    }
+
+    @Test
     void syntheticVerdictSkipsTheJudge() {
         val verdict = new StepVerdict(Outcome.FAIL,
                 "The model returned an empty or unparseable response.", List.of());
@@ -188,7 +211,7 @@ class EvaluationStepRunnerTest {
         assertThat(events).containsExactly("failing:started");
     }
 
-    private static final class RecordingEvaluationLogger implements EvaluationStepRunnerCallback {
+    private static class RecordingEvaluationLogger implements EvaluationStepRunnerCallback {
 
         private final List<String> events = new ArrayList<>();
 

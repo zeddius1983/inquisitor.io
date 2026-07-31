@@ -15,6 +15,56 @@ Leading and trailing source line breaks are preserved by count, so callers can
 request a genuine blank line between the conventional Logback prefix and a
 rendered Markdown block.
 
+## Markdown tables
+
+GFM pipe tables render as compact Rich-style Unicode tables. For example:
+
+```markdown
+| Model | Groundedness | Notes |
+|:------|-------------:|:------|
+| gemma-3 | **100%** | Fast |
+| qwen-3 | 92% | Uses `reasoning` |
+```
+
+An ANSI-capable console uses dim borders, a bold cyan header, and the normal
+inline Markdown styles while retaining this geometry:
+
+```text
+┌─────────┬──────────────┬────────────────┐
+│ Model   │ Groundedness │ Notes          │
+├─────────┼──────────────┼────────────────┤
+│ gemma-3 │         100% │ Fast           │
+│ qwen-3  │          92% │ Uses reasoning │
+└─────────┴──────────────┴────────────────┘
+```
+
+ANSI-disabled output has the same Unicode shape with no escape sequences.
+Left, centre, and right separator alignment is honoured; narrow cells wrap on
+word boundaries and hard-wrap long tokens without discarding content. Width is
+measured in terminal columns, so combining marks, CJK text, and emoji do not
+distort the borders.
+
+The deterministic message-body limit defaults to 120 columns. Manual Logback
+patterns can override it in marked or unmarked mode:
+
+```xml
+<pattern>%mdMsg{marked,tableWidth=100}%n</pattern>
+<pattern>%mdMsg{tableWidth=100}%n</pattern>
+```
+
+For converter output, the limit includes the standard four-space Markdown
+indent. It cannot discover the timestamp/logger prefix outside `%mdMsg`; subtract
+that prefix from the desired physical terminal width. Invalid or out-of-range
+values fall back to 120 and produce a Logback status warning. Programmatic users
+can configure the renderer directly:
+
+```java
+new FlexmarkAnsiRenderer(true, new MarkdownRendererOptions(100));
+```
+
+Tables are a console presentation. File and structured/JSON appenders should
+continue using `%msg` so they retain the original Markdown source.
+
 ## Code blocks
 
 When ANSI is enabled, fenced and indented code blocks render as dark background
@@ -73,6 +123,12 @@ dependencies {
     implementation("io.inquisitor:inquisitor-logback-markdown")
 }
 ```
+
+The module exposes Logback types as a compile-only API and does not select or
+pin an application's logging backend at runtime. Spring Boot applications
+already receive a compatible `logback-classic` through starter logging. A
+standalone Logback application must provide `logback-classic` 1.5.13 or later
+itself.
 
 ## Shared console appender
 

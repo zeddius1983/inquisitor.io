@@ -16,6 +16,7 @@ spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-depe
 spring-ai-bom            = { module = "org.springframework.ai:spring-ai-bom",              version.ref = "spring-ai" }
 flexmark-all             = { module = "com.vladsch.flexmark:flexmark-all",                 version.ref = "flexmark" }
 flexmark-core            = { module = "com.vladsch.flexmark:flexmark",                     version.ref = "flexmark" }
+flexmark-tables          = { module = "com.vladsch.flexmark:flexmark-ext-tables",          version.ref = "flexmark" }
 junit-jupiter            = { module = "org.junit.jupiter:junit-jupiter",                   version.ref = "junit-jupiter" }
 jspecify                 = { module = "org.jspecify:jspecify",                             version.ref = "jspecify" }
 lombok                   = { module = "org.projectlombok:lombok",                          version.ref = "lombok" }

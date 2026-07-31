@@ -18,7 +18,6 @@ package io.inquisitor.harness.logging;
 
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
-import io.inquisitor.harness.executor.LlmStepRunnerCallback;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -26,7 +25,7 @@ import lombok.val;
 /** Marker-tagged Markdown actor-model diagnostics. */
 @Slf4j
 @RequiredArgsConstructor
-public class MarkdownLlmLogger implements LlmStepRunnerCallback {
+public class MarkdownLlmLogger implements LlmLoggerCallback {
 
     private final ModelRegistry models;
 

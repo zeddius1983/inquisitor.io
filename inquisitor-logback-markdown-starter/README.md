@@ -82,6 +82,10 @@ processed once. `SiftingAppender` children are not discoverable when the starter
 runs and may be created later, so use the base module's manual
 `%mdMsg{marked}` integration inside a sifted appender configuration.
 
+Installation is startup-only. Logback's configuration lock prevents competing
+reconfiguration but does not pause threads already formatting events; do not call
+the installer manually after application startup.
+
 Logback runtime scan/reload may replace the layout and remove the instance-level
 override. Restart the application after a logging reconfiguration, or use the
 base module's manual `%mdMsg{marked}` integration when runtime scanning is

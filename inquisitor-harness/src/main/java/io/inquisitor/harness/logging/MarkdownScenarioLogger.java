@@ -16,9 +16,12 @@
 
 package io.inquisitor.harness.logging;
 
+import java.time.Duration;
+
 import io.inquisitor.harness.executor.ScenarioExecutionCallback;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.ScenarioResult;
+import io.inquisitor.harness.model.StepResult;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
@@ -28,31 +31,48 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
 
     @Override
     public void scenarioStarted(Scenario scenario) {
-        info(markdown("# ", scenario.name(), scenario.description()));
+        info("""
+                ### %s
+
+                # %s%s
+                """.formatted(MarkdownBreadcrumbs.scenario(scenario, 0, "RUN"),
+                scenario.name(), body(scenario.description())));
     }
 
     @Override
     public void scenarioAborted(ScenarioResult partialResult, Throwable cause) {
-        val message = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
-        log.warn(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
+        val markdown = MarkdownLogSupport.block("""
                 > **Scenario aborted:** %s
-                > Completed `%d/%d` steps before `%s`.
+                > Completed `%d/%d` steps before an infrastructure failure.
                 """.formatted(partialResult.scenario().name(), partialResult.results().size(),
-                partialResult.scenario().steps().size(), message)), cause);
+                partialResult.scenario().steps().size()));
+        log.atWarn()
+                .addMarker(MarkdownLogSupport.marker())
+                .setCause(cause)
+                .log(markdown);
     }
 
     @Override
     public void scenarioCompleted(ScenarioResult result) {
+        val outcome = result.passed() ? "PASS" : "FAIL";
+        val breadcrumb = MarkdownBreadcrumbs.scenario(result.scenario(), result.results().size(),
+                outcome, "⧖ " + LogDurationFormatter.format(elapsed(result)));
         info("""
-                # Scenario result — %s
+                ### %s
 
                 **%s** completed `%d/%d` steps.
-                """.formatted(result.passed() ? "PASS" : "FAIL", result.scenario().name(),
+                """.formatted(breadcrumb, result.scenario().name(),
                 result.results().size(), result.scenario().steps().size()));
     }
 
-    private static String markdown(String prefix, String heading, String body) {
-        return body.isBlank() ? prefix + heading : prefix + heading + "\n\n" + body;
+    private static Duration elapsed(ScenarioResult result) {
+        return result.results().stream()
+                .map(StepResult::elapsed)
+                .reduce(Duration.ZERO, Duration::plus);
+    }
+
+    private static String body(String value) {
+        return value.isBlank() ? "" : "\n\n" + value;
     }
 
     private static void info(String markdown) {

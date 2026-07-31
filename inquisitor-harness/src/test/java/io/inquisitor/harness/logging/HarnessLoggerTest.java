@@ -31,7 +31,9 @@ import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
 import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.Scenario;
+import io.inquisitor.harness.model.ScenarioResult;
 import io.inquisitor.harness.model.Step;
+import io.inquisitor.harness.model.StepResult;
 import io.inquisitor.harness.model.StepVerdict;
 import lombok.val;
 import org.junit.jupiter.api.Test;
@@ -55,7 +57,33 @@ class HarnessLoggerTest {
                     .containsExactly(MarkdownLogSupport.MARKER_NAME);
             assertThat(event.getFormattedMessage()).startsWith("\n\n").endsWith("\n");
             assertThat(event.getFormattedMessage())
-                    .contains("# Account lifecycle", "Open and fund Bob's account.");
+                    .contains(
+                            "###  Account lifecycle  ▱▱▱▱▱ 0/1  RUN ",
+                            "# Account lifecycle",
+                            "Open and fund Bob's account.");
+        });
+    }
+
+    @Test
+    void markdownScenarioCompletionUsesProgressOutcomeAndTotalDurationBreadcrumb() {
+        val result = new ScenarioResult(SCENARIO, List.of(new StepResult(
+                SCENARIO.steps().getFirst(),
+                new StepVerdict(Outcome.PASS, "verified", List.of()),
+                Duration.ofMillis(73_289))));
+
+        val events = capture(MarkdownScenarioLogger.class, Level.INFO,
+                () -> new MarkdownScenarioLogger().scenarioCompleted(result));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getMarkerList())
+                    .extracting(Object::toString)
+                    .containsExactly(MarkdownLogSupport.MARKER_NAME);
+            assertThat(event.getFormattedMessage())
+                    .startsWith("\n\n")
+                    .endsWith("\n")
+                    .contains(
+                            "###  Account lifecycle  ▰▰▰▰▰ 1/1  PASS  ⧖ 1 min 13.289 s ",
+                            "**Account lifecycle** completed `1/1` steps.");
         });
     }
 
@@ -140,6 +168,41 @@ class HarnessLoggerTest {
             assertThat(String.join(" ", reasoningLines.stream()
                     .map(line -> line.substring(2))
                     .toList())).isEqualTo(reasoning);
+        });
+    }
+
+    @Test
+    void markdownActorCompletionToleratesMissingReasoning() {
+        val request = StepRequest.of("conversation", SCENARIO, SCENARIO.steps().getFirst());
+        val run = new StepRun(
+                new StepVerdict(Outcome.PASS, null, List.of()),
+                List.of(), Duration.ofSeconds(1));
+
+        val events = capture(MarkdownLlmLogger.class, Level.DEBUG,
+                () -> new MarkdownLlmLogger(new ModelRegistry()).stepCompleted(request, run));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .contains("### Reasoning", "\n\n>"));
+    }
+
+    @Test
+    void markdownScenarioAbortPreservesThrowableWhenItsMessageContainsPlaceholders() {
+        val cause = new IllegalStateException("response body contained {}");
+        val result = new ScenarioResult(SCENARIO, List.of());
+
+        val events = capture(MarkdownScenarioLogger.class, Level.WARN,
+                () -> new MarkdownScenarioLogger().scenarioAborted(result, cause));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getThrowableProxy()).isNotNull();
+            assertThat(event.getThrowableProxy().getClassName())
+                    .isEqualTo(IllegalStateException.class.getName());
+            assertThat(event.getThrowableProxy().getMessage())
+                    .isEqualTo("response body contained {}");
+            assertThat(event.getFormattedMessage())
+                    .contains("Scenario aborted", "infrastructure failure")
+                    .doesNotContain("response body contained");
         });
     }
 

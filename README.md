@@ -124,8 +124,9 @@ explicitly with `@Scenario("classpath:scenarios/custom.md")`.
 
 ## Harness logging
 
-The harness logs an INFO-level run narrative without requiring framework-wide
-DEBUG logging. Choose plain text (the default) or marker-tagged Markdown:
+The harness logs scenario start/completion at INFO. Actor-step breadcrumbs,
+verdict reasoning, judge scores, and judge feedback are detailed diagnostics at
+DEBUG. Choose plain text (the default) or marker-tagged Markdown:
 
 ```yaml
 inquisitor:
@@ -134,7 +135,18 @@ inquisitor:
       format: markdown # plain | markdown
 ```
 
-The harness logs each scenario and step immediately before it runs. The first
+Enable the two narrow logger namespaces to see the complete run narrative
+without enabling framework-wide DEBUG logging:
+
+```yaml
+logging:
+  level:
+    io.inquisitor.harness.logging: DEBUG
+    io.inquisitor.harness.evaluation.logging: DEBUG # when evaluation is enabled
+```
+
+The harness logs each scenario at INFO and each step at DEBUG immediately before
+it runs. The first
 nonblank actor-model name reported by real response metadata is cached without a
 probe request. In Markdown mode, it becomes a step-breadcrumb segment as soon as
 it is available: normally on the first completion and every later step event.
