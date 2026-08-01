@@ -36,7 +36,7 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
     @Override
     public void stepStarted(StepRequest request) {
         val step = request.step();
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
                 ### %s
 
                 ## %s%s
@@ -48,7 +48,7 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
     public void responseUnparseable(StepRequest request, Throwable cause) {
         val scenario = request.scenario();
         val step = request.step();
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
                 > **Actor response rejected — step %d/%d:** unparseable model response; treating as FAIL.
                 >
                 > %s
@@ -59,7 +59,7 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
     public void stepCompleted(StepRequest request, StepRun run) {
         val breadcrumb = breadcrumb(request, run.verdict().outcome().name(),
                 "⧖ " + LogDurationFormatter.format(run.elapsed()));
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
                 ### %s
 
                 ### Reasoning

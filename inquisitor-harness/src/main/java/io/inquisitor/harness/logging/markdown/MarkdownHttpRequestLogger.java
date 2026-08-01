@@ -54,7 +54,7 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
                 MarkdownLogSupport.codeBlock("http", headers(request.headers())),
                 MarkdownLogSupport.codeBlock(language(request.body(), contentType(request.headers())),
                         body(request.body(), contentType(request.headers()))));
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
     @Override
@@ -69,7 +69,7 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
                 breadcrumb(request, "HTTP " + response.status()),
                 MarkdownLogSupport.codeBlock(language(response.body(), response.contentType()),
                         body(response.body(), response.contentType())));
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
     @Override
@@ -82,7 +82,7 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
                 """.formatted(
                 breadcrumb,
                 MarkdownStepLogSupport.blockquote(error, breadcrumb.length()));
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
     private static String breadcrumb(Request request, String... trailingSegments) {

@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -37,21 +38,50 @@ import ch.qos.logback.core.encoder.Encoder;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
 import ch.qos.logback.core.pattern.DynamicConverter;
 import ch.qos.logback.core.spi.AppenderAttachable;
-import io.inquisitor.logback.markdown.MarkdownMessageConverter;
-import io.inquisitor.logback.markdown.MarkdownRenderer;
-import lombok.RequiredArgsConstructor;
+import io.inquisitor.logback.markdown.converter.MarkdownEventConverter;
+import io.inquisitor.logback.markdown.converter.MarkdownMessageConverter;
+import io.inquisitor.logback.markdown.marker.MarkdownMarkerTurboFilter;
+import io.inquisitor.logback.markdown.palette.MarkdownPalette;
+import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
+import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.ILoggerFactory;
 
 @Slf4j
-@RequiredArgsConstructor
 class LogbackMarkdownInstaller {
 
     private static final List<String> MESSAGE_WORDS = List.of("m", "msg", "message");
+    private static final String EVENT_WORD = "mdEvent";
+    private static final String EXCLUSIVE_PATTERN = "%" + EVENT_WORD;
 
     private final MarkdownRenderer renderer;
+    private final MarkdownConsoleMode consoleMode;
+    private final @Nullable Boolean ansiEnabled;
+    private final MarkdownPalette palette;
+
+    LogbackMarkdownInstaller(MarkdownRenderer renderer) {
+        this(renderer, MarkdownConsoleMode.SHARED, false, MarkdownPalettes.defaultPalette());
+    }
+
+    LogbackMarkdownInstaller(
+            MarkdownRenderer renderer,
+            MarkdownConsoleMode consoleMode,
+            @Nullable Boolean ansiEnabled) {
+        this(renderer, consoleMode, ansiEnabled, MarkdownPalettes.defaultPalette());
+    }
+
+    LogbackMarkdownInstaller(
+            MarkdownRenderer renderer,
+            MarkdownConsoleMode consoleMode,
+            @Nullable Boolean ansiEnabled,
+            MarkdownPalette palette) {
+        this.renderer = renderer;
+        this.consoleMode = consoleMode;
+        this.ansiEnabled = ansiEnabled;
+        this.palette = palette;
+    }
 
     int install(ILoggerFactory loggingSystem) {
         if (!(loggingSystem instanceof LoggerContext context)) {
@@ -67,6 +97,7 @@ class LogbackMarkdownInstaller {
         try {
             val appenders = reachableAppenders(context);
             int installed = 0;
+            boolean exclusiveLayoutPresent = false;
             for (val appender : appenders) {
                 if (!(appender instanceof ConsoleAppender<?> consoleAppender)) {
                     continue;
@@ -81,6 +112,10 @@ class LogbackMarkdownInstaller {
                 if (install(layout)) {
                     installed++;
                 }
+                exclusiveLayoutPresent |= isExclusive(layout);
+            }
+            if (consoleMode == MarkdownConsoleMode.EXCLUSIVE && exclusiveLayoutPresent) {
+                installMarkerEnabler(context);
             }
             log.debug("Automatic Markdown logging installed into {} console layout(s)", installed);
             return installed;
@@ -91,6 +126,12 @@ class LogbackMarkdownInstaller {
     }
 
     private boolean install(PatternLayout layout) {
+        return consoleMode == MarkdownConsoleMode.EXCLUSIVE
+                ? installExclusive(layout)
+                : installShared(layout);
+    }
+
+    private boolean installShared(PatternLayout layout) {
         val converterMap = layout.getInstanceConverterMap();
         if (MESSAGE_WORDS.stream()
                 .allMatch(word -> converterMap.get(word) instanceof MarkdownConverterSupplier)) {
@@ -133,6 +174,61 @@ class LogbackMarkdownInstaller {
             log.debug("Could not install automatic Markdown conversion into a console layout", exception);
             return false;
         }
+    }
+
+    private boolean installExclusive(PatternLayout layout) {
+        val supplier = new MarkdownEventConverterSupplier(renderer, ansiEnabled, palette);
+        if (EXCLUSIVE_PATTERN.equals(layout.getPattern())
+                && supplier.equals(layout.getInstanceConverterMap().get(EVENT_WORD))) {
+            return false;
+        }
+        val converterMap = layout.getInstanceConverterMap();
+        val previousSupplier = converterMap.get(EVENT_WORD);
+        boolean previouslyAbsent = !converterMap.containsKey(EVENT_WORD);
+        val previousPattern = layout.getPattern();
+        val wasStarted = layout.isStarted();
+        try {
+            converterMap.put(EVENT_WORD, supplier);
+            layout.setPattern(EXCLUSIVE_PATTERN);
+            if (wasStarted) {
+                layout.start();
+                if (!layout.isStarted()) {
+                    throw new IllegalStateException("PatternLayout did not restart");
+                }
+            }
+            return true;
+        }
+        catch (RuntimeException exception) {
+            restoreEventConverter(converterMap, previousSupplier, previouslyAbsent);
+            layout.setPattern(previousPattern);
+            if (wasStarted) {
+                try {
+                    layout.start();
+                }
+                catch (RuntimeException recoveryException) {
+                    exception.addSuppressed(recoveryException);
+                }
+            }
+            log.debug("Could not install exclusive Markdown console conversion", exception);
+            return false;
+        }
+    }
+
+    private static boolean isExclusive(PatternLayout layout) {
+        return EXCLUSIVE_PATTERN.equals(layout.getPattern())
+                && layout.getInstanceConverterMap().get(EVENT_WORD)
+                instanceof MarkdownEventConverterSupplier;
+    }
+
+    private static void installMarkerEnabler(LoggerContext context) {
+        if (context.getTurboFilterList().stream()
+                .anyMatch(MarkdownMarkerTurboFilter.class::isInstance)) {
+            return;
+        }
+        val filter = new MarkdownMarkerTurboFilter();
+        filter.setContext(context);
+        filter.start();
+        context.getTurboFilterList().add(0, filter);
     }
 
     private static Set<Appender<ILoggingEvent>> reachableAppenders(LoggerContext context) {
@@ -178,12 +274,38 @@ class LogbackMarkdownInstaller {
         previouslyAbsent.forEach(converterMap::remove);
     }
 
+    private static void restoreEventConverter(
+            Map<String, Supplier<DynamicConverter>> converterMap,
+            @Nullable Supplier<DynamicConverter> previous,
+            boolean previouslyAbsent) {
+        if (previouslyAbsent) {
+            converterMap.remove(EVENT_WORD);
+        }
+        else {
+            converterMap.put(EVENT_WORD, Objects.requireNonNull(previous));
+        }
+    }
+
     private record MarkdownConverterSupplier(MarkdownRenderer renderer)
             implements Supplier<DynamicConverter> {
 
         @Override
         public DynamicConverter get() {
             return new MarkdownMessageConverter(renderer, true);
+        }
+    }
+
+    private record MarkdownEventConverterSupplier(
+            MarkdownRenderer renderer,
+            @Nullable Boolean ansiEnabled,
+            MarkdownPalette palette)
+            implements Supplier<DynamicConverter> {
+
+        @Override
+        public DynamicConverter get() {
+            return ansiEnabled == null
+                    ? new MarkdownEventConverter(renderer, palette)
+                    : new MarkdownEventConverter(renderer, ansiEnabled, palette);
         }
     }
 }

@@ -37,6 +37,7 @@ import io.inquisitor.harness.logging.markdown.MarkdownLogSupport;
 import io.inquisitor.harness.logging.markdown.MarkdownScenarioLogger;
 import io.inquisitor.harness.logging.markdown.MarkdownSqlLogger;
 import io.inquisitor.harness.logging.plain.PlainHttpRequestLogger;
+import io.inquisitor.harness.logging.plain.PlainLlmLogger;
 import io.inquisitor.harness.logging.plain.PlainScenarioLogger;
 import io.inquisitor.harness.logging.plain.PlainSqlLogger;
 import io.inquisitor.harness.model.Outcome;
@@ -89,11 +90,8 @@ class HarnessLoggerTest {
                     .extracting(Object::toString)
                     .containsExactly(MarkdownLogSupport.MARKER_NAME);
             assertThat(event.getFormattedMessage())
-                    .startsWith("\n\n")
-                    .endsWith("\n")
-                    .contains(
-                            "###  Account lifecycle  ▰▰▰▰▰ 1/1  PASS  ⧖ 1 min 13.289 s ",
-                            "**Account lifecycle** completed `1/1` steps.");
+                    .isEqualTo("\n\n###  Account lifecycle  ▰▰▰▰▰ 1/1 "
+                            + " PASS  ⧖ 1 min 13.289 s \n");
         });
     }
 
@@ -105,7 +103,7 @@ class HarnessLoggerTest {
                 List.of(), Duration.ofMillis(13_289));
         val registry = new ModelRegistry();
 
-        val events = capture(MarkdownLlmLogger.class, Level.DEBUG, () -> {
+        val events = capture(MarkdownLlmLogger.class, Level.INFO, () -> {
             val logger = new MarkdownLlmLogger(registry);
             logger.stepStarted(request);
             resolve(registry, ModelRole.ACTOR,
@@ -141,7 +139,7 @@ class HarnessLoggerTest {
         val scenario = new Scenario("Import accounts", "", steps, null);
         val request = StepRequest.of("conversation", scenario, steps.get(1));
 
-        val events = capture(MarkdownLlmLogger.class, Level.DEBUG,
+        val events = capture(MarkdownLlmLogger.class, Level.INFO,
                 () -> new MarkdownLlmLogger(new ModelRegistry()).stepStarted(request));
 
         assertThat(events).singleElement().satisfies(event ->
@@ -159,7 +157,7 @@ class HarnessLoggerTest {
                 new StepVerdict(Outcome.PASS, reasoning, List.of()),
                 List.of(), Duration.ofSeconds(2));
 
-        val events = capture(MarkdownLlmLogger.class, Level.DEBUG,
+        val events = capture(MarkdownLlmLogger.class, Level.INFO,
                 () -> new MarkdownLlmLogger(new ModelRegistry()).stepCompleted(request, run));
 
         assertThat(events).singleElement().satisfies(event -> {
@@ -188,7 +186,7 @@ class HarnessLoggerTest {
                 new StepVerdict(Outcome.PASS, null, List.of()),
                 List.of(), Duration.ofSeconds(1));
 
-        val events = capture(MarkdownLlmLogger.class, Level.DEBUG,
+        val events = capture(MarkdownLlmLogger.class, Level.INFO,
                 () -> new MarkdownLlmLogger(new ModelRegistry()).stepCompleted(request, run));
 
         assertThat(events).singleElement().satisfies(event ->
@@ -201,7 +199,7 @@ class HarnessLoggerTest {
         val cause = new IllegalStateException("response body contained {}");
         val result = new ScenarioResult(SCENARIO, List.of());
 
-        val events = capture(MarkdownScenarioLogger.class, Level.WARN,
+        val events = capture(MarkdownScenarioLogger.class, Level.INFO,
                 () -> new MarkdownScenarioLogger().scenarioAborted(result, cause));
 
         assertThat(events).singleElement().satisfies(event -> {
@@ -225,7 +223,7 @@ class HarnessLoggerTest {
                 "localhost", "POST", "/accounts/import", headers,
                 "[{\"id\":1,\"owner\":\"Alice\"},{\"id\":2,\"owner\":\"Bob\"}]");
 
-        val events = capture(MarkdownHttpRequestLogger.class, Level.DEBUG,
+        val events = capture(MarkdownHttpRequestLogger.class, Level.INFO,
                 () -> new MarkdownHttpRequestLogger().requestStarted(request));
 
         assertThat(events).singleElement().satisfies(event -> {
@@ -257,7 +255,7 @@ class HarnessLoggerTest {
                 201, "application/json",
                 "[{\"id\":1,\"owner\":\"Alice\"},{\"id\":2,\"owner\":\"Bob\"}]");
 
-        val events = capture(MarkdownHttpRequestLogger.class, Level.DEBUG,
+        val events = capture(MarkdownHttpRequestLogger.class, Level.INFO,
                 () -> new MarkdownHttpRequestLogger().requestCompleted(request, response));
 
         assertThat(events).singleElement().satisfies(event ->
@@ -293,7 +291,7 @@ class HarnessLoggerTest {
         val request = new SqlLogger.Request(
                 "app", "SELECT owner, currency FROM account ORDER BY owner");
 
-        val events = capture(MarkdownSqlLogger.class, Level.DEBUG,
+        val events = capture(MarkdownSqlLogger.class, Level.INFO,
                 () -> new MarkdownSqlLogger().statementStarted(request));
 
         assertThat(events).singleElement().satisfies(event -> {
@@ -316,7 +314,7 @@ class HarnessLoggerTest {
         val request = new SqlLogger.Request("app", "SELECT owner FROM account");
         val response = new SqlLogger.Response("1 row(s): [{owner=Alice}]");
 
-        val events = capture(MarkdownSqlLogger.class, Level.DEBUG,
+        val events = capture(MarkdownSqlLogger.class, Level.INFO,
                 () -> new MarkdownSqlLogger().statementCompleted(request, response));
 
         assertThat(events).singleElement().satisfies(event ->
@@ -342,15 +340,30 @@ class HarnessLoggerTest {
     }
 
     @Test
-    void plainEventsDoNotCarryTheMarkdownMarker() {
+    void plainScenarioStartOmitsTheMarkdownDescription() {
         val events = capture(PlainScenarioLogger.class, Level.INFO,
                 () -> new PlainScenarioLogger().scenarioStarted(SCENARIO));
 
         assertThat(events).singleElement().satisfies(event -> {
             assertThat(event.getMarkerList()).isNullOrEmpty();
             assertThat(event.getFormattedMessage())
-                    .startsWith("Scenario START: Account lifecycle")
-                    .contains("Open and fund Bob's account.");
+                    .isEqualTo("Scenario START: Account lifecycle")
+                    .doesNotContain("Open and fund Bob's account.");
+        });
+    }
+
+    @Test
+    void plainStepStartOmitsTheMarkdownInstruction() {
+        val request = StepRequest.of("conversation", SCENARIO, SCENARIO.steps().getFirst());
+
+        val events = capture(PlainLlmLogger.class, Level.DEBUG,
+                () -> new PlainLlmLogger().stepStarted(request));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getMarkerList()).isNullOrEmpty();
+            assertThat(event.getFormattedMessage())
+                    .isEqualTo("[Account lifecycle] step 1/1 - RUN: Step 1 — Open account")
+                    .doesNotContain("Create Bob in USD.");
         });
     }
 
@@ -374,7 +387,12 @@ class HarnessLoggerTest {
         logger.addAppender(appender);
         try {
             invocation.run();
-            return List.copyOf(appender.list);
+            val events = List.copyOf(appender.list);
+            if (loggerType.getSimpleName().startsWith("Markdown")) {
+                assertThat(events).allSatisfy(event ->
+                        assertThat(event.getLevel()).isEqualTo(Level.INFO));
+            }
+            return events;
         }
         finally {
             logger.detachAppender(appender);

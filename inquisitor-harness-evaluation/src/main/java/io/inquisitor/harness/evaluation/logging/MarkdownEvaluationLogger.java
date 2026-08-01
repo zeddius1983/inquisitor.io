@@ -39,14 +39,14 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
 
     @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {
-        debug("### " + breadcrumb(request, "EVALUATION"));
+        info("### " + breadcrumb(request, "EVALUATION"));
     }
 
     @Override
     public void evaluationSkipped(StepRequest request, StepRun actorRun, String reason) {
         val scenario = request.scenario();
         val step = request.step();
-        debug("""
+        info("""
                 > **Not evaluated — step %d/%d:** %s
                 """.formatted(step.index(), scenario.steps().size(), reason));
     }
@@ -55,7 +55,7 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
     public void evaluationFailed(StepRequest request, StepRun actorRun, Throwable cause) {
         val scenario = request.scenario();
         val step = request.step();
-        log.warn(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
                 > **Judge call failed — step %d/%d:** the actor result is unchanged and this step was not evaluated.
                 """.formatted(step.index(), scenario.steps().size())), cause);
     }
@@ -70,7 +70,7 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
         val breadcrumb = breadcrumb(request, category,
                 "Score %.3f".formatted(response.getScore()),
                 "⧖ " + LogDurationFormatter.format(elapsed));
-        debug("""
+        info("""
                 ### %s
 
                 ### Feedback
@@ -93,7 +93,7 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
                 : String.valueOf(metadata.get("category"));
     }
 
-    private static void debug(String markdown) {
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+    private static void info(String markdown) {
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 }

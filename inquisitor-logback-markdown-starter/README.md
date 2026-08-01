@@ -18,21 +18,25 @@ No `logback.xml` or `logback-spring.xml` change is required for Spring Boot's
 standard pattern console appender. Emit Markdown with the shared marker:
 
 ```java
-import static io.inquisitor.logback.markdown.MarkdownMarkers.markdown;
+import static io.inquisitor.logback.markdown.marker.MarkdownMarkers.markdown;
 
 log.info(markdown(), "## Step 1\n\n**Intent:** create an account");
 ```
 
-Only marked events are parsed. Ordinary Spring, SQL, and application messages
-remain unchanged. Each non-empty rendered Markdown line receives four spaces of
-left padding, making multiline blocks visually distinct from their Logback prefix
-and surrounding conventional messages. List markers receive one additional space.
+Only marked events are parsed. In shared mode, ordinary Spring, SQL, and
+application messages remain unchanged and each rendered Markdown line receives
+four spaces of left padding. In exclusive mode the starter owns the complete
+console event: ordinary events are omitted, the original Logback prefix is
+removed, and an indented Markdown body follows a compact Powerline time/level
+header. The exclusive layout is installed in Boot's early logging lifecycle, so
+framework startup records are suppressed before application initialization.
 ANSI code blocks use the base renderer's equal-width background panels and
 language-aware highlighting; plain output remains unframed and readable.
 
-The harness emits the same marker for scenario, step, actor, and judge events when
-`inquisitor.harness.logging.format=markdown`; adding this starter renders them
-without any logging XML changes.
+The harness emits the same marker for scenario, step, actor, tool, and judge events
+when `inquisitor.harness.logging.format=markdown`. The starter's default `auto`
+mode detects that property and selects the exclusive console automatically,
+without logging XML or logger-level configuration.
 
 ## Configuration
 
@@ -43,9 +47,67 @@ inquisitor:
   logging:
     markdown:
       enabled: true
+      console-mode: auto # auto | shared | exclusive
+      palette: gruvbox   # gruvbox | nord | catppuccin | tokyo-night
 ```
 
 Set `enabled: false` to leave the active Logback context untouched.
+
+`auto` preserves the shared console for a generic application and selects
+`exclusive` when `inquisitor.harness.logging.format=markdown`. Set `shared`
+explicitly to keep ordinary console logs beside the rendered harness narrative,
+or `exclusive` to use the clean marker-only console without the harness.
+
+## Exclusive console
+
+Exclusive mode replaces the compatible console layout with the full-event
+`%mdEvent` converter. A marked INFO event appears as:
+
+```text
+
+13:42:15.123INFO
+
+    Fetch a non-existent account
+```
+
+ANSI-capable terminals use the selected palette for the timestamp, log level,
+Markdown syntax, tables, code highlighting, and Powerline breadcrumbs. Gruvbox
+is the default and uses the neutral `color_bg1` timestamp background
+(`#3c3836`) and a level-specific segment:
+
+| Level | Color |
+|-------|-------|
+| INFO | muted green `#98971a` |
+| WARN | muted yellow `#d79921` |
+| ERROR | muted red `#cc241d` |
+| DEBUG | muted purple `#b16286` |
+| TRACE | neutral `#665c54` |
+
+With the default, breadcrumbs and Markdown syntax use the rest of Gruvbox Dark:
+orange `#d65d0e`, aqua `#689d6a`, blue `#458588`, foreground `#fbf1c7`, and
+neutral panel shades `#3c3836`/`#665c54`.
+
+The other built-in choices are Nord, Catppuccin Mocha, and Tokyo Night. Palette
+selection is honored by both shared mode and the early exclusive-console
+installation, so startup and application events cannot disagree. Powerline text
+automatically switches between the palette's light and dark neutral colors to
+maintain contrast against each segment background, falling back to black or white
+when necessary to reach 4.5:1.
+
+Third-party palettes implement the base module's `MarkdownPaletteProvider` SPI
+and register it through `META-INF/services`. Their provider name can be used in
+the same `palette` property. `ServiceLoader` resolution intentionally happens
+outside the Spring bean lifecycle so the palette is already available to the
+early exclusive-console installer. See the base module's
+[custom palette guide](../inquisitor-logback-markdown/README.md#custom-palettes).
+
+The SLF4J `INQUISITOR_MARKDOWN` marker is the selection contract. A Java marker
+interface is intentionally unnecessary: Logback evaluates events, not Spring bean
+types, and the event marker also supports custom Markdown emitters. A neutral
+TurboFilter force-enables marked DEBUG/TRACE events while leaving unmarked events
+at their normal effective levels. The exclusive console converter then emits only
+marked events; file and structured appenders continue receiving their normal raw
+events and patterns.
 
 ## ANSI policy
 
@@ -63,10 +125,12 @@ This bridge is starter-specific. Manual `%mdMsg` layouts use the base module's
 ## Supported layouts and fallback
 
 The starter updates only `ConsoleAppender` instances whose encoder exposes a
-Logback `PatternLayout`. It keeps the consumer's complete pattern and replaces
-the instance-local `m`, `msg`, and `message` converter suppliers with a
-marker-aware converter. Attached composite appenders are traversed recursively,
-so a compatible console behind an `AsyncAppender` is supported.
+Logback `PatternLayout`. Shared mode keeps the consumer's complete pattern and
+replaces the instance-local `m`, `msg`, and `message` converter suppliers with a
+marker-aware converter. Exclusive mode replaces that console pattern with
+`%mdEvent`; the original pattern remains untouched on every non-console appender.
+Attached composite appenders are traversed recursively, so a compatible console
+behind an `AsyncAppender` is supported.
 
 It deliberately skips:
 
@@ -82,9 +146,11 @@ processed once. `SiftingAppender` children are not discoverable when the starter
 runs and may be created later, so use the base module's manual
 `%mdMsg{marked}` integration inside a sifted appender configuration.
 
-Installation is startup-only. Logback's configuration lock prevents competing
-reconfiguration but does not pause threads already formatting events; do not call
-the installer manually after application startup.
+Exclusive mode is installed immediately after Spring Boot initializes its logging
+system; shared mode and a contributed renderer are finalized by autoconfiguration.
+Logback's configuration lock prevents competing reconfiguration but does not pause
+threads already formatting events; do not call the installer manually after
+application startup.
 
 Logback runtime scan/reload may replace the layout and remove the instance-level
 override. Restart the application after a logging reconfiguration, or use the
@@ -95,5 +161,6 @@ required.
 
 For complete appender and pattern control, depend only on
 `inquisitor-logback-markdown` and follow its README to register
-`%mdMsg`/`%mdMsg{marked}`. The manual and automatic artifacts are alternatives;
+`%mdMsg`/`%mdMsg{marked}` or the full-event `%mdEvent`. The manual and automatic
+artifacts are alternatives;
 the starter does not ship or take ownership of a root logging configuration.

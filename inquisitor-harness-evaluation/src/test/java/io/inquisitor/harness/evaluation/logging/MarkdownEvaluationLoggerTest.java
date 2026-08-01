@@ -149,13 +149,16 @@ class MarkdownEvaluationLoggerTest {
         val originalLevel = logger.getLevel();
         val originalAdditive = logger.isAdditive();
         val appender = new ListAppender<ILoggingEvent>();
-        logger.setLevel(Level.DEBUG);
+        logger.setLevel(Level.INFO);
         logger.setAdditive(false);
         appender.start();
         logger.addAppender(appender);
         try {
             invocation.run();
-            return List.copyOf(appender.list);
+            val events = List.copyOf(appender.list);
+            assertThat(events).allSatisfy(event ->
+                    assertThat(event.getLevel()).isEqualTo(Level.INFO));
+            return events;
         }
         finally {
             logger.detachAppender(appender);

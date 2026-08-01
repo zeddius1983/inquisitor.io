@@ -31,6 +31,7 @@ The authoritative status is git history + this table.
 | 15C | Semantic plain/Markdown harness lifecycle and model logging | ✅ done (`tasks/task-15c-verbose-harness-logging.md`) |
 | 15D | Rich-style Markdown table rendering in terminal logs | ✅ done (`tasks/task-15d-markdown-tables.md`) |
 | 15E | ANSI code-block panels and pluggable syntax highlighting | ✅ done (`tasks/task-15e-code-block-highlighting.md`) |
+| 15F | Clean marker-only Markdown console with Powerline event headers | ✅ done (`tasks/task-15f-clean-markdown-console.md`) |
 | 06 | `inquisitor-mock` + `inquisitor-mock-starter` — LLM-authored dependency mocks | 🧭 design outlined, not started (`tasks/task-06`) |
 
 ## Now

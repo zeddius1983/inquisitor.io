@@ -34,7 +34,8 @@ Create `inquisitor-logback-markdown` with base package
   version catalog/BOM rather than inline versions. Do not use `flexmark-all`
   when the module only needs the parser/core AST.
 - Do not depend on `inquisitor-harness` or any Spring AI module.
-- Add `package-info.java` with `@NullMarked`.
+- Add `@NullMarked` `package-info.java` declarations to the responsibility-based
+  `ansi`, `converter`, `highlight`, `marker`, `palette`, and `renderer` packages.
 
 Logback is the intentional backend API of this artifact. It must not leak into
 the core harness merely because this optional module exists.
@@ -125,7 +126,7 @@ Ship a resource such as `io/inquisitor/logback/markdown.xml`:
 <included>
     <conversionRule
         conversionWord="mdMsg"
-        class="io.inquisitor.logback.markdown.MarkdownMessageConverter"/>
+        class="io.inquisitor.logback.markdown.converter.MarkdownMessageConverter"/>
 </included>
 ```
 

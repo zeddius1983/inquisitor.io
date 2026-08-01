@@ -35,18 +35,27 @@ import ch.qos.logback.core.FileAppender;
 import ch.qos.logback.core.LayoutBase;
 import ch.qos.logback.core.encoder.EncoderBase;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
-import io.inquisitor.logback.markdown.FlexmarkAnsiRenderer;
-import io.inquisitor.logback.markdown.MarkdownMarkers;
-import io.inquisitor.logback.markdown.MarkdownRenderer;
+import ch.qos.logback.core.spi.FilterReply;
+import io.inquisitor.logback.markdown.marker.MarkdownMarkerTurboFilter;
+import io.inquisitor.logback.markdown.marker.MarkdownMarkers;
+import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
+import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
 import lombok.val;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.ansi.AnsiOutput;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.bootstrap.DefaultBootstrapContext;
+import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
+import org.springframework.boot.context.logging.LoggingApplicationListener;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.ApplicationListener;
+import org.springframework.core.io.support.SpringFactoriesLoader;
+import org.springframework.mock.env.MockEnvironment;
 
 class InquisitorLogbackMarkdownAutoConfigurationTest {
 
@@ -68,6 +77,10 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         runner(loggerContext).run(context -> {
             assertThat(context).hasSingleBean(MarkdownLoggingProperties.class);
             assertThat(context.getBean(MarkdownLoggingProperties.class).enabled()).isTrue();
+            assertThat(context.getBean(MarkdownLoggingProperties.class).consoleMode())
+                    .isEqualTo(MarkdownConsoleMode.AUTO);
+            assertThat(context.getBean(MarkdownLoggingProperties.class).palette())
+                    .isEqualTo("gruvbox");
             assertThat(context).hasSingleBean(MarkdownRenderer.class);
             assertThat(context).hasBean("inquisitorLogbackMarkdownInstallation");
 
@@ -76,6 +89,200 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
             assertThat(console.layout().doLayout(event("## ordinary")))
                     .isEqualTo("prefix [INFO] ## ordinary");
         });
+    }
+
+    @Test
+    void configuredPaletteStylesSharedMarkdownRendering() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.ALWAYS);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "%msg");
+
+        runner(loggerContext)
+                .withPropertyValues("inquisitor.logging.markdown.palette=tokyo-night")
+                .run(context -> {
+                    assertThat(context.getBean(MarkdownLoggingProperties.class).palette())
+                            .isEqualTo("tokyo-night");
+                    assertThat(console.layout().doLayout(marked("## rendered")))
+                            .contains("38;2;125;207;255");
+                });
+    }
+
+    @Test
+    void harnessMarkdownFormatUsesAnExclusivePowerlineConsole() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.NEVER);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "prefix [%level] %msg%n");
+        val root = loggerContext.getLogger(Logger.ROOT_LOGGER_NAME);
+        root.setLevel(Level.INFO);
+
+        runner(loggerContext)
+                .withPropertyValues("inquisitor.harness.logging.format=markdown")
+                .run(context -> {
+                    val markedOutput = console.layout().doLayout(marked("## Fetch account"));
+                    val lineSeparator = System.lineSeparator();
+
+                    assertThat(markedOutput)
+                            .matches("\\R\\d{2}:\\d{2}:\\d{2}\\.\\d{3}INFO\\R"
+                                    + "\\R    Fetch account\\R")
+                            .doesNotContain("prefix", "    ");
+                    assertThat(console.layout().doLayout(event("ordinary"))).isEmpty();
+                    assertThat(loggerContext.getTurboFilterList())
+                            .singleElement()
+                            .isInstanceOf(MarkdownMarkerTurboFilter.class);
+
+                    val logger = loggerContext.getLogger("exclusive-test");
+                    assertThat(logger.isDebugEnabled()).isFalse();
+                    assertThat(logger.isDebugEnabled(MarkdownMarkers.markdown())).isTrue();
+                    assertThat(loggerContext.getTurboFilterList().getFirst().decide(
+                            null, logger, Level.DEBUG, "ordinary", null, null))
+                            .isEqualTo(FilterReply.NEUTRAL);
+                    assertThat(markedOutput).endsWith(lineSeparator);
+                });
+    }
+
+    @Test
+    void earlyListenerSuppressesSpringStartupOutput() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.NEVER);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "prefix %msg%n");
+        val environment = new MockEnvironment()
+                .withProperty("inquisitor.harness.logging.format", "markdown");
+        val listener = new MarkdownLoggingApplicationListener(() -> loggerContext);
+
+        assertThat(listener.getOrder())
+                .isEqualTo(LoggingApplicationListener.DEFAULT_ORDER + 1);
+        listener.onApplicationEvent(environmentPreparedEvent(environment));
+
+        assertThat(console.layout().doLayout(event("Spring startup"))).isEmpty();
+        assertThat(console.layout().doLayout(marked("## Harness event")))
+                .matches("\\R\\d{2}:\\d{2}:\\d{2}\\.\\d{3}INFO\\R"
+                        + "\\R    Harness event\\R");
+    }
+
+    @Test
+    void earlyExclusiveInstallationUsesTheConfiguredPalette() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.ALWAYS);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "prefix %msg%n");
+        val environment = new MockEnvironment()
+                .withProperty("inquisitor.harness.logging.format", "markdown")
+                .withProperty("inquisitor.logging.markdown.palette", "nord");
+
+        new MarkdownLoggingApplicationListener(() -> loggerContext)
+                .onApplicationEvent(environmentPreparedEvent(environment));
+
+        assertThat(console.layout().doLayout(marked("## Harness event")))
+                .contains(
+                        "48;2;59;66;82",
+                        "48;2;163;190;140",
+                        "38;2;143;188;187");
+    }
+
+    @Test
+    void earlyExclusiveInstallationResolvesAServiceProvidedPalette() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.ALWAYS);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "prefix %msg%n");
+        val environment = new MockEnvironment()
+                .withProperty("inquisitor.harness.logging.format", "markdown")
+                .withProperty("inquisitor.logging.markdown.palette", "starter-test");
+
+        new MarkdownLoggingApplicationListener(() -> loggerContext)
+                .onApplicationEvent(environmentPreparedEvent(environment));
+
+        assertThat(console.layout().doLayout(marked("## Harness event")))
+                .contains("38;2;18;171;239");
+    }
+
+    @Test
+    void earlyListenerLeavesSharedAndDisabledConsolesUntouched() {
+        val sharedContext = loggerContext();
+        val shared = console(sharedContext, "SHARED", "prefix %msg");
+        val sharedEnvironment = new MockEnvironment()
+                .withProperty("inquisitor.logging.markdown.console-mode", "shared");
+
+        new MarkdownLoggingApplicationListener(() -> sharedContext)
+                .onApplicationEvent(environmentPreparedEvent(sharedEnvironment));
+
+        assertThat(shared.layout().doLayout(event("ordinary"))).isEqualTo("prefix ordinary");
+
+        val disabledContext = loggerContext();
+        val disabled = console(disabledContext, "DISABLED", "prefix %msg");
+        val disabledEnvironment = new MockEnvironment()
+                .withProperty("inquisitor.harness.logging.format", "markdown")
+                .withProperty("inquisitor.logging.markdown.enabled", "false");
+
+        new MarkdownLoggingApplicationListener(() -> disabledContext)
+                .onApplicationEvent(environmentPreparedEvent(disabledEnvironment));
+
+        assertThat(disabled.layout().doLayout(event("ordinary"))).isEqualTo("prefix ordinary");
+    }
+
+    @Test
+    void registersTheEarlyListenerThroughSpringFactories() {
+        assertThat(SpringFactoriesLoader.loadFactories(
+                ApplicationListener.class, getClass().getClassLoader()))
+                .anyMatch(MarkdownLoggingApplicationListener.class::isInstance);
+    }
+
+    @Test
+    void explicitSharedModeOverridesHarnessMarkdownFormat() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.NEVER);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "prefix %msg");
+
+        runner(loggerContext)
+                .withPropertyValues(
+                        "inquisitor.harness.logging.format=markdown",
+                        "inquisitor.logging.markdown.console-mode=shared")
+                .run(context -> {
+                    assertThat(context.getBean(MarkdownLoggingProperties.class).consoleMode())
+                            .isEqualTo(MarkdownConsoleMode.SHARED);
+                    assertThat(console.layout().doLayout(marked("## rendered")))
+                            .isEqualTo("prefix     rendered");
+                    assertThat(console.layout().doLayout(event("ordinary")))
+                            .isEqualTo("prefix ordinary");
+                    assertThat(loggerContext.getTurboFilterList()).isEmpty();
+                });
+    }
+
+    @Test
+    void explicitExclusiveModeWorksWithoutTheHarness() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.NEVER);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "%msg");
+
+        runner(loggerContext)
+                .withPropertyValues("inquisitor.logging.markdown.console-mode=exclusive")
+                .run(context -> {
+                    assertThat(console.layout().doLayout(marked("**rendered**")))
+                            .contains("INFO", "rendered")
+                            .doesNotContain("**");
+                    assertThat(console.layout().doLayout(event("ordinary"))).isEmpty();
+                });
+    }
+
+    @Test
+    void exclusiveInstallationIsIdempotentAndLeavesFileLayoutsRaw() {
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "prefix %msg%n");
+        val fileLayout = file(loggerContext, "FILE", "%level %msg%n");
+        val installer = new LogbackMarkdownInstaller(
+                new FlexmarkAnsiRenderer(false), MarkdownConsoleMode.EXCLUSIVE, false);
+
+        assertThat(installer.install(loggerContext)).isEqualTo(1);
+        assertThat(installer.install(loggerContext)).isZero();
+        assertThat(loggerContext.getTurboFilterList())
+                .singleElement()
+                .isInstanceOf(MarkdownMarkerTurboFilter.class);
+        assertThat(console.layout().doLayout(event("ordinary"))).isEmpty();
+        assertThat(console.layout().doLayout(marked("## rendered")))
+                .contains("INFO", "rendered")
+                .doesNotContain("prefix");
+        assertThat(fileLayout.doLayout(event("ordinary")))
+                .isEqualTo("INFO ordinary" + System.lineSeparator());
+        assertThat(fileLayout.doLayout(marked("## raw")))
+                .isEqualTo("INFO ## raw" + System.lineSeparator());
     }
 
     @Test
@@ -267,6 +474,15 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         context.start();
         loggerContexts.add(context);
         return context;
+    }
+
+    private static ApplicationEnvironmentPreparedEvent environmentPreparedEvent(
+            MockEnvironment environment) {
+        return new ApplicationEnvironmentPreparedEvent(
+                new DefaultBootstrapContext(),
+                new SpringApplication(Object.class),
+                new String[0],
+                environment);
     }
 
     private static ConsoleFixture console(

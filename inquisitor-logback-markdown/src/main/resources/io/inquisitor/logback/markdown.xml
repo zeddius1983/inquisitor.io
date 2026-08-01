@@ -1,5 +1,8 @@
 <included>
     <conversionRule
         conversionWord="mdMsg"
-        class="io.inquisitor.logback.markdown.MarkdownMessageConverter"/>
+        class="io.inquisitor.logback.markdown.converter.MarkdownMessageConverter"/>
+    <conversionRule
+        conversionWord="mdEvent"
+        class="io.inquisitor.logback.markdown.converter.MarkdownEventConverter"/>
 </included>

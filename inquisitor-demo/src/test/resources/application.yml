@@ -20,6 +20,9 @@ spring:
       enabled: always
 
 inquisitor:
+  logging:
+    markdown:
+      palette: catppuccin
   harness:
     logging:
       # Render scenario, step, actor, and judge lifecycle events through the
@@ -36,8 +39,3 @@ inquisitor:
       # back to spring.ai.openai.api-key when unset.
       base-url: ${INQUISITOR_EVAL_BASE_URL:http://127.0.0.1:8001}
       model: ${INQUISITOR_EVAL_MODEL:Qwen3.6-35B-A3B-Q8_0}
-
-logging:
-  level:
-    io.inquisitor.harness.logging: DEBUG
-    io.inquisitor.harness.evaluation.logging: DEBUG

@@ -1,0 +1,2 @@
+io.inquisitor.logback.markdown.palette.SolarizedTestPaletteProvider
+io.inquisitor.logback.markdown.palette.ConflictingGruvboxTestPaletteProvider

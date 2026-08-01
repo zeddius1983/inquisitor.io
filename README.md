@@ -77,8 +77,8 @@ plain CI build (see [Building](#building)).
 
 | Module | Role |
 |--------|------|
-| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` Logback converter for ANSI-styled console Markdown. |
-| `inquisitor-logback-markdown-starter` | Automatic marker-aware Markdown rendering for compatible Spring Boot Logback consoles. |
+| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` and clean `%mdEvent` Logback converters for ANSI-styled console Markdown. |
+| `inquisitor-logback-markdown-starter` | Automatic shared or marker-only Markdown rendering for compatible Spring Boot Logback consoles. |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness. |
 | `inquisitor-harness-junit` | JUnit 5 layer: `@Harness` on the class + one `@Scenario` method per scenario, each step a sub-test. |
@@ -124,10 +124,9 @@ explicitly with `@Scenario("classpath:scenarios/custom.md")`.
 
 ## Harness logging
 
-The harness logs scenario start/completion at INFO. Actor-step breadcrumbs,
-HTTP tool requests/responses, verdict reasoning, judge scores, and judge feedback
-are detailed diagnostics at DEBUG. Choose plain text (the default) or
-marker-tagged Markdown:
+Plain harness logging keeps scenario start/completion at INFO and detailed actor,
+tool, and judge diagnostics at DEBUG. Markdown logging emits its complete marked
+narrative at INFO. Choose plain text (the default) or marker-tagged Markdown:
 
 ```yaml
 inquisitor:
@@ -136,8 +135,11 @@ inquisitor:
       format: markdown # plain | markdown
 ```
 
-Enable the two narrow logger namespaces to see the complete run narrative
-without enabling framework-wide DEBUG logging:
+Plain mode keeps the output operational and compact: scenario and step starts
+include their names and lifecycle state, but do not repeat the Markdown
+descriptions or instructions. Enable the two narrow logger namespaces to see
+the step, tool, verdict, and evaluation diagnostics without enabling
+framework-wide DEBUG logging:
 
 ```yaml
 logging:
@@ -146,8 +148,26 @@ logging:
     io.inquisitor.harness.evaluation.logging: DEBUG # when evaluation is enabled
 ```
 
-The harness logs each scenario at INFO and each step at DEBUG immediately before
-it runs. The first
+With `format: markdown` and the optional Logback Markdown starter, no logger-level
+configuration is required. All Markdown harness events are emitted at INFO. Its
+default `auto` console mode recognizes the harness format and switches compatible
+console appenders to an exclusive Markdown stream: marked events are retained,
+while ordinary Spring, application,
+and SQL events are omitted from the console. File and structured appenders keep
+their existing behavior. Each event starts with a compact Powerline header such as
+`13:42:15.123INFO`; the timestamp uses a neutral Gruvbox background, with INFO
+green, WARN yellow, ERROR red, DEBUG purple, and TRACE gray. Exclusive mode is
+installed during Boot's early logging lifecycle, so framework startup output is
+also omitted. Rendered content is indented four spaces and complete events are
+separated by blank lines. Powerline breadcrumbs, Markdown emphasis, tables, and
+code highlighting use the same muted Gruvbox Dark palette instead of bright ANSI
+primary colors. Set `inquisitor.logging.markdown.palette` to `nord`,
+`catppuccin`, or `tokyo-night` to select another built-in palette; `gruvbox`
+remains the default. Additional named palettes can be contributed through the
+renderer module's `MarkdownPaletteProvider` ServiceLoader SPI.
+
+In Markdown mode, the harness logs each scenario, step, tool call, and evaluation
+event at INFO. The first
 nonblank actor-model name reported by real response metadata is cached without a
 probe request. In Markdown mode, it becomes a step-breadcrumb segment as soon as
 it is available: normally on the first completion and every later step event.
@@ -179,7 +199,8 @@ Choose how they appear:
   configure `%mdMsg{marked}` for manual Logback control;
 - add
   [`inquisitor-logback-markdown-starter`](inquisitor-logback-markdown-starter/README.md)
-  for automatic rendering in compatible Spring Boot console layouts.
+  for automatic rendering and a clean marker-only console in compatible Spring
+  Boot layouts.
 
 The harness itself depends on neither optional Markdown module and remains
 portable to other SLF4J backends. Actor and judge invocation diagnostics remain

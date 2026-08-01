@@ -23,7 +23,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * Configuration for automatic Markdown console rendering.
  *
  * @param enabled whether compatible Logback console layouts should be enhanced
+ * @param consoleMode whether the starter preserves shared console output or emits
+ *                    only marker-selected Markdown events
+ * @param palette built-in or service-provided terminal palette name
  */
 @ConfigurationProperties("inquisitor.logging.markdown")
-public record MarkdownLoggingProperties(@DefaultValue("true") boolean enabled) {
+public record MarkdownLoggingProperties(
+        @DefaultValue("true") boolean enabled,
+        @DefaultValue("auto") MarkdownConsoleMode consoleMode,
+        @DefaultValue("gruvbox") String palette) {
 }

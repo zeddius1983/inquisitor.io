@@ -27,7 +27,7 @@ public class PlainScenarioLogger implements ScenarioExecutionCallback {
 
     @Override
     public void scenarioStarted(Scenario scenario) {
-        log.info("Scenario START: {}{}", scenario.name(), body(scenario.description()));
+        log.info("Scenario START: {}", scenario.name());
     }
 
     @Override
@@ -41,9 +41,5 @@ public class PlainScenarioLogger implements ScenarioExecutionCallback {
         log.info("Scenario END: {} — {} ({}/{} steps)", result.scenario().name(),
                 result.passed() ? "PASS" : "FAIL", result.results().size(),
                 result.scenario().steps().size());
-    }
-
-    private static String body(String value) {
-        return value.isBlank() ? "" : "\n" + value;
     }
 }

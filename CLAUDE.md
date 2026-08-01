@@ -17,8 +17,8 @@ Base package: `io.inquisitor`. Group: `io.inquisitor`.
 
 | Module | Role |
 |--------|------|
-| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` Logback converter for ANSI-styled Markdown console messages, including Unicode bordered/aligned/wrapped GFM tables; manual integration, independent of the harness and Spring |
-| `inquisitor-logback-markdown-starter` | Optional Spring Boot autoconfiguration that installs marker-aware Markdown conversion into compatible Logback `PatternLayout` console appenders; instance-local, leaves file/structured appenders unchanged |
+| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` message and `%mdEvent` full-event Logback converters for ANSI-styled Markdown console messages, including Unicode bordered/aligned/wrapped GFM tables; manual integration, independent of the harness and Spring |
+| `inquisitor-logback-markdown-starter` | Optional Spring Boot autoconfiguration that installs marker-aware Markdown conversion into compatible Logback `PatternLayout` console appenders; automatically uses a marker-only Powerline event stream for Markdown harness runs, leaves file/structured appenders unchanged |
 | `buildSrc/` | Gradle convention plugins (`inquisitor.java-conventions`, `.spring-conventions`, `.publish-conventions`) |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness |
@@ -142,9 +142,22 @@ callbacks compose in order through `andThen`; the harness
 starter composes contributed actor callbacks with its selected logger, while the
 evaluation starter chains `StepEvaluationRecorder`, contributed evaluation
 callbacks, and the selected `EvaluationLoggerCallback`, leaving each runner with
-one collaborator.
+one collaborator. Plain scenario and actor-step starts log only lifecycle data
+(names, progress, and status); full Markdown scenario descriptions and step
+instructions are exclusive to Markdown mode.
 Markdown mode emits marker-tagged blocks, and rendering remains optional through
-either Logback Markdown module. `HttpRequestLogger` and `SqlLogger` have
+either Logback Markdown module. With the starter, the Markdown harness format
+selects an exclusive compatible console: marked diagnostics are force-enabled and
+all emit at INFO with a compact colored time/level header, while unmarked console events are
+suppressed from Boot's early logging lifecycle without changing file/structured
+appenders. Event bodies retain four spaces of indentation and are separated by
+blank lines. Powerline and Markdown styles share a muted true-color Gruvbox Dark
+palette by default; `inquisitor.logging.markdown.palette` can select Gruvbox,
+Nord, Catppuccin Mocha, or Tokyo Night consistently across the early event header
+and Markdown body. Third parties contribute named palettes through the base
+module's `MarkdownPaletteProvider` ServiceLoader SPI, which remains available
+before Spring bean creation. Powerline text maintains at least 4.5:1 contrast.
+`HttpRequestLogger` and `SqlLogger` have
 plain/Markdown implementations; the former renders resolved target hostname, method,
 path, status, redacted headers, and pretty-printed JSON payloads, while the latter
 renders datasource, status, statement, and result without changing tool results.

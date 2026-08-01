@@ -47,7 +47,7 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
                 > Completed `%d/%d` steps before an infrastructure failure.
                 """.formatted(partialResult.scenario().name(), partialResult.results().size(),
                 partialResult.scenario().steps().size()));
-        log.atWarn()
+        log.atInfo()
                 .addMarker(MarkdownLogSupport.marker())
                 .setCause(cause)
                 .log(markdown);
@@ -58,12 +58,7 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
         val outcome = result.passed() ? "PASS" : "FAIL";
         val breadcrumb = MarkdownBreadcrumbs.scenario(result.scenario(), result.results().size(),
                 outcome, "⧖ " + LogDurationFormatter.format(elapsed(result)));
-        info("""
-                ### %s
-
-                **%s** completed `%d/%d` steps.
-                """.formatted(breadcrumb, result.scenario().name(),
-                result.results().size(), result.scenario().steps().size()));
+        info("### " + breadcrumb);
     }
 
     private static Duration elapsed(ScenarioResult result) {

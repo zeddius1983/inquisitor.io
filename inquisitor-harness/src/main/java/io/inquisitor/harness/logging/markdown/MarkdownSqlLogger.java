@@ -35,7 +35,7 @@ public class MarkdownSqlLogger implements SqlLogger {
                 """.formatted(
                 breadcrumb(request, "EXECUTE"),
                 MarkdownLogSupport.codeBlock("sql", request.statement()));
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
     @Override
@@ -49,7 +49,7 @@ public class MarkdownSqlLogger implements SqlLogger {
                 """.formatted(
                 breadcrumb(request, "SUCCESS"),
                 MarkdownLogSupport.codeBlock("text", response.result()));
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
     @Override
@@ -62,7 +62,7 @@ public class MarkdownSqlLogger implements SqlLogger {
                 """.formatted(
                 breadcrumb,
                 MarkdownStepLogSupport.blockquote(error, breadcrumb.length()));
-        log.debug(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
     private static String breadcrumb(Request request, String status) {

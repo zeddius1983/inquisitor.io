@@ -79,6 +79,15 @@ see [roadmap.md](roadmap.md); for stable repo context see
   whole-run and JUnit step-at-a-time behavior without duplicate step messages.
   Markdown events use the `INQUISITOR_MARKDOWN` SLF4J marker; raw, manually
   rendered, and automatically rendered consoles remain consumer choices.
+- **Clean Markdown console selection is event-marker-driven.** When the harness
+  format is Markdown, the automatic Logback starter replaces compatible console
+  patterns with a full-event converter: compact colored time/level header plus the
+  rendered body, and zero bytes for unmarked events. A neutral TurboFilter accepts
+  marked events so DEBUG diagnostics work without broad logger-level overrides;
+  it leaves unmarked events neutral, preserving ordinary file/structured logging.
+  A Java `MarkdownLogger` interface was rejected because Logback evaluates
+  `ILoggingEvent`s, not Spring bean types, while the existing SLF4J marker is both
+  direct and open to custom emitters.
 - **HTTP log presentation never changes tool data.** The HTTP logger receives the
   normalized request and response alongside the tool invocation, but the compact
   response returned to the model is unchanged. Markdown mode may pretty-print
@@ -407,18 +416,21 @@ see [roadmap.md](roadmap.md); for stable repo context see
   Boot's ANSI policy is separate and is bridged by the optional starter, rather
   than coupled into this Spring-free module.
 - **Automatic installation mutates only compatible console layout instances.**
-  The starter waits until all singletons exist, discovers identity-deduplicated
-  console appenders through logger attachments and `AppenderAttachable`
-  composites, and updates each `PatternLayout#getInstanceConverterMap()` under
-  the `LoggerContext` configuration lock. It supplies a marker-only converter
-  for `m`, `msg`, and `message`; normal messages remain raw and file/JSON/custom
-  layouts are untouched. Dynamically created `SiftingAppender` children require
-  manual `%mdMsg{marked}` configuration because they do not exist during starter
-  installation and are not exposed as attached appenders. Global converter maps
-  and consumer logging configuration files remain owned by the application. The
-  Logback configuration lock serializes configuration changes, not active event
-  formatting, so this mutation is deliberately startup-only; applications should
-  not invoke the installer later while background threads are logging.
+  For exclusive mode, a Spring Boot application listener runs immediately after
+  `LoggingApplicationListener`, so ordinary framework startup records are filtered
+  before application initialization. Autoconfiguration later finalizes shared mode
+  and any contributed renderer. Both paths discover identity-deduplicated console
+  appenders through logger attachments and `AppenderAttachable` composites and
+  update each `PatternLayout#getInstanceConverterMap()` under the `LoggerContext`
+  configuration lock. Shared mode supplies a marker-only converter for `m`, `msg`,
+  and `message`; exclusive mode owns the complete `%mdEvent` console layout. File,
+  JSON, and custom layouts remain untouched. Dynamically created `SiftingAppender`
+  children require manual `%mdMsg{marked}` configuration because they do not exist
+  during starter installation and are not exposed as attached appenders. Global
+  converter maps and consumer logging configuration files remain owned by the
+  application. The configuration lock serializes configuration changes, not active
+  event formatting, so applications should not invoke the installer later while
+  background threads are logging.
 - **No Lombok in the small renderer module.** Its state is deliberately explicit
   and per-render-call, and the handful of constructors/accessors do not justify
   adding an annotation processor to this dependency-light published artifact.
@@ -433,7 +445,25 @@ see [roadmap.md](roadmap.md); for stable repo context see
   Powerlevel10k-style pills. Rounded Powerline caps provide the intended pill
   silhouette and require a patched font with the extra-symbol range. The source
   remains readable Markdown, plain output remains escape-free, and the harness
-  stays independent of Logback/Jansi.
+  stays independent of Logback/Jansi. Powerline segments and styled Markdown use
+  one selected true-color palette. Gruvbox Dark remains the Starship-inspired
+  default, while Nord, Catppuccin Mocha, and Tokyo Night are built in and selected
+  through `inquisitor.logging.markdown.palette`. The early exclusive installer
+  reads the same setting as autoconfiguration so its event header cannot diverge
+  from the Markdown body. `MarkdownPalette` is an open RGB contract; built-in and
+  third-party values both use `RgbMarkdownPalette` and are named through the same
+  `MarkdownPaletteProvider` abstraction. Built-in providers live in a deterministic
+  internal catalog so they cannot disappear with service metadata, while third-party
+  providers use `ServiceLoader` rather than Spring beans because they must be
+  discoverable before the application context exists.
+  Powerline foregrounds select the strongest palette-neutral contrast and fall
+  back to black or white when needed to meet the 4.5:1 normal-text target.
+- **The renderer module is organized by responsibility.** Public rendering types
+  live under `.renderer`, palette values and their provider SPI under `.palette`,
+  syntax highlighting under `.highlight`, terminal styling under `.ansi`,
+  Logback converters under `.converter`, and marker filtering under `.marker`.
+  This keeps extension contracts separate from parser, table, and logging-framework
+  implementation.
 
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.

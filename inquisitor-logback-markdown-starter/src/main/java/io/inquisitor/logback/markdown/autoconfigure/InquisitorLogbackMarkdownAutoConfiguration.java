@@ -18,18 +18,18 @@ package io.inquisitor.logback.markdown.autoconfigure;
 
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.core.ConsoleAppender;
-import io.inquisitor.logback.markdown.FlexmarkAnsiRenderer;
-import io.inquisitor.logback.markdown.MarkdownMessageConverter;
-import io.inquisitor.logback.markdown.MarkdownRenderer;
+import io.inquisitor.logback.markdown.converter.MarkdownMessageConverter;
+import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
+import lombok.val;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
-import org.springframework.boot.ansi.AnsiOutput;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 
 /**
  * Installs marker-aware Markdown conversion into compatible Logback console
@@ -51,12 +51,9 @@ public class InquisitorLogbackMarkdownAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    MarkdownRenderer inquisitorLogbackMarkdownRenderer() {
-        return switch (AnsiOutput.getEnabled()) {
-            case ALWAYS -> new FlexmarkAnsiRenderer(true);
-            case NEVER -> new FlexmarkAnsiRenderer(false);
-            case DETECT -> new FlexmarkAnsiRenderer();
-        };
+    MarkdownRenderer inquisitorLogbackMarkdownRenderer(MarkdownLoggingProperties properties) {
+        return MarkdownConsoleSettings.renderer(
+                MarkdownConsoleSettings.palette(properties.palette()));
     }
 
     @Bean
@@ -66,8 +63,16 @@ public class InquisitorLogbackMarkdownAutoConfiguration {
     }
 
     @Bean
-    LogbackMarkdownInstaller inquisitorLogbackMarkdownInstaller(MarkdownRenderer renderer) {
-        return new LogbackMarkdownInstaller(renderer);
+    LogbackMarkdownInstaller inquisitorLogbackMarkdownInstaller(
+            MarkdownRenderer renderer,
+            MarkdownLoggingProperties properties,
+            Environment environment) {
+        val consoleMode = MarkdownConsoleSettings.consoleMode(
+                properties.consoleMode(), environment);
+        val palette = MarkdownConsoleSettings.palette(properties.palette());
+        return new LogbackMarkdownInstaller(
+                renderer, consoleMode, MarkdownConsoleSettings.ansiPolicy(),
+                palette);
     }
 
     @Bean
@@ -76,4 +81,5 @@ public class InquisitorLogbackMarkdownAutoConfiguration {
             LoggingSystemProvider loggingSystemProvider) {
         return () -> installer.install(loggingSystemProvider.get());
     }
+
 }

@@ -1,11 +1,24 @@
 # Inquisitor Logback Markdown
 
-`inquisitor-logback-markdown` adds a Flexmark-backed `%mdMsg` conversion word to
-Logback pattern layouts. It renders headings, emphasis, code, lists, quotes, and
-links as terminal-oriented text with ANSI styling. It has no dependency on the
-Inquisitor harness or Spring.
+`inquisitor-logback-markdown` adds Flexmark-backed `%mdMsg` and `%mdEvent`
+conversion words to Logback pattern layouts. It renders headings, emphasis, code,
+lists, quotes, and links as terminal-oriented text with ANSI styling. It has no
+dependency on the Inquisitor harness or Spring.
 
-Every non-empty rendered line receives four spaces of left padding. Padding is
+## Package layout
+
+- `io.inquisitor.logback.markdown.renderer` — rendering API, Flexmark renderer,
+  tables, and terminal-width handling;
+- `io.inquisitor.logback.markdown.highlight` — syntax-highlighting SPI and the
+  built-in tokenizer;
+- `io.inquisitor.logback.markdown.palette` — palette values, lookup, and provider
+  SPI;
+- `io.inquisitor.logback.markdown.ansi` — ANSI capability detection and styling;
+- `io.inquisitor.logback.markdown.converter` — Logback message and event
+  converters;
+- `io.inquisitor.logback.markdown.marker` — marker utilities and filtering.
+
+With `%mdMsg`, every non-empty rendered line receives four spaces of left padding. Padding is
 applied after Markdown parsing, so it visually separates Markdown from ordinary
 log lines without turning the source into a Markdown code block. Blank lines
 remain empty and unmarked messages remain byte-for-byte unchanged. List markers
@@ -108,11 +121,104 @@ for failed/unsupported states. Other segments use the positional palette. Plain
 rendering preserves the same readable text without ANSI sequences, while headings
 without this exact shape retain the normal heading style.
 
+ANSI styles default to the muted Gruvbox Dark palette: orange for
+primary/scenario segments, yellow for steps and warnings, aqua for progress and
+headings, green for success, purple for DEBUG and inline code, red for failures,
+blue for links and properties, and neutral shades for timestamp, duration,
+TRACE, table borders, and code panels. Nord, Catppuccin Mocha, and Tokyo Night
+are also built in and resolved through the same named-provider abstraction as
+extension palettes:
+
+```java
+new FlexmarkAnsiRenderer(true, MarkdownPalettes.require("nord"));
+```
+
+### Custom palettes
+
+`MarkdownPalette` is an open interface. Every built-in palette uses
+`RgbMarkdownPalette`, the same convenient immutable implementation available to
+extensions for a palette defined by ten `0xRRGGBB` values:
+
+```java
+MarkdownPalette solarized = new RgbMarkdownPalette(
+        0xeee8d5, // foreground
+        0x002b36, // surface
+        0x586e75, // muted
+        0x268bd2, // blue
+        0x2aa198, // aqua
+        0x859900, // green
+        0xcb4b16, // orange
+        0x6c71c4, // purple
+        0xdc322f, // red
+        0xb58900  // yellow
+);
+```
+
+Programmatic renderers can use that value directly. To make a palette selectable
+by name in `%mdMsg`, `%mdEvent`, and the Spring Boot starter, publish a
+`MarkdownPaletteProvider`:
+
+```java
+public final class SolarizedPaletteProvider implements MarkdownPaletteProvider {
+    @Override
+    public String name() {
+        return "solarized-dark";
+    }
+
+    @Override
+    public MarkdownPalette palette() {
+        return solarizedPalette();
+    }
+}
+```
+
+Register its binary class name in:
+
+```text
+META-INF/services/io.inquisitor.logback.markdown.palette.MarkdownPaletteProvider
+```
+
+The palette is then available as `palette=solarized-dark` and through
+`inquisitor.logging.markdown.palette=solarized-dark`. Resolution uses
+`ServiceLoader`, so it works during Boot's early logging phase before Spring beans
+exist. Built-in names are reserved; duplicate provider names fail with a clear
+configuration error.
+
 Breadcrumbs use the rounded Powerline `` and `` caps with `` transitions.
 They require a patched font that includes the Powerline extra-symbol range.
 The harness uses a five-cell `▰`/`▱` gauge, rounded to the nearest cell, before
 the current/total step counter. Completion breadcrumbs add the verdict and a
 human-readable `⧖` duration segment.
+
+## Clean marker-only events
+
+`%mdEvent` owns the complete console event rather than only its message body. It
+emits nothing for an unmarked event; a marked event receives a compact Powerline
+time/level header followed by a four-space-indented rendered body. A blank line
+separates complete events:
+
+```text
+
+13:42:15.123INFO
+
+    Fetch a non-existent account
+```
+
+The time segment uses the neutral Gruvbox `color_bg1`/`color_fg0` pair
+(`#3c3836`/`#fbf1c7`). INFO is muted green (`#98971a`), WARN yellow (`#d79921`),
+ERROR red (`#cc241d`), DEBUG purple (`#b16286`), and TRACE `color_bg3`
+(`#665c54`). The `plain` and `ansi` options control both header and body:
+
+```xml
+<pattern>%mdEvent{plain}</pattern>
+<pattern>%mdEvent{ansi}</pattern>
+<pattern>%mdEvent{ansi,palette=tokyo-night}</pattern>
+```
+
+Do not append `%n`: `%mdEvent` owns its final line break so an unmarked event is
+truly zero bytes. Throwable output from a marked event is retained after the
+Markdown body. Use this converter only on a dedicated marker-only console; keep
+ordinary `%msg` on file and structured appenders.
 
 ## Dependency
 
@@ -187,7 +293,7 @@ The same include and appender work in plain `logback.xml`; omit the Spring Boot
 Mark Markdown events through the normal SLF4J API:
 
 ```java
-import static io.inquisitor.logback.markdown.MarkdownMarkers.markdown;
+import static io.inquisitor.logback.markdown.marker.MarkdownMarkers.markdown;
 
 log.info(markdown(), "## Step 1\n\n**Intent:** create an account");
 ```
@@ -245,7 +351,17 @@ plain. Pattern options can override detection:
 
 <!-- Force ANSI for a console whose TTY cannot be detected. -->
 <pattern>%mdMsg{marked,ansi}%n</pattern>
+
+<!-- Select a built-in palette; Gruvbox is the default. -->
+<pattern>%mdMsg{marked,ansi,palette=catppuccin}%n</pattern>
 ```
+
+Palette names are `gruvbox`, `nord`, `catppuccin`, and `tokyo-night`.
+Invalid names fall back to Gruvbox and add a warning to Logback's status stream.
+Powerline text first chooses the palette's light or dark neutral color for the
+strongest contrast with each segment background. If neither reaches the 4.5:1
+normal-text target, it falls back to black or white. This keeps every built-in
+and custom palette readable without changing its accent backgrounds.
 
 For a process-wide plain-text switch, set
 `-Dorg.jline.jansi.Ansi.disable=true` before the JVM starts. Do not rely on

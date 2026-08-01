@@ -29,8 +29,9 @@ The loggers report:
 Markdown messages have two leading newlines and one trailing newline, producing
 an empty line after the conventional Logback prefix and separation before the
 next event. They carry the shared `INQUISITOR_MARKDOWN` SLF4J marker. Plain
-messages use ordinary unmarked log lines. Scenario narration is INFO,
-actor/judge invocation details are DEBUG, and aborts are WARN. Markdown actor
+messages use ordinary unmarked log lines. Plain logging retains its conventional
+INFO/DEBUG/WARN levels; every Markdown event uses INFO to keep the rendered run
+narrative visible without logger-specific DEBUG configuration. Markdown actor
 starts use a Powerline breadcrumb
 (`optional actual actor model`, `scenario`, `step`, `progress`, `status`); the optional renderer turns it into
 Powerlevel10k-style pills while raw/plain output remains readable. Progress uses

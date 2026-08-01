@@ -31,8 +31,8 @@ public class PlainLlmLogger implements LlmLoggerCallback {
     public void stepStarted(StepRequest request) {
         val scenario = request.scenario();
         val step = request.step();
-        log.debug("[{}] step {}/{} - RUN: {}{}", scenario.name(), step.index(),
-                scenario.steps().size(), step.title(), body(step.instruction()));
+        log.debug("[{}] step {}/{} - RUN: {}", scenario.name(), step.index(),
+                scenario.steps().size(), step.title());
     }
 
     @Override
@@ -50,9 +50,5 @@ public class PlainLlmLogger implements LlmLoggerCallback {
         log.debug("[{}] step {}/{} — {} in {}: {}", scenario.name(), step.index(),
                 scenario.steps().size(), run.verdict().outcome(),
                 LogDurationFormatter.format(run.elapsed()), run.verdict().reasoning());
-    }
-
-    private static String body(String instruction) {
-        return instruction.isBlank() ? "" : "\n" + instruction;
     }
 }
