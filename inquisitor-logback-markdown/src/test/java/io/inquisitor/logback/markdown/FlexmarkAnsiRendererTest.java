@@ -258,36 +258,60 @@ class FlexmarkAnsiRendererTest {
 
     @Test
     void rendersPowerlineHeadingsAsBackgroundColoredPills() {
-        String markdown = "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ";
+        String markdown = "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ";
 
         String rendered = new FlexmarkAnsiRenderer(true).render(markdown);
 
-        assertEquals(" actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ",
+        assertEquals(" actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ",
                 stripAnsi(rendered));
         assertTrue(rendered.contains("\u001B[44"));
         assertTrue(rendered.contains("\u001B[46"));
         assertTrue(rendered.contains("\u001B[45"));
         assertTrue(rendered.contains("\u001B[42"));
+        assertTrue(rendered.substring(0, rendered.indexOf(" actual-model "))
+                .contains("\u001B[0;34m"));
+        assertTrue(rendered.substring(rendered.indexOf(" Running ") + " Running ".length())
+                .contains("\u001B[0;32m"));
     }
 
     @Test
     void leavesPowerlineHeadingsReadableWhenAnsiIsDisabled() {
         String rendered = plainRenderer.render(
-                "###  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ");
+                "###  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ");
 
-        assertEquals(" Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ",
+        assertEquals(" Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ",
                 rendered);
     }
 
     @Test
     void rendersFailedPowerlineStatusWithFailureBackground() {
         String rendered = new FlexmarkAnsiRenderer(true).render(
-                "###  Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ");
+                "###  Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ");
 
-        assertEquals(" Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ",
+        assertEquals(" Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ",
                 stripAnsi(rendered));
         assertTrue(rendered.contains("\u001B[41"));
         assertTrue(rendered.contains("\u001B[40"));
+    }
+
+    @Test
+    void rendersHttpBreadcrumbTargetAndStatusAsDistinctSegments() {
+        String rendered = new FlexmarkAnsiRenderer(true).render(
+                "###  HTTP  localhost  POST  /accounts/import  HTTP 201 ");
+
+        assertEquals(" HTTP  localhost  POST  /accounts/import  HTTP 201 ",
+                stripAnsi(rendered));
+        assertTrue(rendered.contains("\u001B[40"));
+        assertTrue(rendered.contains("\u001B[42"));
+    }
+
+    @Test
+    void rendersSqlBreadcrumbWithSemanticExecutionStatus() {
+        String rendered = new FlexmarkAnsiRenderer(true).render(
+                "###  SQL  default  EXECUTE ");
+
+        assertEquals(" SQL  default  EXECUTE ", stripAnsi(rendered));
+        assertTrue(rendered.contains("\u001B[42"));
     }
 
     @ParameterizedTest
@@ -304,8 +328,8 @@ class FlexmarkAnsiRendererTest {
             String status,
             String backgroundCode) {
         String rendered = new FlexmarkAnsiRenderer(true).render(
-                "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  "
-                        + status + " ");
+                "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  "
+                        + status + " ");
 
         assertTrue(rendered.contains("\u001B[" + backgroundCode));
         assertFalse(rendered.contains("\u001B[40"));

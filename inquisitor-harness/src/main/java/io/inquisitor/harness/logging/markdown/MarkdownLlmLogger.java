@@ -14,10 +14,14 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.logging;
+package io.inquisitor.harness.logging.markdown;
 
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
+import io.inquisitor.harness.logging.LlmLoggerCallback;
+import io.inquisitor.harness.logging.LogDurationFormatter;
+import io.inquisitor.harness.logging.ModelRegistry;
+import io.inquisitor.harness.logging.ModelRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;

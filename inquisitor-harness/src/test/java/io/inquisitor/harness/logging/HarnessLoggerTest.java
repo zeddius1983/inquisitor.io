@@ -21,7 +21,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -29,6 +31,14 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
+import io.inquisitor.harness.logging.markdown.MarkdownHttpRequestLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownLlmLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownLogSupport;
+import io.inquisitor.harness.logging.markdown.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownSqlLogger;
+import io.inquisitor.harness.logging.plain.PlainHttpRequestLogger;
+import io.inquisitor.harness.logging.plain.PlainScenarioLogger;
+import io.inquisitor.harness.logging.plain.PlainSqlLogger;
 import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.ScenarioResult;
@@ -58,7 +68,7 @@ class HarnessLoggerTest {
             assertThat(event.getFormattedMessage()).startsWith("\n\n").endsWith("\n");
             assertThat(event.getFormattedMessage())
                     .contains(
-                            "###  Account lifecycle  ▱▱▱▱▱ 0/1  RUN ",
+                            "###  Account lifecycle  ▱▱▱▱▱ 0/1  RUN ",
                             "# Account lifecycle",
                             "Open and fund Bob's account.");
         });
@@ -82,7 +92,7 @@ class HarnessLoggerTest {
                     .startsWith("\n\n")
                     .endsWith("\n")
                     .contains(
-                            "###  Account lifecycle  ▰▰▰▰▰ 1/1  PASS  ⧖ 1 min 13.289 s ",
+                            "###  Account lifecycle  ▰▰▰▰▰ 1/1  PASS  ⧖ 1 min 13.289 s ",
                             "**Account lifecycle** completed `1/1` steps.");
         });
     }
@@ -110,12 +120,12 @@ class HarnessLoggerTest {
             assertThat(event.getFormattedMessage()).startsWith("\n\n").endsWith("\n");
         });
         assertThat(events.get(0).getFormattedMessage()).contains(
-                "###  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  RUN ",
+                "###  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  RUN ",
                 "## Step 1 — Open account",
                 "Create Bob in USD.");
         assertThat(events.get(1).getFormattedMessage())
                 .contains(
-                        "###  gemma-4-31B-it-qat-UD-Q4_K_XL  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  PASS  ⧖ 13.289 s ",
+                        "###  gemma-4-31B-it-qat-UD-Q4_K_XL  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  PASS  ⧖ 13.289 s ",
                         "### Reasoning",
                         "> verified\n> with evidence")
                 .doesNotContain("/models/", ".GGUF", "**Duration:**", "- **Reasoning:**");
@@ -136,7 +146,7 @@ class HarnessLoggerTest {
 
         assertThat(events).singleElement().satisfies(event ->
                 assertThat(event.getFormattedMessage()).contains(
-                        " Import accounts  Import Bob  ▰▰▰▱▱ 2/4  RUN "));
+                        " Import accounts  Import Bob  ▰▰▰▱▱ 2/4  RUN "));
     }
 
     @Test
@@ -155,7 +165,7 @@ class HarnessLoggerTest {
         assertThat(events).singleElement().satisfies(event -> {
             val lines = event.getFormattedMessage().lines().toList();
             val breadcrumb = lines.stream()
-                    .filter(line -> line.startsWith("### "))
+                    .filter(line -> line.startsWith("### "))
                     .findFirst()
                     .orElseThrow()
                     .substring("### ".length());
@@ -203,6 +213,131 @@ class HarnessLoggerTest {
             assertThat(event.getFormattedMessage())
                     .contains("Scenario aborted", "infrastructure failure")
                     .doesNotContain("response body contained");
+        });
+    }
+
+    @Test
+    void markdownHttpRequestShowsBreadcrumbHeadersAndPrettyJsonBody() {
+        val headers = new LinkedHashMap<String, String>();
+        headers.put("Content-Type", "application/json");
+        headers.put("Authorization", "Bearer secret");
+        val request = new HttpRequestLogger.Request(
+                "localhost", "POST", "/accounts/import", headers,
+                "[{\"id\":1,\"owner\":\"Alice\"},{\"id\":2,\"owner\":\"Bob\"}]");
+
+        val events = capture(MarkdownHttpRequestLogger.class, Level.DEBUG,
+                () -> new MarkdownHttpRequestLogger().requestStarted(request));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getMarkerList())
+                    .extracting(Object::toString)
+                    .containsExactly(MarkdownLogSupport.MARKER_NAME);
+            assertThat(event.getFormattedMessage())
+                    .startsWith("\n\n")
+                    .endsWith("\n")
+                    .contains(
+                            "###  HTTP  localhost  POST  /accounts/import ",
+                            "### Headers",
+                            "```http",
+                            "Content-Type: application/json",
+                            "Authorization: [REDACTED]",
+                            "### Body",
+                            "```json",
+                            "\"owner\" : \"Alice\"",
+                            "\"owner\" : \"Bob\"")
+                    .doesNotContain("Bearer secret");
+        });
+    }
+
+    @Test
+    void markdownHttpResponseAddsStatusAndPrettyPrintsJson() {
+        val request = new HttpRequestLogger.Request(
+                "localhost", "POST", "/accounts/import", Map.of(), null);
+        val response = new HttpRequestLogger.Response(
+                201, "application/json",
+                "[{\"id\":1,\"owner\":\"Alice\"},{\"id\":2,\"owner\":\"Bob\"}]");
+
+        val events = capture(MarkdownHttpRequestLogger.class, Level.DEBUG,
+                () -> new MarkdownHttpRequestLogger().requestCompleted(request, response));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage()).contains(
+                        "###  HTTP  localhost  POST  /accounts/import  HTTP 201 ",
+                        "### Response",
+                        "```json",
+                        "\"id\" : 1",
+                        "\"id\" : 2"));
+    }
+
+    @Test
+    void plainHttpEventsDoNotCarryTheMarkdownMarker() {
+        val request = new HttpRequestLogger.Request(
+                "app", "GET", "/accounts/99999",
+                Map.of("Authorization", "Bearer secret"), null);
+
+        val events = capture(PlainHttpRequestLogger.class, Level.DEBUG,
+                () -> new PlainHttpRequestLogger().requestStarted(request));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getMarkerList()).isNullOrEmpty();
+            assertThat(event.getFormattedMessage())
+                    .isEqualTo("httpRequest <- target=app, method=GET, "
+                            + "path=/accounts/99999, "
+                            + "headers={Authorization=[REDACTED]}, body=null")
+                    .doesNotContain("Bearer secret");
+        });
+    }
+
+    @Test
+    void markdownSqlRequestShowsDatasourceBreadcrumbAndHighlightedStatement() {
+        val request = new SqlLogger.Request(
+                "app", "SELECT owner, currency FROM account ORDER BY owner");
+
+        val events = capture(MarkdownSqlLogger.class, Level.DEBUG,
+                () -> new MarkdownSqlLogger().statementStarted(request));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getMarkerList())
+                    .extracting(Object::toString)
+                    .containsExactly(MarkdownLogSupport.MARKER_NAME);
+            assertThat(event.getFormattedMessage())
+                    .startsWith("\n\n")
+                    .endsWith("\n")
+                    .contains(
+                            "###  SQL  app  EXECUTE ",
+                            "### Statement",
+                            "```sql",
+                            "SELECT owner, currency FROM account ORDER BY owner");
+        });
+    }
+
+    @Test
+    void markdownSqlResponseShowsSuccessBreadcrumbAndResult() {
+        val request = new SqlLogger.Request("app", "SELECT owner FROM account");
+        val response = new SqlLogger.Response("1 row(s): [{owner=Alice}]");
+
+        val events = capture(MarkdownSqlLogger.class, Level.DEBUG,
+                () -> new MarkdownSqlLogger().statementCompleted(request, response));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage()).contains(
+                        "###  SQL  app  SUCCESS ",
+                        "### Result",
+                        "```text",
+                        "1 row(s): [{owner=Alice}]"));
+    }
+
+    @Test
+    void plainSqlEventsDoNotCarryTheMarkdownMarker() {
+        val request = new SqlLogger.Request("app", "TRUNCATE TABLE account");
+
+        val events = capture(PlainSqlLogger.class, Level.DEBUG,
+                () -> new PlainSqlLogger().statementStarted(request));
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getMarkerList()).isNullOrEmpty();
+            assertThat(event.getFormattedMessage())
+                    .isEqualTo("sqlQuery <- datasource=app, sql=TRUNCATE TABLE account");
         });
     }
 

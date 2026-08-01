@@ -97,7 +97,7 @@ An ANSI-rendered heading that uses Powerline caps and separators is displayed as
 a Powerlevel10k-style sequence of background-colored pills:
 
 ```markdown
-###  Accounts scenario  Verify balances  ▰▰▰▰▰ 4/4  PASS  ⧖ 13.289 s 
+###  Accounts scenario  Verify balances  ▰▰▰▰▰ 4/4  PASS  ⧖ 13.289 s 
 ```
 
 Each transition uses the preceding segment's foreground color and the following
@@ -108,9 +108,8 @@ for failed/unsupported states. Other segments use the positional palette. Plain
 rendering preserves the same readable text without ANSI sequences, while headings
 without this exact shape retain the normal heading style.
 
-The classic `` and `` caps use the baseline Powerline glyphs supported by
-older patched fonts as well as current Nerd Fonts. Rounded ``/`` caps are not
-used because they come from the less widely supported extra-symbol range.
+Breadcrumbs use the rounded Powerline `` and `` caps with `` transitions.
+They require a patched font that includes the Powerline extra-symbol range.
 The harness uses a five-cell `▰`/`▱` gauge, rounded to the nearest cell, before
 the current/total step counter. Completion breadcrumbs add the verdict and a
 human-readable `⧖` duration segment.

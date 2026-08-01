@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.logging;
+package io.inquisitor.harness.logging.markdown;
 
+import lombok.val;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 
@@ -38,5 +39,25 @@ public final class MarkdownLogSupport {
     /** Adds visual separation from the surrounding conventional log stream. */
     public static String block(String markdown) {
         return "\n\n" + markdown.strip() + "\n";
+    }
+
+    static String codeBlock(String language, String content) {
+        val fence = "`".repeat(Math.max(3, longestBacktickRun(content) + 1));
+        return fence + language + "\n" + content + "\n" + fence;
+    }
+
+    private static int longestBacktickRun(String content) {
+        int longest = 0;
+        int current = 0;
+        for (int index = 0; index < content.length(); index++) {
+            if (content.charAt(index) == '`') {
+                current++;
+                longest = Math.max(longest, current);
+            }
+            else {
+                current = 0;
+            }
+        }
+        return longest;
     }
 }

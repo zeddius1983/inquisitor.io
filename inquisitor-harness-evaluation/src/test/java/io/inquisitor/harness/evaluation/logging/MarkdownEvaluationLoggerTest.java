@@ -30,9 +30,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
-import io.inquisitor.harness.logging.MarkdownLogSupport;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
+import io.inquisitor.harness.logging.markdown.MarkdownLogSupport;
 import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.Step;
@@ -68,8 +68,8 @@ class MarkdownEvaluationLoggerTest {
             assertThat(event.getFormattedMessage())
                     .startsWith("\n\n")
                     .endsWith("\n")
-                    .contains("###  Import accounts from CSV and plain text  "
-                            + "Reset the database  ▰▱▱▱▱ 1/4  EVALUATION ")
+                    .contains("###  Import accounts from CSV and plain text  "
+                            + "Reset the database  ▰▱▱▱▱ 1/4  EVALUATION ")
                     .doesNotContain("**Scenario:**", "**Step:**");
         });
     }
@@ -92,7 +92,7 @@ class MarkdownEvaluationLoggerTest {
             val message = event.getFormattedMessage();
             val lines = message.lines().toList();
             val breadcrumb = lines.stream()
-                    .filter(line -> line.startsWith("### "))
+                    .filter(line -> line.startsWith("### "))
                     .findFirst()
                     .orElseThrow()
                     .substring("### ".length());
@@ -101,9 +101,9 @@ class MarkdownEvaluationLoggerTest {
                     .toList();
 
             assertThat(message).contains(
-                    "###  gemma-4-31B-it-qat-UD-Q4_K_XL  "
+                    "###  gemma-4-31B-it-qat-UD-Q4_K_XL  "
                             + "Import accounts from CSV and plain text  Reset the database  "
-                            + "▰▱▱▱▱ 1/4  GROUNDED  Score 1.000  ⧖ 9.807 s ",
+                            + "▰▱▱▱▱ 1/4  GROUNDED  Score 1.000  ⧖ 9.807 s ",
                     "### Feedback");
             assertThat(message).doesNotContain("/models/", ".gguf", "- **Feedback:**");
             assertThat(feedbackLines).hasSizeGreaterThan(1)

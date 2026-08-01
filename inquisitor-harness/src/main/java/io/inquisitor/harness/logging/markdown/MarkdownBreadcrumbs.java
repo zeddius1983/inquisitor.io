@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.logging;
+package io.inquisitor.harness.logging.markdown;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +31,9 @@ final class MarkdownBreadcrumbs {
     private static final String GAUGE_FILLED = "▰";
     private static final String GAUGE_EMPTY = "▱";
     private static final String GGUF_EXTENSION = ".gguf";
+    private static final String POWERLINE_LEFT_CAP = "";
+    private static final String POWERLINE_SEPARATOR = "";
+    private static final String POWERLINE_RIGHT_CAP = "";
 
     private MarkdownBreadcrumbs() { }
 
@@ -60,8 +63,41 @@ final class MarkdownBreadcrumbs {
         return breadcrumb(segments);
     }
 
+    static String http(
+            String target,
+            String method,
+            String path,
+            String... trailingSegments) {
+        val segments = new ArrayList<String>();
+        segments.add("HTTP");
+        segments.add(target);
+        segments.add(method);
+        segments.add(path);
+        segments.addAll(List.of(trailingSegments));
+        return breadcrumb(segments.stream()
+                .map(MarkdownBreadcrumbs::headingLiteral)
+                .toList());
+    }
+
+    static String sql(String datasource, String status) {
+        return breadcrumb(List.of("SQL", datasource, status).stream()
+                .map(MarkdownBreadcrumbs::headingLiteral)
+                .toList());
+    }
+
     private static String breadcrumb(List<String> segments) {
-        return " " + String.join("  ", segments) + " ";
+        return POWERLINE_LEFT_CAP + " "
+                + String.join(" " + POWERLINE_SEPARATOR + " ", segments)
+                + " " + POWERLINE_RIGHT_CAP;
+    }
+
+    private static String headingLiteral(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("`", "\\`")
+                .replace("*", "\\*")
+                .replace("_", "\\_")
+                .replace("[", "\\[")
+                .replace("]", "\\]");
     }
 
     private static String progress(int current, int total) {

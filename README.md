@@ -125,8 +125,9 @@ explicitly with `@Scenario("classpath:scenarios/custom.md")`.
 ## Harness logging
 
 The harness logs scenario start/completion at INFO. Actor-step breadcrumbs,
-verdict reasoning, judge scores, and judge feedback are detailed diagnostics at
-DEBUG. Choose plain text (the default) or marker-tagged Markdown:
+HTTP tool requests/responses, verdict reasoning, judge scores, and judge feedback
+are detailed diagnostics at DEBUG. Choose plain text (the default) or
+marker-tagged Markdown:
 
 ```yaml
 inquisitor:
@@ -158,9 +159,16 @@ With the optional renderer, actor step starts and completions use a
 Powerlevel10k-style pill breadcrumb for actual model (when resolved), scenario,
 step, progress, and status. Provider-reported model file paths are reduced to the
 filename without the `.gguf` extension.
+HTTP tool calls use the same style for target hostname, method, path, and response status;
+request headers and bodies plus response bodies are rendered as syntax-highlighted
+code blocks. Valid JSON bodies are pretty-printed for the log only, and sensitive
+header values such as authorization tokens and cookies are redacted. SQL tool calls
+show the resolved datasource and execution status, followed by highlighted statement
+and result blocks.
 Completion breadcrumbs add a human-scale duration segment (`842 ms`, `13.289 s`,
-`2 min 5.4 s`). Their classic Powerline glyphs require a patched Powerline or Nerd
-Font; the underlying Markdown remains readable when ANSI is disabled.
+`2 min 5.4 s`). Their rounded Powerline caps require a patched font with the
+Powerline extra-symbol range; the underlying Markdown remains readable when ANSI
+is disabled.
 When evaluation is enabled, judge starts use the same breadcrumb with `EVALUATION`.
 Judge results include the actual judge model, category, labeled score, and
 judge-call duration, followed by wrapped feedback in a Markdown blockquote.

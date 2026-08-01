@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.logging;
+package io.inquisitor.harness.logging.markdown;
 
 import java.time.Duration;
 
 import io.inquisitor.harness.executor.ScenarioExecutionCallback;
+import io.inquisitor.harness.logging.LogDurationFormatter;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.ScenarioResult;
 import io.inquisitor.harness.model.StepResult;

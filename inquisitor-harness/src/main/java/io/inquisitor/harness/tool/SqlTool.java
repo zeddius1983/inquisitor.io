@@ -22,7 +22,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import lombok.extern.slf4j.Slf4j;
+import io.inquisitor.harness.logging.SqlLogger;
+import io.inquisitor.harness.logging.plain.PlainSqlLogger;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.tool.annotation.Tool;
@@ -39,13 +40,20 @@ import org.springframework.jdbc.core.StatementCallback;
  * other statement returns the affected row count. SQL errors are returned as a
  * readable string rather than thrown.
  */
-@Slf4j
 public class SqlTool {
 
+    private static final String DEFAULT_DATASOURCE = "default";
+
     private final DataSourceRegistry registry;
+    private final SqlLogger logger;
 
     public SqlTool(DataSourceRegistry registry) {
+        this(registry, new PlainSqlLogger());
+    }
+
+    public SqlTool(DataSourceRegistry registry, SqlLogger logger) {
         this.registry = registry;
+        this.logger = logger;
     }
 
     @Tool(description = "Execute a SQL statement against a datasource. A query (SELECT) returns its rows; "
@@ -57,8 +65,10 @@ public class SqlTool {
             @Nullable String datasource,
             @ToolParam(description = "the SQL statement to execute") String sql) {
 
-        log.debug("sqlQuery <- datasource={}, sql={}", datasource, sql);
-        val jdbcTemplate = new JdbcTemplate(registry.resolve(datasource));
+        val dataSource = registry.resolve(datasource);
+        val request = new SqlLogger.Request(displayDatasourceName(datasource), sql);
+        logger.statementStarted(request);
+        val jdbcTemplate = new JdbcTemplate(dataSource);
         try {
             val result = jdbcTemplate.execute((StatementCallback<String>) statement -> {
                 if (statement.execute(sql)) {
@@ -68,13 +78,19 @@ public class SqlTool {
                 }
                 return "Updated " + statement.getUpdateCount() + " row(s).";
             });
-            log.debug("sqlQuery -> {}", result);
+            logger.statementCompleted(request, new SqlLogger.Response(result));
             return result;
         } catch (DataAccessException e) {
             val error = "SQL error: " + e.getMostSpecificCause().getMessage();
-            log.debug("sqlQuery -> {}", error);
+            logger.statementFailed(request, error);
             return error;
         }
+    }
+
+    private static String displayDatasourceName(@Nullable String datasource) {
+        return datasource == null || datasource.isBlank()
+                ? DEFAULT_DATASOURCE
+                : datasource.strip();
     }
 
     private static String formatRows(@Nullable ResultSet resultSet) throws SQLException {

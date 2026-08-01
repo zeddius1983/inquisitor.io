@@ -19,11 +19,15 @@ package io.inquisitor.harness.tool;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
+import io.inquisitor.harness.logging.SqlLogger;
 import lombok.val;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.DockerClientFactory;
@@ -38,6 +42,7 @@ class SqlToolTest {
     private static final PostgreSQLContainer CONTAINER = new PostgreSQLContainer("postgres:17-alpine");
 
     private static SqlTool tool;
+    private static DataSourceRegistry registry;
 
     @BeforeAll
     static void startDatabase() {
@@ -50,7 +55,7 @@ class SqlToolTest {
         new JdbcTemplate(dataSource).execute(
                 "CREATE TABLE item (id SERIAL PRIMARY KEY, name VARCHAR(50) NOT NULL)");
 
-        val registry = new DataSourceRegistry();
+        registry = new DataSourceRegistry();
         registry.register("app", dataSource);
         tool = new SqlTool(registry);
     }
@@ -83,6 +88,25 @@ class SqlToolTest {
         val result = tool.sqlQuery(null, "SELECT * FROM does_not_exist");
 
         assertThat(result).startsWith("SQL error:");
+    }
+
+    @Test
+    void reportsDefaultDatasourceAndSuccessfulResult() {
+        val logger = mock(SqlLogger.class);
+        val loggedTool = new SqlTool(registry, logger);
+
+        loggedTool.sqlQuery(null, "SELECT 1 AS value");
+
+        val request = ArgumentCaptor.forClass(SqlLogger.Request.class);
+        verify(logger).statementStarted(request.capture());
+        assertThat(request.getValue().datasource()).isEqualTo("default");
+        assertThat(request.getValue().statement()).isEqualTo("SELECT 1 AS value");
+
+        val response = ArgumentCaptor.forClass(SqlLogger.Response.class);
+        verify(logger).statementCompleted(request.capture(), response.capture());
+        assertThat(response.getValue().result())
+                .contains("1 row(s)")
+                .contains("value=1");
     }
 
     @Test

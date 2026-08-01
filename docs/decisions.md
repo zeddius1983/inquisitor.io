@@ -68,7 +68,8 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **Harness logging is semantic and presentation-selectable.**
   `inquisitor.harness.logging.format=plain|markdown` selects implementations of
   `LlmStepRunnerCallback`, `EvaluationStepRunnerCallback`, and
-  `ScenarioExecutionCallback`; the shipped loggers implement these generic
+  `ScenarioExecutionCallback`, plus the `HttpRequestLogger` and `SqlLogger` used by
+  the built-in tools; the shipped loggers implement these generic
   lifecycle seams while runners remain presentation-agnostic. Step-runner callbacks
   compose sequentially through `andThen`; `StepEvaluationRecorder` implements the
   evaluation seam and is chained before the narrower `EvaluationLoggerCallback`.
@@ -78,6 +79,16 @@ see [roadmap.md](roadmap.md); for stable repo context see
   whole-run and JUnit step-at-a-time behavior without duplicate step messages.
   Markdown events use the `INQUISITOR_MARKDOWN` SLF4J marker; raw, manually
   rendered, and automatically rendered consoles remain consumer choices.
+- **HTTP log presentation never changes tool data.** The HTTP logger receives the
+  normalized request and response alongside the tool invocation, but the compact
+  response returned to the model is unchanged. Markdown mode may pretty-print
+  valid JSON for human-readable code blocks. Sensitive request-header values are
+  redacted before formatting, including authorization, cookies, API keys, tokens,
+  and secrets.
+- **SQL log presentation follows the same tool seam.** `SqlLogger` receives the
+  resolved datasource name, original statement, and already-formatted tool result.
+  Markdown mode renders the statement in an `sql` fence and the result in a plain
+  code fence; neither representation changes the value returned to the model.
 - **Actual model metadata is observed, never probed.** A response advisor on each
   real actor/judge `ChatClient` call stores the first nonblank server-reported
   model in a shared `ModelRegistry`; no configured options or endpoints are copied
@@ -418,9 +429,9 @@ see [roadmap.md](roadmap.md); for stable repo context see
   output that does not reconstruct the exact source line falls back to the base
   code style; a debugging renderer must never mutate logged payloads.
 - **Powerline breadcrumbs are a renderer convention, not embedded ANSI.** A
-  heading shaped as ` segment  segment … ` renders as background-colored
-  Powerlevel10k-style pills. The classic baseline Powerline caps are preferred
-  over rounded extra-symbol glyphs for broader patched-font support. The source
+  heading shaped as ` segment  segment … ` renders as background-colored
+  Powerlevel10k-style pills. Rounded Powerline caps provide the intended pill
+  silhouette and require a patched font with the extra-symbol range. The source
   remains readable Markdown, plain output remains escape-free, and the harness
   stays independent of Logback/Jansi.
 

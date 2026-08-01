@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.logging;
+package io.inquisitor.harness.logging.plain;
 
 import io.inquisitor.harness.executor.ScenarioExecutionCallback;
 import io.inquisitor.harness.model.Scenario;

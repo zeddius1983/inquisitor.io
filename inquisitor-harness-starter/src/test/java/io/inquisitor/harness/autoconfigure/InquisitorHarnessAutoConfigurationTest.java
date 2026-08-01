@@ -26,19 +26,25 @@ import javax.sql.DataSource;
 
 import io.inquisitor.harness.config.HarnessLoggingFormat;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
-import io.inquisitor.harness.executor.LlmStepRunnerCallback;
 import io.inquisitor.harness.executor.LlmStepRunner;
-import io.inquisitor.harness.executor.StepRequest;
+import io.inquisitor.harness.executor.LlmStepRunnerCallback;
 import io.inquisitor.harness.executor.ScenarioExecutionCallback;
 import io.inquisitor.harness.executor.ScenarioExecutor;
+import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRunner;
-import io.inquisitor.harness.logging.MarkdownLlmLogger;
-import io.inquisitor.harness.logging.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.HttpRequestLogger;
 import io.inquisitor.harness.logging.LlmLoggerCallback;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
-import io.inquisitor.harness.logging.PlainLlmLogger;
-import io.inquisitor.harness.logging.PlainScenarioLogger;
+import io.inquisitor.harness.logging.SqlLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownHttpRequestLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownLlmLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownSqlLogger;
+import io.inquisitor.harness.logging.plain.PlainHttpRequestLogger;
+import io.inquisitor.harness.logging.plain.PlainLlmLogger;
+import io.inquisitor.harness.logging.plain.PlainScenarioLogger;
+import io.inquisitor.harness.logging.plain.PlainSqlLogger;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.Step;
 import io.inquisitor.harness.parser.ScenarioParser;
@@ -71,6 +77,8 @@ class InquisitorHarnessAutoConfigurationTest {
             assertThat(context).hasSingleBean(ChatClient.class);
             assertThat(context).hasSingleBean(ScenarioExecutor.class);
             assertThat(context).hasSingleBean(ModelRegistry.class);
+            assertThat(context).hasSingleBean(HttpRequestLogger.class);
+            assertThat(context).hasSingleBean(SqlLogger.class);
             assertThat(context.getBean(ModelRegistry.class).actualModel(ModelRole.ACTOR)).isEmpty();
             assertThat(context).hasSingleBean(LlmStepRunnerCallback.class);
             assertThat(context).hasSingleBean(ScenarioExecutionCallback.class);
@@ -86,6 +94,10 @@ class InquisitorHarnessAutoConfigurationTest {
                     .isInstanceOf(PlainLlmLogger.class);
             assertThat(context.getBean(ScenarioExecutionCallback.class))
                     .isInstanceOf(PlainScenarioLogger.class);
+            assertThat(context.getBean(HttpRequestLogger.class))
+                    .isInstanceOf(PlainHttpRequestLogger.class);
+            assertThat(context.getBean(SqlLogger.class))
+                    .isInstanceOf(PlainSqlLogger.class);
         });
 
         runner.withPropertyValues("inquisitor.harness.logging.format=markdown").run(context -> {
@@ -95,6 +107,10 @@ class InquisitorHarnessAutoConfigurationTest {
                     .isInstanceOf(MarkdownLlmLogger.class);
             assertThat(context.getBean(ScenarioExecutionCallback.class))
                     .isInstanceOf(MarkdownScenarioLogger.class);
+            assertThat(context.getBean(HttpRequestLogger.class))
+                    .isInstanceOf(MarkdownHttpRequestLogger.class);
+            assertThat(context.getBean(SqlLogger.class))
+                    .isInstanceOf(MarkdownSqlLogger.class);
         });
     }
 
@@ -102,13 +118,19 @@ class InquisitorHarnessAutoConfigurationTest {
     void allowsSemanticLoggersToBeReplaced() {
         val llmCallback = mock(LlmLoggerCallback.class);
         val scenarioCallback = mock(ScenarioExecutionCallback.class);
+        val httpLogger = mock(HttpRequestLogger.class);
+        val sqlLogger = mock(SqlLogger.class);
 
         runner.withBean(LlmLoggerCallback.class, () -> llmCallback)
                 .withBean(ScenarioExecutionCallback.class, () -> scenarioCallback)
+                .withBean(HttpRequestLogger.class, () -> httpLogger)
+                .withBean(SqlLogger.class, () -> sqlLogger)
                 .run(context -> {
                     assertThat(context.getBean(LlmLoggerCallback.class)).isSameAs(llmCallback);
                     assertThat(context.getBean(ScenarioExecutionCallback.class))
                             .isSameAs(scenarioCallback);
+                    assertThat(context.getBean(HttpRequestLogger.class)).isSameAs(httpLogger);
+                    assertThat(context.getBean(SqlLogger.class)).isSameAs(sqlLogger);
                 });
     }
 

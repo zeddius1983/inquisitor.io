@@ -29,14 +29,20 @@ import io.inquisitor.harness.executor.LlmStepRunnerCallback;
 import io.inquisitor.harness.executor.ScenarioExecutionCallback;
 import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.executor.StepRunner;
-import io.inquisitor.harness.logging.MarkdownLlmLogger;
-import io.inquisitor.harness.logging.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.HttpRequestLogger;
 import io.inquisitor.harness.logging.LlmLoggerCallback;
 import io.inquisitor.harness.logging.ModelMetadataAdvisor;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
-import io.inquisitor.harness.logging.PlainLlmLogger;
-import io.inquisitor.harness.logging.PlainScenarioLogger;
+import io.inquisitor.harness.logging.SqlLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownHttpRequestLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownLlmLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownSqlLogger;
+import io.inquisitor.harness.logging.plain.PlainHttpRequestLogger;
+import io.inquisitor.harness.logging.plain.PlainLlmLogger;
+import io.inquisitor.harness.logging.plain.PlainScenarioLogger;
+import io.inquisitor.harness.logging.plain.PlainSqlLogger;
 import io.inquisitor.harness.parser.ScenarioParser;
 import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
@@ -114,6 +120,24 @@ public class InquisitorHarnessAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    HttpRequestLogger inquisitorHttpRequestLogger(InquisitorHarnessProperties properties) {
+        return switch (properties.logging().format()) {
+            case PLAIN -> new PlainHttpRequestLogger();
+            case MARKDOWN -> new MarkdownHttpRequestLogger();
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    SqlLogger inquisitorSqlLogger(InquisitorHarnessProperties properties) {
+        return switch (properties.logging().format()) {
+            case PLAIN -> new PlainSqlLogger();
+            case MARKDOWN -> new MarkdownSqlLogger();
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     ChatMemory inquisitorChatMemory() {
         return MessageWindowChatMemory.builder().build();
     }
@@ -143,14 +167,16 @@ public class InquisitorHarnessAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    HttpRequestTool inquisitorHttpRequestTool(HttpTargetRegistry registry) {
-        return new HttpRequestTool(registry);
+    HttpRequestTool inquisitorHttpRequestTool(
+            HttpTargetRegistry registry,
+            HttpRequestLogger logger) {
+        return new HttpRequestTool(registry, logger);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    SqlTool inquisitorSqlTool(DataSourceRegistry registry) {
-        return new SqlTool(registry);
+    SqlTool inquisitorSqlTool(DataSourceRegistry registry, SqlLogger logger) {
+        return new SqlTool(registry, logger);
     }
 
     // The built-in tools are exposed as individual ToolCallback beans (each tool has one

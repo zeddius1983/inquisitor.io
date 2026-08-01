@@ -83,9 +83,9 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
 
     private static final int LIST_LEFT_INDENT = 1;
     private static final int MAX_HIGHLIGHTED_CODE_CHARS = 16_384;
-    private static final String POWERLINE_LEFT_CAP = "";
+    private static final String POWERLINE_LEFT_CAP = "";
     private static final String POWERLINE_SEPARATOR = "";
-    private static final String POWERLINE_RIGHT_CAP = "";
+    private static final String POWERLINE_RIGHT_CAP = "";
 
     private static final Parser PARSER = tableParser();
 
@@ -286,7 +286,8 @@ public final class FlexmarkAnsiRenderer implements MarkdownRenderer {
                 List<String> segments,
                 int index) {
             return AnsiStyler.PowerlineStyle.forSegment(
-                    index, segments.get(index));
+                    index, segments.get(index),
+                    segments.getFirst().equalsIgnoreCase("HTTP"));
         }
 
         private static Optional<List<String>> powerlineSegments(Heading heading) {

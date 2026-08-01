@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.harness.logging;
+package io.inquisitor.harness.logging.markdown;
 
 import java.util.ArrayList;
 import java.util.List;

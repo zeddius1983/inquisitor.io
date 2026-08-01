@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 import org.jline.jansi.Ansi;
+import org.jspecify.annotations.Nullable;
 
 final class AnsiStyler {
 
@@ -106,16 +107,42 @@ final class AnsiStyler {
             return PALETTE[index % PALETTE.length];
         }
 
-        static PowerlineStyle forSegment(int index, String text) {
-            return switch (text.strip().toUpperCase(Locale.ROOT)) {
+        static PowerlineStyle forSegment(
+                int index,
+                String text,
+                boolean httpBreadcrumb) {
+            String normalized = text.strip().toUpperCase(Locale.ROOT);
+            @Nullable PowerlineStyle semantic = switch (normalized) {
                 case "FAIL", "FAILED", "ERROR", "ABORTED", "UNSUPPORTED",
                         "CONTRADICTED" -> FAILURE;
                 case "SKIP", "SKIPPED", "NOT_EVALUATED",
                         "PARTIALLY_GROUNDED" -> WARNING;
-                case "PASS", "PASSED", "SUCCESS", "RUN", "RUNNING", "EVALUATION",
+                case "PASS", "PASSED", "SUCCESS", "RUN", "RUNNING", "EXECUTE", "EVALUATION",
                         "EVALUATING", "GROUNDED", "COMPLETED" -> STATUS;
-                default -> at(index);
+                default -> httpStatus(normalized);
             };
+            if (semantic != null) {
+                return semantic;
+            }
+            return httpBreadcrumb && index == 3 ? DURATION : at(index);
+        }
+
+        private static @Nullable PowerlineStyle httpStatus(String text) {
+            if (!text.startsWith("HTTP ")) {
+                return null;
+            }
+            String statusText = text.substring("HTTP ".length()).strip();
+            if (statusText.length() != 3 || !statusText.chars().allMatch(Character::isDigit)) {
+                return null;
+            }
+            int status = Integer.parseInt(statusText);
+            if (status >= 500) {
+                return FAILURE;
+            }
+            if (status >= 400) {
+                return WARNING;
+            }
+            return status >= 200 ? STATUS : null;
         }
     }
 
