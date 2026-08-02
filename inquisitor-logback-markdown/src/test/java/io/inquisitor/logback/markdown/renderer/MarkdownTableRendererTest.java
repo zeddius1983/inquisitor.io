@@ -33,7 +33,7 @@ class MarkdownTableRendererTest {
 
     private static final Pattern ANSI = Pattern.compile("\\u001B\\[[;\\d]*m");
 
-    private final FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(false);
+    private final FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain());
 
     @Test
     void rendersBasicTableWithUnicodeBordersAndAlignment() {
@@ -99,7 +99,7 @@ class MarkdownTableRendererTest {
                 | styled | **bold** *emphasis* `code` [docs](https://example.test) |
                 """;
         String plain = renderer.render(markdown);
-        FlexmarkAnsiRenderer ansiRenderer = new FlexmarkAnsiRenderer(true);
+        FlexmarkAnsiRenderer ansiRenderer = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi());
         String ansi = ansiRenderer.render(markdown);
         String followedByPlainText = ansiRenderer.render(markdown + "\nAfter table");
 
@@ -116,7 +116,7 @@ class MarkdownTableRendererTest {
     @Test
     void wrapsWordsAndLongTokensWithinConfiguredWidth() {
         String rendered = new FlexmarkAnsiRenderer(
-                false, new MarkdownRendererOptions(24)).render("""
+                MarkdownRendererOptions.plain().withTableWidth(24)).render("""
                 | Key | Value |
                 |---|---|
                 | notes | alpha beta gamma delta |
@@ -138,7 +138,7 @@ class MarkdownTableRendererTest {
     @Test
     void overflowsReadablyWhenColumnBordersAloneExceedTheLimit() {
         String rendered = new FlexmarkAnsiRenderer(
-                false, new MarkdownRendererOptions(20)).render("""
+                MarkdownRendererOptions.plain().withTableWidth(20)).render("""
                 | A | B | C | D | E | F | G |
                 |---|---|---|---|---|---|---|
                 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
@@ -194,7 +194,7 @@ class MarkdownTableRendererTest {
     @Test
     void activePrefixesAreDeductedFromTheConfiguredTableWidth() {
         FlexmarkAnsiRenderer narrow = new FlexmarkAnsiRenderer(
-                false, new MarkdownRendererOptions(24));
+                MarkdownRendererOptions.plain().withTableWidth(24));
         String quoted = narrow.render("""
                 > | Key | Value |
                 > |---|---|
@@ -220,7 +220,7 @@ class MarkdownTableRendererTest {
 
     @Test
     void concurrentTableRendersDoNotShareLayoutOrStyleState() throws Exception {
-        FlexmarkAnsiRenderer shared = new FlexmarkAnsiRenderer(true);
+        FlexmarkAnsiRenderer shared = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi());
         List<Callable<String>> calls = IntStream.range(0, 100)
                 .mapToObj(index -> (Callable<String>) () -> shared.render("""
                         | Index | Value |

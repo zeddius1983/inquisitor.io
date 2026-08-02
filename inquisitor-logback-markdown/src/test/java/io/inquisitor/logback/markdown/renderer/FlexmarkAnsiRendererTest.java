@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
+import io.inquisitor.logback.markdown.ansi.AnsiStyler;
+import io.inquisitor.logback.markdown.ansi.PowerlineSegmentClassifier;
 import io.inquisitor.logback.markdown.highlight.SyntaxHighlighter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,7 +39,7 @@ class FlexmarkAnsiRendererTest {
 
     private static final Pattern ANSI = Pattern.compile("\\u001B\\[[;\\d]*m");
 
-    private final FlexmarkAnsiRenderer plainRenderer = new FlexmarkAnsiRenderer(false);
+    private final FlexmarkAnsiRenderer plainRenderer = new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain());
 
     @Test
     void rendersSupportedBlockAndInlineNodes() {
@@ -113,7 +115,7 @@ class FlexmarkAnsiRendererTest {
 
     @Test
     void ansiCodeBlocksUseAnEqualWidthBackgroundPanelAndSyntaxColors() {
-        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(true);
+        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi());
 
         String rendered = renderer.render("""
                 ```json
@@ -137,7 +139,8 @@ class FlexmarkAnsiRendererTest {
             language.set(receivedLanguage);
             return List.of(new SyntaxHighlighter.Span("different", SyntaxHighlighter.Style.KEYWORD));
         };
-        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(true, corrupting);
+        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(
+                MarkdownRendererOptions.ansi().withSyntaxHighlighter(corrupting));
 
         String rendered = renderer.render("```custom option\noriginal\n```");
 
@@ -151,7 +154,8 @@ class FlexmarkAnsiRendererTest {
             throw new IllegalStateException("broken grammar");
         };
 
-        String rendered = new FlexmarkAnsiRenderer(true, failing)
+        String rendered = new FlexmarkAnsiRenderer(
+                MarkdownRendererOptions.ansi().withSyntaxHighlighter(failing))
                 .render("```custom\nsource\n```");
 
         assertEquals(" source ", stripAnsi(rendered));
@@ -261,7 +265,7 @@ class FlexmarkAnsiRendererTest {
     void rendersPowerlineHeadingsAsBackgroundColoredPills() {
         String markdown = "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ";
 
-        String rendered = new FlexmarkAnsiRenderer(true).render(markdown);
+        String rendered = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi()).render(markdown);
 
         assertEquals(" actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  Running ",
                 stripAnsi(rendered));
@@ -286,7 +290,7 @@ class FlexmarkAnsiRendererTest {
 
     @Test
     void rendersFailedPowerlineStatusWithFailureBackground() {
-        String rendered = new FlexmarkAnsiRenderer(true).render(
+        String rendered = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi()).render(
                 "###  Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ");
 
         assertEquals(" Accounts  Verify balances  ▰▰▰▰▰ 4/4  FAIL  ⧖ 13.289 s ",
@@ -297,7 +301,7 @@ class FlexmarkAnsiRendererTest {
 
     @Test
     void rendersHttpBreadcrumbTargetAndStatusAsDistinctSegments() {
-        String rendered = new FlexmarkAnsiRenderer(true).render(
+        String rendered = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi()).render(
                 "###  HTTP  localhost  POST  /accounts/import  HTTP 201 ");
 
         assertEquals(" HTTP  localhost  POST  /accounts/import  HTTP 201 ",
@@ -308,7 +312,7 @@ class FlexmarkAnsiRendererTest {
 
     @Test
     void rendersSqlBreadcrumbWithSemanticExecutionStatus() {
-        String rendered = new FlexmarkAnsiRenderer(true).render(
+        String rendered = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi()).render(
                 "###  SQL  default  EXECUTE ");
 
         assertEquals(" SQL  default  EXECUTE ", stripAnsi(rendered));
@@ -318,17 +322,13 @@ class FlexmarkAnsiRendererTest {
     @ParameterizedTest
     @CsvSource({
             "RUN, '48;2;152;151;26'",
-            "EVALUATION, '48;2;152;151;26'",
-            "GROUNDED, '48;2;152;151;26'",
-            "PARTIALLY_GROUNDED, '48;2;215;153;33'",
-            "NOT_EVALUATED, '48;2;215;153;33'",
-            "UNSUPPORTED, '48;2;204;36;29'",
-            "CONTRADICTED, '48;2;204;36;29'"
+            "WARN, '48;2;215;153;33'",
+            "UNSUPPORTED, '48;2;204;36;29'"
     })
-    void rendersLifecycleAndEvaluationStatusesWithSemanticBackgrounds(
+    void rendersGenericLifecycleStatusesWithSemanticBackgrounds(
             String status,
             String backgroundCode) {
-        String rendered = new FlexmarkAnsiRenderer(true).render(
+        String rendered = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi()).render(
                 "###  actual-model  Accounts  Verify balances  ▰▰▰▰▰ 4/4  "
                         + status + " ");
 
@@ -337,8 +337,23 @@ class FlexmarkAnsiRendererTest {
     }
 
     @Test
+    void acceptsADomainSpecificPowerlineClassifier() {
+        PowerlineSegmentClassifier standard = PowerlineSegmentClassifier.standard();
+        MarkdownRendererOptions options = MarkdownRendererOptions.ansi()
+                .withPowerlineClassifier((index, segments) ->
+                segments.get(index).equals("GROUNDED")
+                        ? AnsiStyler.PowerlineStyle.STATUS
+                        : standard.classify(index, segments));
+
+        String rendered = new FlexmarkAnsiRenderer(options).render(
+                "###  model  scenario  step  GROUNDED ");
+
+        assertTrue(rendered.contains("48;2;152;151;26"));
+    }
+
+    @Test
     void resetsStylesBeforeAdjacentPlainTextAndBetweenMessages() {
-        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(true);
+        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi());
 
         String styled = renderer.render("**strong** plain");
         String plain = renderer.render("plain");
@@ -351,7 +366,7 @@ class FlexmarkAnsiRendererTest {
 
     @Test
     void oneRendererCanServeConcurrentCalls() throws Exception {
-        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(false);
+        FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain());
         List<Callable<String>> calls = IntStream.range(0, 100)
                 .mapToObj(index -> (Callable<String>) () -> renderer.render(
                         "# Scenario " + index + "\n\n- step `" + index + "`"))

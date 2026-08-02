@@ -26,43 +26,24 @@ public class MarkdownSqlLogger implements SqlLogger {
 
     @Override
     public void statementStarted(Request request) {
-        val markdown = """
-                ### %s
-
-                ### Statement
-
-                %s
-                """.formatted(
-                breadcrumb(request, "EXECUTE"),
-                MarkdownLogSupport.codeBlock("sql", request.statement()));
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        val event = MarkdownLogSupport.event(breadcrumb(request, "EXECUTE"))
+                .section("Statement", MarkdownLogSupport.codeBlock("sql", request.statement()));
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     @Override
     public void statementCompleted(Request request, Response response) {
-        val markdown = """
-                ### %s
-
-                ### Result
-
-                %s
-                """.formatted(
-                breadcrumb(request, "SUCCESS"),
-                MarkdownLogSupport.codeBlock("text", response.result()));
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        val event = MarkdownLogSupport.event(breadcrumb(request, "SUCCESS"))
+                .section("Result", MarkdownLogSupport.codeBlock("text", response.result()));
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     @Override
     public void statementFailed(Request request, String error) {
         val breadcrumb = breadcrumb(request, "ERROR");
-        val markdown = """
-                ### %s
-
-                %s
-                """.formatted(
-                breadcrumb,
-                MarkdownStepLogSupport.blockquote(error, breadcrumb.length()));
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        val event = MarkdownLogSupport.event(breadcrumb)
+                .content(MarkdownStepLogSupport.blockquote(error, breadcrumb.length()));
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     private static String breadcrumb(Request request, String status) {

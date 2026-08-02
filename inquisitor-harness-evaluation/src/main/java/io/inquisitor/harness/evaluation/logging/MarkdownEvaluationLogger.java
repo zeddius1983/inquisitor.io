@@ -39,7 +39,7 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
 
     @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {
-        info("### " + breadcrumb(request, "EVALUATION"));
+        info(MarkdownLogSupport.event(breadcrumb(request, "EVALUATION")).message());
     }
 
     @Override
@@ -70,15 +70,10 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
         val breadcrumb = breadcrumb(request, category,
                 "Score %.3f".formatted(response.getScore()),
                 "⧖ " + LogDurationFormatter.format(elapsed));
-        info("""
-                ### %s
-
-                ### Feedback
-
-                %s
-                """.formatted(breadcrumb,
-                MarkdownStepLogSupport.blockquote(
-                        response.getFeedback(), breadcrumb.length())));
+        info(MarkdownLogSupport.event(breadcrumb)
+                .section("Feedback", MarkdownStepLogSupport.blockquote(
+                        response.getFeedback(), breadcrumb.length()))
+                .message());
     }
 
     private String breadcrumb(StepRequest request, String... trailingSegments) {

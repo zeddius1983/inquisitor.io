@@ -16,53 +16,92 @@
 
 package io.inquisitor.logback.markdown.renderer;
 
-/** Immutable terminal-layout options for the built-in Markdown renderer. */
-public final class MarkdownRendererOptions {
+import java.util.Objects;
+
+import io.inquisitor.logback.markdown.ansi.AnsiPolicy;
+import io.inquisitor.logback.markdown.ansi.PowerlineSegmentClassifier;
+import io.inquisitor.logback.markdown.highlight.BuiltinSyntaxHighlighter;
+import io.inquisitor.logback.markdown.highlight.SyntaxHighlighter;
+import io.inquisitor.logback.markdown.palette.MarkdownPalette;
+import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
+
+/** Immutable policy for the built-in Markdown renderer. */
+public record MarkdownRendererOptions(
+        AnsiPolicy ansiPolicy,
+        SyntaxHighlighter syntaxHighlighter,
+        MarkdownPalette palette,
+        PowerlineSegmentClassifier powerlineClassifier,
+        int tableWidth,
+        int tableIndent) {
 
     public static final int DEFAULT_TABLE_WIDTH = 120;
     public static final int MIN_TABLE_WIDTH = 20;
     public static final int MAX_TABLE_WIDTH = 1_000;
 
-    private final int tableWidth;
-    private final int tableIndent;
-
-    /** Creates the documented default options. */
-    public MarkdownRendererOptions() {
-        this(DEFAULT_TABLE_WIDTH);
+    /** Validates collaborators and normalizes terminal-layout dimensions. */
+    public MarkdownRendererOptions {
+        Objects.requireNonNull(ansiPolicy, "ansiPolicy");
+        Objects.requireNonNull(syntaxHighlighter, "syntaxHighlighter");
+        palette = MarkdownPalettes.validate(Objects.requireNonNull(palette, "palette"));
+        Objects.requireNonNull(powerlineClassifier, "powerlineClassifier");
+        tableWidth = isValidTableWidth(tableWidth) ? tableWidth : DEFAULT_TABLE_WIDTH;
+        tableIndent = Math.max(0, tableIndent);
     }
 
-    /**
-     * Creates options with a deterministic message-body table width. Unsupported
-     * values normalize to {@link #DEFAULT_TABLE_WIDTH}; converter integration also
-     * reports invalid source options through Logback's status system.
-     *
-     * @param tableWidth maximum message-body width allocated to a table
-     */
-    public MarkdownRendererOptions(int tableWidth) {
-        this(isValidTableWidth(tableWidth) ? tableWidth : DEFAULT_TABLE_WIDTH, 0);
+    /** Returns the documented renderer defaults with automatic ANSI detection. */
+    public static MarkdownRendererOptions defaults() {
+        return new MarkdownRendererOptions(
+                AnsiPolicy.DETECT,
+                BuiltinSyntaxHighlighter.INSTANCE,
+                MarkdownPalettes.defaultPalette(),
+                PowerlineSegmentClassifier.standard(),
+                DEFAULT_TABLE_WIDTH,
+                0);
     }
 
-    private MarkdownRendererOptions(int tableWidth, int tableIndent) {
-        this.tableWidth = tableWidth;
-        this.tableIndent = tableIndent;
+    /** Returns options that always produce plain terminal text. */
+    public static MarkdownRendererOptions plain() {
+        return defaults().withAnsiPolicy(AnsiPolicy.NEVER);
     }
 
-    /** Maximum message-body width allocated to a table. */
-    public int tableWidth() {
-        return tableWidth;
+    /** Returns options that always emit ANSI terminal styling. */
+    public static MarkdownRendererOptions ansi() {
+        return defaults().withAnsiPolicy(AnsiPolicy.ALWAYS);
     }
 
-    /** Whether a message-body table width is within the supported safety bounds. */
+    /** Whether a table width is within the supported safety bounds. */
     public static boolean isValidTableWidth(int tableWidth) {
         return tableWidth >= MIN_TABLE_WIDTH && tableWidth <= MAX_TABLE_WIDTH;
     }
 
-    /** Returns options that reserve an outer indentation from the table width. */
-    public MarkdownRendererOptions withTableIndent(int indent) {
-        return new MarkdownRendererOptions(tableWidth, Math.max(0, indent));
+    public MarkdownRendererOptions withAnsiPolicy(AnsiPolicy policy) {
+        return new MarkdownRendererOptions(policy, syntaxHighlighter, palette,
+                powerlineClassifier, tableWidth, tableIndent);
     }
 
-    int tableIndent() {
-        return tableIndent;
+    public MarkdownRendererOptions withSyntaxHighlighter(SyntaxHighlighter highlighter) {
+        return new MarkdownRendererOptions(ansiPolicy, highlighter, palette,
+                powerlineClassifier, tableWidth, tableIndent);
+    }
+
+    public MarkdownRendererOptions withPalette(MarkdownPalette value) {
+        return new MarkdownRendererOptions(ansiPolicy, syntaxHighlighter, value,
+                powerlineClassifier, tableWidth, tableIndent);
+    }
+
+    public MarkdownRendererOptions withPowerlineClassifier(
+            PowerlineSegmentClassifier classifier) {
+        return new MarkdownRendererOptions(ansiPolicy, syntaxHighlighter, palette,
+                classifier, tableWidth, tableIndent);
+    }
+
+    public MarkdownRendererOptions withTableWidth(int width) {
+        return new MarkdownRendererOptions(ansiPolicy, syntaxHighlighter, palette,
+                powerlineClassifier, width, tableIndent);
+    }
+
+    public MarkdownRendererOptions withTableIndent(int indent) {
+        return new MarkdownRendererOptions(ansiPolicy, syntaxHighlighter, palette,
+                powerlineClassifier, tableWidth, indent);
     }
 }

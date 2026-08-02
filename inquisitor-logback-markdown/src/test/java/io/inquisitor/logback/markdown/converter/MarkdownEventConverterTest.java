@@ -26,11 +26,13 @@ import java.util.regex.Pattern;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxy;
+import io.inquisitor.logback.markdown.ansi.AnsiPolicy;
 import io.inquisitor.logback.markdown.ansi.AnsiStyler;
 import io.inquisitor.logback.markdown.marker.MarkdownMarkers;
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
 import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
+import io.inquisitor.logback.markdown.renderer.MarkdownRendererOptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -61,7 +63,8 @@ class MarkdownEventConverterTest {
     @Test
     void indentsEveryNonemptyContentLine() {
         MarkdownEventConverter converter = new MarkdownEventConverter(
-                markdown -> "first\n\nsecond", false);
+                markdown -> "first\n\nsecond", AnsiPolicy.NEVER,
+                MarkdownPalettes.defaultPalette());
         converter.start();
 
         String rendered = converter.convert(marked(Level.INFO, "ignored"));
@@ -107,8 +110,8 @@ class MarkdownEventConverterTest {
     void appliesTheSelectedPaletteToHeaderAndMarkdownBody() {
         MarkdownPalette palette = MarkdownPalettes.require("catppuccin");
         MarkdownEventConverter converter = new MarkdownEventConverter(
-                new FlexmarkAnsiRenderer(true, palette),
-                true,
+                new FlexmarkAnsiRenderer(MarkdownRendererOptions.ansi().withPalette(palette)),
+                AnsiPolicy.ALWAYS,
                 palette);
         converter.start();
 
@@ -139,7 +142,7 @@ class MarkdownEventConverterTest {
     void fallsBackToRawBodyWhenRenderingFails() {
         MarkdownEventConverter converter = new MarkdownEventConverter(markdown -> {
             throw new IllegalStateException("renderer failed");
-        }, false);
+        }, AnsiPolicy.NEVER, MarkdownPalettes.defaultPalette());
         converter.start();
 
         String rendered = converter.convert(marked(Level.WARN, "**raw**"));
@@ -162,8 +165,12 @@ class MarkdownEventConverterTest {
     }
 
     private static MarkdownEventConverter converter(boolean ansiEnabled) {
+        AnsiPolicy policy = ansiEnabled ? AnsiPolicy.ALWAYS : AnsiPolicy.NEVER;
         MarkdownEventConverter converter = new MarkdownEventConverter(
-                new FlexmarkAnsiRenderer(ansiEnabled), ansiEnabled);
+                new FlexmarkAnsiRenderer(MarkdownRendererOptions.defaults()
+                        .withAnsiPolicy(policy)),
+                policy,
+                MarkdownPalettes.defaultPalette());
         converter.start();
         return converter;
     }

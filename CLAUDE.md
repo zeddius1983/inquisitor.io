@@ -156,7 +156,9 @@ palette by default; `inquisitor.logging.markdown.palette` can select Gruvbox,
 Nord, Catppuccin Mocha, or Tokyo Night consistently across the early event header
 and Markdown body. Third parties contribute named palettes through the base
 module's `MarkdownPaletteProvider` ServiceLoader SPI, which remains available
-before Spring bean creation. Powerline text maintains at least 4.5:1 contrast.
+before Spring bean creation. Powerline text maintains at least 4.5:1 contrast;
+its base classifier knows only generic log/HTTP concepts, while the starter adds
+judge-result vocabulary when Markdown harness mode is active.
 `HttpRequestLogger` and `SqlLogger` have
 plain/Markdown implementations; the former renders resolved target hostname, method,
 path, status, redacted headers, and pretty-printed JSON payloads, while the latter

@@ -16,6 +16,9 @@
 
 package io.inquisitor.harness.logging.markdown;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import lombok.val;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
@@ -41,6 +44,11 @@ public final class MarkdownLogSupport {
         return "\n\n" + markdown.strip() + "\n";
     }
 
+    /** Starts a Markdown event with a level-three Powerline breadcrumb. */
+    public static Event event(String breadcrumb) {
+        return new Event("### " + breadcrumb);
+    }
+
     static String codeBlock(String language, String content) {
         val fence = "`".repeat(Math.max(3, longestBacktickRun(content) + 1));
         return fence + language + "\n" + content + "\n" + fence;
@@ -59,5 +67,36 @@ public final class MarkdownLogSupport {
             }
         }
         return longest;
+    }
+
+    /** Mutable, single-use builder for the repeated breadcrumb/section event shape. */
+    public static final class Event {
+
+        private final List<String> blocks = new ArrayList<>();
+
+        private Event(String breadcrumb) {
+            blocks.add(breadcrumb);
+        }
+
+        /** Adds a Markdown heading and content when the content is not blank. */
+        public Event section(String heading, String content) {
+            if (!content.isBlank()) {
+                blocks.add("### " + heading + "\n\n" + content.strip());
+            }
+            return this;
+        }
+
+        /** Adds an already formatted Markdown block when it is not blank. */
+        public Event content(String content) {
+            if (!content.isBlank()) {
+                blocks.add(content.strip());
+            }
+            return this;
+        }
+
+        /** Builds the marker-ready message with standard outer spacing. */
+        public String message() {
+            return block(String.join("\n\n", blocks));
+        }
     }
 }

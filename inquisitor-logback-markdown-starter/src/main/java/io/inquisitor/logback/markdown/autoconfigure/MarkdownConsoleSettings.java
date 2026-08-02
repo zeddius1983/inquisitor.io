@@ -18,13 +18,14 @@ package io.inquisitor.logback.markdown.autoconfigure;
 
 import java.util.ServiceConfigurationError;
 
+import io.inquisitor.logback.markdown.ansi.AnsiPolicy;
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
 import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
+import io.inquisitor.logback.markdown.renderer.MarkdownRendererOptions;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.jspecify.annotations.Nullable;
 import org.springframework.boot.ansi.AnsiOutput;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
@@ -57,8 +58,7 @@ final class MarkdownConsoleSettings {
         if (configured != MarkdownConsoleMode.AUTO) {
             return configured;
         }
-        val harnessFormat = environment.getProperty(HARNESS_FORMAT);
-        return harnessFormat != null && harnessFormat.equalsIgnoreCase("markdown")
+        return harnessMarkdown(environment)
                 ? MarkdownConsoleMode.EXCLUSIVE
                 : MarkdownConsoleMode.SHARED;
     }
@@ -83,19 +83,26 @@ final class MarkdownConsoleSettings {
         return MarkdownPalettes.defaultPalette();
     }
 
-    static MarkdownRenderer renderer(MarkdownPalette palette) {
+    static MarkdownRenderer renderer(MarkdownPalette palette, Environment environment) {
+        val options = MarkdownRendererOptions.defaults()
+                .withAnsiPolicy(ansiPolicy())
+                .withPalette(palette);
+        val effectiveOptions = harnessMarkdown(environment)
+                ? options.withPowerlineClassifier(HarnessPowerlineSegmentClassifier.INSTANCE)
+                : options;
+        return new FlexmarkAnsiRenderer(effectiveOptions);
+    }
+
+    static AnsiPolicy ansiPolicy() {
         return switch (AnsiOutput.getEnabled()) {
-            case ALWAYS -> new FlexmarkAnsiRenderer(true, palette);
-            case NEVER -> new FlexmarkAnsiRenderer(false, palette);
-            case DETECT -> new FlexmarkAnsiRenderer(palette);
+            case ALWAYS -> AnsiPolicy.ALWAYS;
+            case NEVER -> AnsiPolicy.NEVER;
+            case DETECT -> AnsiPolicy.DETECT;
         };
     }
 
-    static @Nullable Boolean ansiPolicy() {
-        return switch (AnsiOutput.getEnabled()) {
-            case ALWAYS -> true;
-            case NEVER -> false;
-            case DETECT -> null;
-        };
+    private static boolean harnessMarkdown(Environment environment) {
+        val harnessFormat = environment.getProperty(HARNESS_FORMAT);
+        return harnessFormat != null && harnessFormat.equalsIgnoreCase("markdown");
     }
 }

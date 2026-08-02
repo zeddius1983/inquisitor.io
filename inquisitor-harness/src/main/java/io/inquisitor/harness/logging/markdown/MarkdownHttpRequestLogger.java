@@ -16,7 +16,6 @@
 
 package io.inquisitor.harness.logging.markdown;
 
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,41 +39,36 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
     @Override
     public void requestStarted(Request request) {
         val contentType = contentType(request.headers());
-        val markdown = "### %s%s".formatted(
-                breadcrumb(request),
-                sections(
-                        request.headers().isEmpty() ? "" : section("Headers",
-                                MarkdownLogSupport.codeBlock(
-                                        "http", headers(request.headers()))),
-                        isMissing(request.body()) ? "" : section("Body",
-                                MarkdownLogSupport.codeBlock(
-                                        language(request.body(), contentType),
-                                        body(request.body(), contentType)))));
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        val event = MarkdownLogSupport.event(breadcrumb(request));
+        if (!request.headers().isEmpty()) {
+            event.section("Headers", MarkdownLogSupport.codeBlock(
+                    "http", headers(request.headers())));
+        }
+        if (!isMissing(request.body())) {
+            event.section("Body", MarkdownLogSupport.codeBlock(
+                    language(request.body(), contentType), body(request.body(), contentType)));
+        }
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     @Override
     public void requestCompleted(Request request, Response response) {
-        val markdown = "### %s%s".formatted(
-                breadcrumb(request, "HTTP " + response.status()),
-                isMissing(response.body()) ? "" : sections(section("Response",
-                        MarkdownLogSupport.codeBlock(
-                                language(response.body(), response.contentType()),
-                                body(response.body(), response.contentType())))));
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        val event = MarkdownLogSupport.event(
+                breadcrumb(request, "HTTP " + response.status()));
+        if (!isMissing(response.body())) {
+            event.section("Response", MarkdownLogSupport.codeBlock(
+                    language(response.body(), response.contentType()),
+                    body(response.body(), response.contentType())));
+        }
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     @Override
     public void requestFailed(Request request, String error) {
         val breadcrumb = breadcrumb(request, "ERROR");
-        val markdown = """
-                ### %s
-
-                %s
-                """.formatted(
-                breadcrumb,
-                MarkdownStepLogSupport.blockquote(error, breadcrumb.length()));
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
+        val event = MarkdownLogSupport.event(breadcrumb)
+                .content(MarkdownStepLogSupport.blockquote(error, breadcrumb.length()));
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     private static String breadcrumb(Request request, String... trailingSegments) {
@@ -130,17 +124,6 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
 
     private static boolean isMissing(@Nullable String value) {
         return value == null || value.isBlank();
-    }
-
-    private static String section(String heading, String content) {
-        return "### " + heading + "\n\n" + content;
-    }
-
-    private static String sections(String... candidates) {
-        val content = Arrays.stream(candidates)
-                .filter(candidate -> !candidate.isEmpty())
-                .collect(Collectors.joining("\n\n"));
-        return content.isEmpty() ? "" : "\n\n" + content;
     }
 
 }

@@ -35,9 +35,12 @@ import ch.qos.logback.core.FileAppender;
 import ch.qos.logback.core.LayoutBase;
 import ch.qos.logback.core.encoder.EncoderBase;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
+import io.inquisitor.logback.markdown.ansi.AnsiPolicy;
 import io.inquisitor.logback.markdown.marker.MarkdownMarkers;
+import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
+import io.inquisitor.logback.markdown.renderer.MarkdownRendererOptions;
 import lombok.val;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -105,6 +108,20 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
                     assertThat(console.layout().doLayout(marked("## rendered")))
                             .contains("38;2;125;207;255");
                 });
+    }
+
+    @Test
+    void harnessMarkdownModeAddsEvaluationStatusClassification() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.ALWAYS);
+        val environment = new MockEnvironment()
+                .withProperty("inquisitor.harness.logging.format", "markdown");
+        val renderer = MarkdownConsoleSettings.renderer(
+                MarkdownPalettes.defaultPalette(), environment);
+
+        val rendered = renderer.render(
+                "###  model  scenario  step  GROUNDED ");
+
+        assertThat(rendered).contains("48;2;152;151;26");
     }
 
     @Test
@@ -298,7 +315,8 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         val console = console(loggerContext, "CONSOLE", "prefix %msg%n");
         val fileLayout = file(loggerContext, "FILE", "%level %msg%n");
         val installer = new LogbackMarkdownInstaller(
-                new FlexmarkAnsiRenderer(false), MarkdownConsoleMode.EXCLUSIVE, false);
+                new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()),
+                MarkdownConsoleMode.EXCLUSIVE, AnsiPolicy.NEVER);
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(installer.install(loggerContext)).isZero();
@@ -338,7 +356,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         val loggerContext = loggerContext();
         val console = console(loggerContext, "CONSOLE", "%msg");
         val fileLayout = file(loggerContext, "FILE", "%msg");
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(console.layout().doLayout(marked("## rendered"))).isEqualTo("    rendered");
@@ -366,7 +384,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         custom.setEncoder(wrappingEncoder);
         loggerContext.getLogger("custom").addAppender(custom);
 
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertThat(installer.install(loggerContext)).isZero();
         assertThat(customLayout.doLayout(marked("## raw"))).isEqualTo("## raw");
@@ -377,7 +395,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         val loggerContext = loggerContext();
         val console = console(loggerContext, "SHARED", "%message");
         loggerContext.getLogger("named").addAppender(console.appender());
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(installer.install(loggerContext)).isZero();
@@ -395,7 +413,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         async.setName("ASYNC");
         async.addAppender(console.appender());
         root.addAppender(async);
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(console.layout().doLayout(marked("## rendered"))).isEqualTo("    rendered");
@@ -416,7 +434,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         appender.setName("OBSERVED_CONSOLE");
         appender.setEncoder(encoder);
         loggerContext.getLogger(Logger.ROOT_LOGGER_NAME).addAppender(appender);
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(layout.stopped).isFalse();
@@ -439,7 +457,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         appender.setName("FAILING_CONSOLE");
         appender.setEncoder(encoder);
         loggerContext.getLogger(Logger.ROOT_LOGGER_NAME).addAppender(appender);
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertThat(installer.install(loggerContext)).isZero();
         assertThat(layout.isStarted()).isTrue();
@@ -452,7 +470,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
         val shortWord = console(loggerContext, "SHORT", "%m");
         val normalWord = console(loggerContext, "NORMAL", "%msg");
         val longWord = console(loggerContext, "LONG", "%message");
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertThat(installer.install(loggerContext)).isEqualTo(3);
         assertThat(shortWord.layout().doLayout(marked("## short"))).isEqualTo("    short");
@@ -462,7 +480,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
 
     @Test
     void skipsAnAlternativeSlf4jBackend() {
-        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(false));
+        val installer = new LogbackMarkdownInstaller(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
         ILoggerFactory alternative = LoggerFactory::getLogger;
 
         assertThat(installer.install(alternative)).isZero();

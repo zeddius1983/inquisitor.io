@@ -16,12 +16,9 @@
 
 package io.inquisitor.logback.markdown.ansi;
 
-import java.util.Locale;
-
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
 import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import org.jline.jansi.Ansi;
-import org.jspecify.annotations.Nullable;
 
 /** Applies palette-aware ANSI styles used by renderers and Logback converters. */
 public final class AnsiStyler {
@@ -115,44 +112,6 @@ public final class AnsiStyler {
 
         public static PowerlineStyle at(int index) {
             return PALETTE[index % PALETTE.length];
-        }
-
-        public static PowerlineStyle forSegment(
-                int index,
-                String text,
-                boolean httpBreadcrumb) {
-            String normalized = text.strip().toUpperCase(Locale.ROOT);
-            @Nullable PowerlineStyle semantic = switch (normalized) {
-                case "FAIL", "FAILED", "ERROR", "ABORTED", "UNSUPPORTED",
-                        "CONTRADICTED" -> FAILURE;
-                case "SKIP", "SKIPPED", "NOT_EVALUATED",
-                        "PARTIALLY_GROUNDED" -> WARNING;
-                case "PASS", "PASSED", "SUCCESS", "RUN", "RUNNING", "EXECUTE", "EVALUATION",
-                        "EVALUATING", "GROUNDED", "COMPLETED" -> STATUS;
-                default -> httpStatus(normalized);
-            };
-            if (semantic != null) {
-                return semantic;
-            }
-            return httpBreadcrumb && index == 3 ? DURATION : at(index);
-        }
-
-        private static @Nullable PowerlineStyle httpStatus(String text) {
-            if (!text.startsWith("HTTP ")) {
-                return null;
-            }
-            String statusText = text.substring("HTTP ".length()).strip();
-            if (statusText.length() != 3 || !statusText.chars().allMatch(Character::isDigit)) {
-                return null;
-            }
-            int status = Integer.parseInt(statusText);
-            if (status >= 500) {
-                return FAILURE;
-            }
-            if (status >= 400) {
-                return WARNING;
-            }
-            return status >= 200 ? STATUS : null;
         }
 
     }

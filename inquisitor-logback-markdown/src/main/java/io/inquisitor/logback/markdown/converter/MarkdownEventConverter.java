@@ -26,13 +26,14 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.pattern.ThrowableHandlingConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxyUtil;
+import io.inquisitor.logback.markdown.ansi.AnsiPolicy;
 import io.inquisitor.logback.markdown.ansi.AnsiStyler;
-import io.inquisitor.logback.markdown.ansi.AnsiSupport;
 import io.inquisitor.logback.markdown.marker.MarkdownMarkers;
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
 import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
+import io.inquisitor.logback.markdown.renderer.MarkdownRendererOptions;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -57,72 +58,28 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
             .ofPattern("HH:mm:ss.SSS")
             .withZone(ZoneId.systemDefault());
 
-    private final @Nullable MarkdownRenderer configuredRenderer;
-    private final @Nullable Boolean configuredAnsiEnabled;
-    private final @Nullable MarkdownPalette configuredPalette;
-    private volatile MarkdownRenderer renderer;
-    private volatile AnsiStyler styler;
+    private final @Nullable Configuration configured;
+    private volatile RenderPolicy renderPolicy;
 
     /** Creates a converter backed by the default renderer and ANSI detection. */
     public MarkdownEventConverter() {
-        this.configuredRenderer = null;
-        this.configuredAnsiEnabled = null;
-        this.configuredPalette = null;
-        boolean ansiEnabled = AnsiSupport.isAutoEnabled();
-        this.renderer = new FlexmarkAnsiRenderer(ansiEnabled, MarkdownPalettes.defaultPalette());
-        this.styler = new AnsiStyler(ansiEnabled, MarkdownPalettes.defaultPalette());
-    }
-
-    /**
-     * Creates a converter backed by a custom renderer and automatic header styling.
-     *
-     * @param renderer Markdown body renderer
-     */
-    public MarkdownEventConverter(MarkdownRenderer renderer) {
-        this(renderer, MarkdownPalettes.defaultPalette());
-    }
-
-    /**
-     * Creates a converter backed by a custom renderer, automatic header styling,
-     * and an explicit palette.
-     *
-     * @param renderer Markdown body renderer
-     * @param palette terminal color palette for the event header
-     */
-    public MarkdownEventConverter(MarkdownRenderer renderer, MarkdownPalette palette) {
-        this.configuredRenderer = renderer;
-        this.configuredAnsiEnabled = null;
-        this.configuredPalette = palette;
-        this.renderer = renderer;
-        this.styler = new AnsiStyler(AnsiSupport.isAutoEnabled(), palette);
-    }
-
-    /**
-     * Creates a converter backed by a custom renderer and explicit header styling.
-     *
-     * @param renderer Markdown body renderer
-     * @param ansiEnabled whether the Powerline event header should use ANSI colors
-     */
-    public MarkdownEventConverter(MarkdownRenderer renderer, boolean ansiEnabled) {
-        this(renderer, ansiEnabled, MarkdownPalettes.defaultPalette());
+        this.configured = null;
+        this.renderPolicy = defaultPolicy(AnsiPolicy.DETECT, MarkdownPalettes.defaultPalette());
     }
 
     /**
      * Creates a converter backed by a custom renderer, header policy, and palette.
      *
      * @param renderer Markdown body renderer
-     * @param ansiEnabled whether the Powerline event header should use ANSI colors
+     * @param ansiPolicy whether the Powerline event header should use ANSI colors
      * @param palette terminal color palette for the event header
      */
     public MarkdownEventConverter(
             MarkdownRenderer renderer,
-            boolean ansiEnabled,
+            AnsiPolicy ansiPolicy,
             MarkdownPalette palette) {
-        this.configuredRenderer = renderer;
-        this.configuredAnsiEnabled = ansiEnabled;
-        this.configuredPalette = palette;
-        this.renderer = renderer;
-        this.styler = new AnsiStyler(ansiEnabled, palette);
+        this.configured = new Configuration(renderer, ansiPolicy, palette);
+        this.renderPolicy = policy(renderer, ansiPolicy, palette);
     }
 
     @Override
@@ -136,16 +93,15 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
         if (plain && ansi) {
             addWarn("Both 'plain' and 'ansi' were configured for %mdEvent; using plain output");
         }
-        boolean ansiEnabled = configuredAnsiEnabled != null
-                ? configuredAnsiEnabled
-                : plain ? false : ansi || AnsiSupport.isAutoEnabled();
-        MarkdownPalette palette = configuredPalette == null
+        AnsiPolicy ansiPolicy = configured == null
+                ? optionPolicy(plain, ansi)
+                : configured.ansiPolicy();
+        MarkdownPalette palette = configured == null
                 ? ConverterOptions.palette(options, "%mdEvent", this::addWarn, this::addWarn)
-                : configuredPalette;
-        if (configuredRenderer == null) {
-            renderer = new FlexmarkAnsiRenderer(ansiEnabled, palette);
-        }
-        styler = new AnsiStyler(ansiEnabled, palette);
+                : configured.palette();
+        renderPolicy = configured == null
+                ? defaultPolicy(ansiPolicy, palette)
+                : policy(configured.renderer(), ansiPolicy, palette);
         super.start();
     }
 
@@ -154,11 +110,12 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
         if (!MarkdownMarkers.contains(event.getMarkerList())) {
             return "";
         }
+        RenderPolicy policy = renderPolicy;
         String rawMessage = event.getFormattedMessage();
-        String body = rawMessage == null ? "" : render(rawMessage);
+        String body = rawMessage == null ? "" : render(rawMessage, policy.renderer());
         String lineSeparator = System.lineSeparator();
         StringBuilder result = new StringBuilder(lineSeparator)
-                .append(header(event))
+                .append(header(event, policy.styler()))
                 .append(lineSeparator)
                 .append(lineSeparator);
         if (!body.isBlank()) {
@@ -171,7 +128,7 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
         return result.toString();
     }
 
-    private String render(String rawMessage) {
+    private String render(String rawMessage, MarkdownRenderer renderer) {
         if (rawMessage.isBlank()) {
             return "";
         }
@@ -185,7 +142,7 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
         }
     }
 
-    private String header(ILoggingEvent event) {
+    private static String header(ILoggingEvent event, AnsiStyler styler) {
         String time = TIME_FORMAT.format(Instant.ofEpochMilli(event.getTimeStamp()));
         String level = event.getLevel().toString();
         AnsiStyler.PowerlineStyle timeStyle = AnsiStyler.PowerlineStyle.TIMESTAMP;
@@ -210,6 +167,35 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
 
     private static String indent(String value) {
         return NON_EMPTY_LINE_START.matcher(value).replaceAll(CONTENT_INDENT);
+    }
+
+    private static AnsiPolicy optionPolicy(boolean plain, boolean ansi) {
+        return plain ? AnsiPolicy.NEVER : ansi ? AnsiPolicy.ALWAYS : AnsiPolicy.DETECT;
+    }
+
+    private static RenderPolicy defaultPolicy(
+            AnsiPolicy ansiPolicy,
+            MarkdownPalette palette) {
+        return policy(new FlexmarkAnsiRenderer(
+                MarkdownRendererOptions.defaults()
+                        .withAnsiPolicy(ansiPolicy)
+                        .withPalette(palette)), ansiPolicy, palette);
+    }
+
+    private static RenderPolicy policy(
+            MarkdownRenderer renderer,
+            AnsiPolicy ansiPolicy,
+            MarkdownPalette palette) {
+        return new RenderPolicy(renderer, new AnsiStyler(ansiPolicy.resolve(), palette));
+    }
+
+    private record Configuration(
+            MarkdownRenderer renderer,
+            AnsiPolicy ansiPolicy,
+            MarkdownPalette palette) {
+    }
+
+    private record RenderPolicy(MarkdownRenderer renderer, AnsiStyler styler) {
     }
 
 }

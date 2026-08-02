@@ -38,6 +38,7 @@ import ch.qos.logback.core.encoder.Encoder;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
 import ch.qos.logback.core.pattern.DynamicConverter;
 import ch.qos.logback.core.spi.AppenderAttachable;
+import io.inquisitor.logback.markdown.ansi.AnsiPolicy;
 import io.inquisitor.logback.markdown.converter.MarkdownEventConverter;
 import io.inquisitor.logback.markdown.converter.MarkdownMessageConverter;
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
@@ -57,28 +58,29 @@ class LogbackMarkdownInstaller {
 
     private final MarkdownRenderer renderer;
     private final MarkdownConsoleMode consoleMode;
-    private final @Nullable Boolean ansiEnabled;
+    private final AnsiPolicy ansiPolicy;
     private final MarkdownPalette palette;
 
     LogbackMarkdownInstaller(MarkdownRenderer renderer) {
-        this(renderer, MarkdownConsoleMode.SHARED, false, MarkdownPalettes.defaultPalette());
+        this(renderer, MarkdownConsoleMode.SHARED,
+                AnsiPolicy.NEVER, MarkdownPalettes.defaultPalette());
     }
 
     LogbackMarkdownInstaller(
             MarkdownRenderer renderer,
             MarkdownConsoleMode consoleMode,
-            @Nullable Boolean ansiEnabled) {
-        this(renderer, consoleMode, ansiEnabled, MarkdownPalettes.defaultPalette());
+            AnsiPolicy ansiPolicy) {
+        this(renderer, consoleMode, ansiPolicy, MarkdownPalettes.defaultPalette());
     }
 
     LogbackMarkdownInstaller(
             MarkdownRenderer renderer,
             MarkdownConsoleMode consoleMode,
-            @Nullable Boolean ansiEnabled,
+            AnsiPolicy ansiPolicy,
             MarkdownPalette palette) {
         this.renderer = renderer;
         this.consoleMode = consoleMode;
-        this.ansiEnabled = ansiEnabled;
+        this.ansiPolicy = ansiPolicy;
         this.palette = palette;
     }
 
@@ -127,8 +129,9 @@ class LogbackMarkdownInstaller {
 
     private boolean installShared(PatternLayout layout) {
         val converterMap = layout.getInstanceConverterMap();
+        val supplier = new MarkdownConverterSupplier(renderer);
         if (MESSAGE_WORDS.stream()
-                .allMatch(word -> converterMap.get(word) instanceof MarkdownConverterSupplier)) {
+                .allMatch(word -> supplier.equals(converterMap.get(word)))) {
             return false;
         }
 
@@ -143,35 +146,15 @@ class LogbackMarkdownInstaller {
             }
         }
 
-        val supplier = new MarkdownConverterSupplier(renderer);
-        val wasStarted = layout.isStarted();
-        try {
-            MESSAGE_WORDS.forEach(word -> converterMap.put(word, supplier));
-            if (wasStarted) {
-                layout.start();
-                if (!layout.isStarted()) {
-                    throw new IllegalStateException("PatternLayout did not restart");
-                }
-            }
-            return true;
-        }
-        catch (RuntimeException exception) {
-            restore(converterMap, previous, previouslyAbsent);
-            if (wasStarted) {
-                try {
-                    layout.start();
-                }
-                catch (RuntimeException recoveryException) {
-                    exception.addSuppressed(recoveryException);
-                }
-            }
-            log.debug("Could not install automatic Markdown conversion into a console layout", exception);
-            return false;
-        }
+        return reconfigure(
+                layout,
+                () -> MESSAGE_WORDS.forEach(word -> converterMap.put(word, supplier)),
+                () -> restore(converterMap, previous, previouslyAbsent),
+                "Could not install automatic Markdown conversion into a console layout");
     }
 
     private boolean installExclusive(PatternLayout layout) {
-        val supplier = new MarkdownEventConverterSupplier(renderer, ansiEnabled, palette);
+        val supplier = new MarkdownEventConverterSupplier(renderer, ansiPolicy, palette);
         if (EXCLUSIVE_PATTERN.equals(layout.getPattern())
                 && supplier.equals(layout.getInstanceConverterMap().get(EVENT_WORD))) {
             return false;
@@ -180,31 +163,50 @@ class LogbackMarkdownInstaller {
         val previousSupplier = converterMap.get(EVENT_WORD);
         boolean previouslyAbsent = !converterMap.containsKey(EVENT_WORD);
         val previousPattern = layout.getPattern();
-        val wasStarted = layout.isStarted();
+        return reconfigure(
+                layout,
+                () -> {
+                    converterMap.put(EVENT_WORD, supplier);
+                    layout.setPattern(EXCLUSIVE_PATTERN);
+                },
+                () -> {
+                    restoreEventConverter(converterMap, previousSupplier, previouslyAbsent);
+                    layout.setPattern(previousPattern);
+                },
+                "Could not install exclusive Markdown console conversion");
+    }
+
+    private static boolean reconfigure(
+            PatternLayout layout,
+            Runnable apply,
+            Runnable restore,
+            String failureMessage) {
+        boolean wasStarted = layout.isStarted();
         try {
-            converterMap.put(EVENT_WORD, supplier);
-            layout.setPattern(EXCLUSIVE_PATTERN);
-            if (wasStarted) {
-                layout.start();
-                if (!layout.isStarted()) {
-                    throw new IllegalStateException("PatternLayout did not restart");
-                }
-            }
+            apply.run();
+            restart(layout, wasStarted);
             return true;
         }
         catch (RuntimeException exception) {
-            restoreEventConverter(converterMap, previousSupplier, previouslyAbsent);
-            layout.setPattern(previousPattern);
-            if (wasStarted) {
-                try {
-                    layout.start();
-                }
-                catch (RuntimeException recoveryException) {
-                    exception.addSuppressed(recoveryException);
-                }
+            restore.run();
+            try {
+                restart(layout, wasStarted);
             }
-            log.debug("Could not install exclusive Markdown console conversion", exception);
+            catch (RuntimeException recoveryException) {
+                exception.addSuppressed(recoveryException);
+            }
+            log.debug(failureMessage, exception);
             return false;
+        }
+    }
+
+    private static void restart(PatternLayout layout, boolean wasStarted) {
+        if (!wasStarted) {
+            return;
+        }
+        layout.start();
+        if (!layout.isStarted()) {
+            throw new IllegalStateException("PatternLayout did not restart");
         }
     }
 
@@ -274,15 +276,13 @@ class LogbackMarkdownInstaller {
 
     private record MarkdownEventConverterSupplier(
             MarkdownRenderer renderer,
-            @Nullable Boolean ansiEnabled,
+            AnsiPolicy ansiPolicy,
             MarkdownPalette palette)
             implements Supplier<DynamicConverter> {
 
         @Override
         public DynamicConverter get() {
-            return ansiEnabled == null
-                    ? new MarkdownEventConverter(renderer, palette)
-                    : new MarkdownEventConverter(renderer, ansiEnabled, palette);
+            return new MarkdownEventConverter(renderer, ansiPolicy, palette);
         }
     }
 }

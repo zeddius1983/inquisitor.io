@@ -51,9 +51,11 @@ public class InquisitorLogbackMarkdownAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    MarkdownRenderer inquisitorLogbackMarkdownRenderer(MarkdownLoggingProperties properties) {
+    MarkdownRenderer inquisitorLogbackMarkdownRenderer(
+            MarkdownLoggingProperties properties,
+            Environment environment) {
         return MarkdownConsoleSettings.renderer(
-                MarkdownConsoleSettings.paletteOrDefault(properties.palette()));
+                MarkdownConsoleSettings.paletteOrDefault(properties.palette()), environment);
     }
 
     @Bean

@@ -72,7 +72,8 @@ values fall back to 120 and produce a Logback status warning. Programmatic users
 can configure the renderer directly:
 
 ```java
-new FlexmarkAnsiRenderer(true, new MarkdownRendererOptions(100));
+new FlexmarkAnsiRenderer(
+        MarkdownRendererOptions.ansi().withTableWidth(100));
 ```
 
 Tables are a console presentation. File and structured/JSON appenders should
@@ -99,10 +100,16 @@ whether the log message succeeds. The renderer verifies that highlighted spans
 reconstruct the exact source line; invalid output or a highlighter exception
 falls back to unhighlighted code.
 
-Applications can supply a thread-safe custom `SyntaxHighlighter` through
-`new FlexmarkAnsiRenderer(ansiEnabled, highlighter)`. The programmatic renderer
-can then be passed to `MarkdownMessageConverter`; Spring Boot applications can
-replace the starter's `MarkdownRenderer` bean.
+Applications can supply a thread-safe custom `SyntaxHighlighter` through the
+renderer options:
+
+```java
+new FlexmarkAnsiRenderer(
+        MarkdownRendererOptions.ansi().withSyntaxHighlighter(highlighter));
+```
+
+The programmatic renderer can then be passed to `MarkdownMessageConverter`;
+Spring Boot applications can replace the starter's `MarkdownRenderer` bean.
 
 ## Powerline breadcrumbs
 
@@ -115,11 +122,24 @@ a Powerlevel10k-style sequence of background-colored pills:
 
 Each transition uses the preceding segment's foreground color and the following
 segment's background color, producing a continuous Powerline join. The built-in
-renderer colors known lifecycle and evaluation-result segments semantically:
-green for active/successful states, yellow for partial/skipped states, and red
-for failed/unsupported states. Other segments use the positional palette. Plain
-rendering preserves the same readable text without ANSI sequences, while headings
-without this exact shape retain the normal heading style.
+classifier colors generic lifecycle words and HTTP statuses semantically: green
+for active/successful states, yellow for warnings/skips, and red for failures.
+Paths and duration segments use the muted duration style; other segments use the
+positional palette. Plain rendering preserves the same readable text without ANSI
+sequences, while headings without this exact shape retain the normal heading style.
+
+Domain-specific vocabularies can supply a classifier without coupling the renderer
+to the producing application:
+
+```java
+PowerlineSegmentClassifier standard = PowerlineSegmentClassifier.standard();
+MarkdownRendererOptions options = MarkdownRendererOptions.ansi()
+        .withPowerlineClassifier((index, segments) ->
+                segments.get(index).equals("GROUNDED")
+                        ? AnsiStyler.PowerlineStyle.STATUS
+                        : standard.classify(index, segments));
+FlexmarkAnsiRenderer renderer = new FlexmarkAnsiRenderer(options);
+```
 
 ANSI styles default to the muted Gruvbox Dark palette: orange for
 primary/scenario segments, yellow for steps and warnings, aqua for progress and
@@ -130,7 +150,9 @@ are also built in and resolved through the same named-provider abstraction as
 extension palettes:
 
 ```java
-new FlexmarkAnsiRenderer(true, MarkdownPalettes.require("nord"));
+new FlexmarkAnsiRenderer(
+        MarkdownRendererOptions.ansi()
+                .withPalette(MarkdownPalettes.require("nord")));
 ```
 
 ### Custom palettes

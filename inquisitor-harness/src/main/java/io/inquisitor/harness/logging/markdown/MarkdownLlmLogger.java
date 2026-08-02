@@ -36,13 +36,11 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
     @Override
     public void stepStarted(StepRequest request) {
         val step = request.step();
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
-                ### %s
-
-                ## %s%s
-                """.formatted(breadcrumb(request, "RUN"),
-                MarkdownBreadcrumbs.headingLiteral(step.title()),
-                body(step.instruction()))));
+        val event = MarkdownLogSupport.event(breadcrumb(request, "RUN"))
+                .content("## %s%s".formatted(
+                        MarkdownBreadcrumbs.headingLiteral(step.title()),
+                        body(step.instruction())));
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     @Override
@@ -60,15 +58,10 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
     public void stepCompleted(StepRequest request, StepRun run) {
         val breadcrumb = breadcrumb(request, run.verdict().outcome().name(),
                 "⧖ " + LogDurationFormatter.format(run.elapsed()));
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
-                ### %s
-
-                ### Reasoning
-
-                %s
-                """.formatted(breadcrumb,
-                MarkdownStepLogSupport.blockquote(
-                        run.verdict().reasoning(), breadcrumb.length()))));
+        val event = MarkdownLogSupport.event(breadcrumb)
+                .section("Reasoning", MarkdownStepLogSupport.blockquote(
+                        run.verdict().reasoning(), breadcrumb.length()));
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     private static String safeMessage(Throwable cause) {

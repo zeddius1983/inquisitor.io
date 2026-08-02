@@ -51,7 +51,7 @@ public final class MarkdownLoggingApplicationListener
         }
         val palette = MarkdownConsoleSettings.palette(environment);
         new LogbackMarkdownInstaller(
-                MarkdownConsoleSettings.renderer(palette),
+                MarkdownConsoleSettings.renderer(palette, environment),
                 MarkdownConsoleMode.EXCLUSIVE,
                 MarkdownConsoleSettings.ansiPolicy(),
                 palette)

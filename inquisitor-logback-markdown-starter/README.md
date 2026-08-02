@@ -36,7 +36,9 @@ language-aware highlighting; plain output remains unframed and readable.
 The harness emits the same marker for scenario, step, actor, tool, and judge events
 when `inquisitor.harness.logging.format=markdown`. The starter's default `auto`
 mode detects that property and selects the exclusive console automatically,
-without logging XML or logger-level configuration.
+without logging XML or logger-level configuration. At that integration edge it
+also adds semantic colors for judge outcomes; the reusable base renderer remains
+independent of harness vocabulary.
 
 ## Configuration
 

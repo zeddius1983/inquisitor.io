@@ -447,7 +447,12 @@ see [roadmap.md](roadmap.md); for stable repo context see
   silhouette and require a patched font with the extra-symbol range. The source
   remains readable Markdown, plain output remains escape-free, and the harness
   stays independent of Logback/Jansi. Powerline segments and styled Markdown use
-  one selected true-color palette. Gruvbox Dark remains the Starship-inspired
+  one selected true-color palette. Segment classification is a renderer option:
+  the default recognizes only generic lifecycle, HTTP-status, path, and duration
+  concepts, while applications can inject their own domain vocabulary without
+  adding it to the independently published renderer. The Boot integration adds
+  judge-result vocabulary only when it detects Markdown harness mode. Gruvbox Dark
+  remains the Starship-inspired
   default, while Nord, Catppuccin Mocha, and Tokyo Night are built in and selected
   through `inquisitor.logging.markdown.palette`. The early exclusive installer
   reads the same setting as autoconfiguration so its event header cannot diverge

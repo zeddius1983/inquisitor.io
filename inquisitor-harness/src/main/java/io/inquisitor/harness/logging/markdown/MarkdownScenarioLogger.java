@@ -32,13 +32,11 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
 
     @Override
     public void scenarioStarted(Scenario scenario) {
-        info("""
-                ### %s
-
-                # %s%s
-                """.formatted(MarkdownBreadcrumbs.scenario(scenario, 0, "RUN"),
-                MarkdownBreadcrumbs.headingLiteral(scenario.name()),
-                body(scenario.description())));
+        val event = MarkdownLogSupport.event(MarkdownBreadcrumbs.scenario(scenario, 0, "RUN"))
+                .content("# %s%s".formatted(
+                        MarkdownBreadcrumbs.headingLiteral(scenario.name()),
+                        body(scenario.description())));
+        log.info(MarkdownLogSupport.marker(), event.message());
     }
 
     @Override
@@ -60,7 +58,7 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
         val outcome = result.passed() ? "PASS" : "FAIL";
         val breadcrumb = MarkdownBreadcrumbs.scenario(result.scenario(), result.results().size(),
                 outcome, "⧖ " + LogDurationFormatter.format(elapsed(result)));
-        info("### " + breadcrumb);
+        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.event(breadcrumb).message());
     }
 
     private static Duration elapsed(ScenarioResult result) {
@@ -73,7 +71,4 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
         return value.isBlank() ? "" : "\n\n" + value;
     }
 
-    private static void info(String markdown) {
-        log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
-    }
 }

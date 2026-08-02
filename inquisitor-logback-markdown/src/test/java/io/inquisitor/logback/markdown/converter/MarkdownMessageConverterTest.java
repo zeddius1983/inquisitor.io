@@ -27,6 +27,7 @@ import ch.qos.logback.classic.spi.LoggingEvent;
 import io.inquisitor.logback.markdown.marker.MarkdownMarkers;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
+import io.inquisitor.logback.markdown.renderer.MarkdownRendererOptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -37,14 +38,14 @@ class MarkdownMessageConverterTest {
 
     @Test
     void defaultModeRendersEveryMessage() {
-        MarkdownMessageConverter converter = converter(new FlexmarkAnsiRenderer(false));
+        MarkdownMessageConverter converter = converter(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
 
         assertEquals("    rendered", converter.convert(event("**rendered**")));
     }
 
     @Test
     void markedModeLeavesOrdinaryMessagesByteForByteUnchanged() {
-        MarkdownMessageConverter converter = markedConverter(new FlexmarkAnsiRenderer(false));
+        MarkdownMessageConverter converter = markedConverter(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
         String raw = "## ordinary **message**";
 
         assertEquals(raw, converter.convert(event(raw)));
@@ -52,7 +53,7 @@ class MarkdownMessageConverterTest {
 
     @Test
     void markedModeRendersDirectAndNestedMarkdownMarkers() {
-        MarkdownMessageConverter converter = markedConverter(new FlexmarkAnsiRenderer(false));
+        MarkdownMessageConverter converter = markedConverter(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
         LoggingEvent direct = event("## direct");
         direct.addMarker(MarkdownMarkers.markdown());
 
@@ -158,7 +159,7 @@ class MarkdownMessageConverterTest {
     @Test
     void programmaticMarkedModeDoesNotDependOnPatternOptions() {
         MarkdownMessageConverter converter = new MarkdownMessageConverter(
-                new FlexmarkAnsiRenderer(false), true);
+                new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()), true);
         converter.start();
         LoggingEvent marked = event("## rendered");
         marked.addMarker(MarkdownMarkers.markdown());
@@ -170,7 +171,7 @@ class MarkdownMessageConverterTest {
 
     @Test
     void preservesBlankMessagesAndNormalizesNullToEmpty() {
-        MarkdownMessageConverter converter = converter(new FlexmarkAnsiRenderer(false));
+        MarkdownMessageConverter converter = converter(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
         LoggingEvent nullMessage = new LoggingEvent();
 
         assertEquals("", converter.convert(nullMessage));
@@ -180,7 +181,7 @@ class MarkdownMessageConverterTest {
 
     @Test
     void preservesRequestedOuterLineBreaksAroundRenderedBlocks() {
-        MarkdownMessageConverter converter = markedConverter(new FlexmarkAnsiRenderer(false));
+        MarkdownMessageConverter converter = markedConverter(new FlexmarkAnsiRenderer(MarkdownRendererOptions.plain()));
         LoggingEvent block = event("\n\n## rendered\r\n");
         block.addMarker(MarkdownMarkers.markdown());
 

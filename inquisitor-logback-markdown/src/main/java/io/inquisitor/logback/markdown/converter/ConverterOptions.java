@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.ServiceConfigurationError;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.IntPredicate;
 
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
 import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
@@ -41,6 +42,40 @@ final class ConverterOptions {
                 .map(String::strip)
                 .filter(option -> isNamed(option, expected))
                 .toList();
+    }
+
+    static int intValue(
+            List<String> options,
+            String name,
+            String conversionWord,
+            int fallback,
+            IntPredicate valid,
+            Consumer<String> warning) {
+        List<String> configured = named(options, name);
+        if (configured.isEmpty()) {
+            return fallback;
+        }
+        if (configured.size() > 1) {
+            warning.accept("Multiple " + name + " options were configured for "
+                    + conversionWord + "; using the last one");
+        }
+        String option = configured.getLast();
+        int separator = option.indexOf('=');
+        if (separator >= 0) {
+            String value = option.substring(separator + 1).strip();
+            try {
+                int parsed = Integer.parseInt(value);
+                if (!value.isEmpty() && valid.test(parsed)) {
+                    return parsed;
+                }
+            }
+            catch (NumberFormatException ignored) {
+                // Report every malformed value consistently below.
+            }
+        }
+        warning.accept("Invalid " + conversionWord + " option '" + option
+                + "'; using the default " + name + "=" + fallback);
+        return fallback;
     }
 
     static MarkdownPalette palette(
