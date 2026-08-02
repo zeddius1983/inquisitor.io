@@ -49,7 +49,7 @@ public final class AnsiSupport {
             boolean jansiEnabled) {
         return jansiEnabled
                 && consolePresent
-                && noColor == null
+                && (noColor == null || noColor.isEmpty())
                 && (term == null || !"dumb".equalsIgnoreCase(term.strip()));
     }
 }

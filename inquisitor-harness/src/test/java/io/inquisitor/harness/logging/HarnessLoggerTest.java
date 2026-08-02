@@ -76,6 +76,31 @@ class HarnessLoggerTest {
     }
 
     @Test
+    void markdownHeadingsEscapeScenarioAndStepTitlesAsLiteralText() {
+        val scenario = new Scenario(
+                "Transfer *must* preserve [amount](x) & <tag>",
+                "Authored **Markdown** remains supported in descriptions.",
+                List.of(new Step(1, "Step 1 — Verify *raw* [amount](x)", "Run it.")),
+                null);
+        val request = StepRequest.of("conversation", scenario, scenario.steps().getFirst());
+
+        val scenarioEvents = capture(MarkdownScenarioLogger.class, Level.INFO,
+                () -> new MarkdownScenarioLogger().scenarioStarted(scenario));
+        val stepEvents = capture(MarkdownLlmLogger.class, Level.INFO,
+                () -> new MarkdownLlmLogger(new ModelRegistry()).stepStarted(request));
+
+        assertThat(scenarioEvents).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage()).contains(
+                        "Transfer \\*must\\* preserve \\[amount\\](x) \\& \\<tag\\>",
+                        "# Transfer \\*must\\* preserve \\[amount\\](x) \\& \\<tag\\>",
+                        "Authored **Markdown** remains supported in descriptions."));
+        assertThat(stepEvents).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage()).contains(
+                        "Verify \\*raw\\* \\[amount\\](x)",
+                        "## Step 1 — Verify \\*raw\\* \\[amount\\](x)"));
+    }
+
+    @Test
     void markdownScenarioCompletionUsesProgressOutcomeAndTotalDurationBreadcrumb() {
         val result = new ScenarioResult(SCENARIO, List.of(new StepResult(
                 SCENARIO.steps().getFirst(),
@@ -123,7 +148,7 @@ class HarnessLoggerTest {
                 "Create Bob in USD.");
         assertThat(events.get(1).getFormattedMessage())
                 .contains(
-                        "###  gemma-4-31B-it-qat-UD-Q4_K_XL  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  PASS  ⧖ 13.289 s ",
+                        "###  gemma-4-31B-it-qat-UD-Q4\\_K\\_XL  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  PASS  ⧖ 13.289 s ",
                         "### Reasoning",
                         "> verified\n> with evidence")
                 .doesNotContain("/models/", ".GGUF", "**Duration:**", "- **Reasoning:**");
@@ -248,6 +273,35 @@ class HarnessLoggerTest {
     }
 
     @Test
+    void markdownHttpRequestOmitsMissingHeadersAndBodySectionsIndependently() {
+        val headersOnly = new HttpRequestLogger.Request(
+                "localhost", "GET", "/accounts/1",
+                Map.of("Accept", "application/json"), null);
+        val bodyOnly = new HttpRequestLogger.Request(
+                "localhost", "POST", "/accounts",
+                Map.of(), "{\"owner\":\"Alice\"}");
+        val neither = new HttpRequestLogger.Request(
+                "localhost", "GET", "/accounts/1", Map.of(), null);
+
+        val events = capture(MarkdownHttpRequestLogger.class, Level.INFO, () -> {
+            val logger = new MarkdownHttpRequestLogger();
+            logger.requestStarted(headersOnly);
+            logger.requestStarted(bodyOnly);
+            logger.requestStarted(neither);
+        });
+
+        assertThat(events.get(0).getFormattedMessage())
+                .contains("### Headers", "Accept: application/json")
+                .doesNotContain("### Body", "(none)");
+        assertThat(events.get(1).getFormattedMessage())
+                .contains("### Body", "\"owner\" : \"Alice\"")
+                .doesNotContain("### Headers", "(none)");
+        assertThat(events.get(2).getFormattedMessage())
+                .isEqualTo("\n\n###  HTTP  localhost  GET  /accounts/1 \n")
+                .doesNotContain("### Headers", "### Body", "(none)");
+    }
+
+    @Test
     void markdownHttpResponseAddsStatusAndPrettyPrintsJson() {
         val request = new HttpRequestLogger.Request(
                 "localhost", "POST", "/accounts/import", Map.of(), null);
@@ -265,6 +319,22 @@ class HarnessLoggerTest {
                         "```json",
                         "\"id\" : 1",
                         "\"id\" : 2"));
+    }
+
+    @Test
+    void markdownHttpResponseOmitsTheResponseSectionWhenTheBodyIsMissing() {
+        val request = new HttpRequestLogger.Request(
+                "localhost", "DELETE", "/accounts/1", Map.of(), null);
+        val response = new HttpRequestLogger.Response(204, null, null);
+
+        val events = capture(MarkdownHttpRequestLogger.class, Level.INFO,
+                () -> new MarkdownHttpRequestLogger().requestCompleted(request, response));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .isEqualTo("\n\n###  HTTP  localhost  DELETE  /accounts/1 "
+                                + " HTTP 204 \n")
+                        .doesNotContain("### Response", "(none)"));
     }
 
     @Test

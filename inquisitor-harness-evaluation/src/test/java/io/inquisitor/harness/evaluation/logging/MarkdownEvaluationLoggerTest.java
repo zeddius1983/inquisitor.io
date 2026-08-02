@@ -101,7 +101,7 @@ class MarkdownEvaluationLoggerTest {
                     .toList();
 
             assertThat(message).contains(
-                    "###  gemma-4-31B-it-qat-UD-Q4_K_XL  "
+                    "###  gemma-4-31B-it-qat-UD-Q4\\_K\\_XL  "
                             + "Import accounts from CSV and plain text  Reset the database  "
                             + "▰▱▱▱▱ 1/4  GROUNDED  Score 1.000  ⧖ 9.807 s ",
                     "### Feedback");

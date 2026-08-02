@@ -26,9 +26,11 @@ class AnsiSupportTest {
     @Test
     void autoEnablesAnsiOnlyForAnInteractiveCapableTerminal() {
         assertTrue(AnsiSupport.isAutoEnabled(null, "xterm-256color", true, true));
+        assertTrue(AnsiSupport.isAutoEnabled("", "xterm-256color", true, true));
 
         assertFalse(AnsiSupport.isAutoEnabled(null, "xterm-256color", false, true));
-        assertFalse(AnsiSupport.isAutoEnabled("", "xterm-256color", true, true));
+        assertFalse(AnsiSupport.isAutoEnabled("1", "xterm-256color", true, true));
+        assertFalse(AnsiSupport.isAutoEnabled(" ", "xterm-256color", true, true));
         assertFalse(AnsiSupport.isAutoEnabled(null, "dumb", true, true));
         assertFalse(AnsiSupport.isAutoEnabled(null, " DUMB ", true, true));
         assertFalse(AnsiSupport.isAutoEnabled(null, "xterm-256color", true, false));

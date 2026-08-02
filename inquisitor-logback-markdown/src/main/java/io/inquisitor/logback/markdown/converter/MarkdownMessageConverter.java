@@ -17,15 +17,12 @@
 package io.inquisitor.logback.markdown.converter;
 
 import java.util.List;
-import java.util.ServiceConfigurationError;
 import java.util.regex.Pattern;
 
 import ch.qos.logback.classic.pattern.MessageConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import io.inquisitor.logback.markdown.ansi.AnsiSupport;
 import io.inquisitor.logback.markdown.marker.MarkdownMarkers;
-import io.inquisitor.logback.markdown.palette.MarkdownPalette;
-import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRendererOptions;
@@ -44,7 +41,6 @@ public final class MarkdownMessageConverter extends MessageConverter {
     private static final String PLAIN_OPTION = "plain";
     private static final String ANSI_OPTION = "ansi";
     private static final String TABLE_WIDTH_OPTION = "tableWidth";
-    private static final String PALETTE_OPTION = "palette";
 
     private final @Nullable MarkdownRenderer configuredRenderer;
     private final boolean configuredMarkedOnly;
@@ -93,7 +89,7 @@ public final class MarkdownMessageConverter extends MessageConverter {
         if (options == null) {
             options = List.of();
         }
-        markedOnly = configuredMarkedOnly || hasOption(options, MARKED_OPTION);
+        markedOnly = configuredMarkedOnly || ConverterOptions.hasFlag(options, MARKED_OPTION);
         configureDefaultRenderer(options);
         super.start();
     }
@@ -123,8 +119,8 @@ public final class MarkdownMessageConverter extends MessageConverter {
         if (configuredRenderer != null) {
             return;
         }
-        boolean plain = hasOption(options, PLAIN_OPTION);
-        boolean ansi = hasOption(options, ANSI_OPTION);
+        boolean plain = ConverterOptions.hasFlag(options, PLAIN_OPTION);
+        boolean ansi = ConverterOptions.hasFlag(options, ANSI_OPTION);
         if (plain && ansi) {
             addWarn("Both 'plain' and 'ansi' were configured for %mdMsg; using plain output");
         }
@@ -132,46 +128,11 @@ public final class MarkdownMessageConverter extends MessageConverter {
                 ansiEnabled(plain, ansi),
                 new MarkdownRendererOptions(tableWidth(options))
                         .withTableIndent(LEFT_PADDING.length()),
-                palette(options));
-    }
-
-    private MarkdownPalette palette(List<String> options) {
-        List<String> configured = options.stream()
-                .map(String::strip)
-                .filter(option -> isNamedOption(option, PALETTE_OPTION))
-                .toList();
-        if (configured.isEmpty()) {
-            return MarkdownPalettes.defaultPalette();
-        }
-        if (configured.size() > 1) {
-            addWarn("Multiple palette options were configured for %mdMsg; using the last one");
-        }
-        String option = configured.getLast();
-        int separator = option.indexOf('=');
-        if (separator < 0 || option.substring(separator + 1).strip().isEmpty()) {
-            return invalidPalette(option);
-        }
-        String name = option.substring(separator + 1).strip();
-        try {
-            return MarkdownPalettes.find(name).orElseGet(() -> invalidPalette(option));
-        }
-        catch (RuntimeException | ServiceConfigurationError exception) {
-            addWarn("Could not resolve %mdMsg option '" + option
-                    + "'; using palette=gruvbox", exception);
-            return MarkdownPalettes.defaultPalette();
-        }
-    }
-
-    private MarkdownPalette invalidPalette(String option) {
-        addWarn("Invalid %mdMsg option '" + option + "'; using palette=gruvbox");
-        return MarkdownPalettes.defaultPalette();
+                ConverterOptions.palette(options, "%mdMsg", this::addWarn, this::addWarn));
     }
 
     private int tableWidth(List<String> options) {
-        List<String> configured = options.stream()
-                .map(String::strip)
-                .filter(MarkdownMessageConverter::isTableWidthOption)
-                .toList();
+        List<String> configured = ConverterOptions.named(options, TABLE_WIDTH_OPTION);
         if (configured.isEmpty()) {
             return MarkdownRendererOptions.DEFAULT_TABLE_WIDTH;
         }
@@ -199,20 +160,6 @@ public final class MarkdownMessageConverter extends MessageConverter {
         addWarn("Invalid %mdMsg option '" + option + "'; using the default tableWidth="
                 + MarkdownRendererOptions.DEFAULT_TABLE_WIDTH);
         return MarkdownRendererOptions.DEFAULT_TABLE_WIDTH;
-    }
-
-    private static boolean isTableWidthOption(String option) {
-        return isNamedOption(option, TABLE_WIDTH_OPTION);
-    }
-
-    private static boolean isNamedOption(String option, String expected) {
-        int separator = option.indexOf('=');
-        String name = separator < 0 ? option : option.substring(0, separator).strip();
-        return expected.equalsIgnoreCase(name);
-    }
-
-    private static boolean hasOption(List<String> options, String expected) {
-        return options.stream().map(String::strip).anyMatch(expected::equalsIgnoreCase);
     }
 
     private static boolean ansiEnabled(boolean plain, boolean ansi) {

@@ -40,7 +40,8 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
                 ### %s
 
                 ## %s%s
-                """.formatted(breadcrumb(request, "RUN"), step.title(),
+                """.formatted(breadcrumb(request, "RUN"),
+                MarkdownBreadcrumbs.headingLiteral(step.title()),
                 body(step.instruction()))));
     }
 

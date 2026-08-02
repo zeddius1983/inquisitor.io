@@ -257,7 +257,9 @@ public class InquisitorHarnessAutoConfiguration {
     @ConditionalOnMissingBean
     ScenarioExecutor inquisitorScenarioExecutor(
             StepRunner stepRunner,
-            ScenarioExecutionCallback callback) {
+            ObjectProvider<ScenarioExecutionCallback> callbacks) {
+        val callback = callbacks.orderedStream()
+                .reduce(ScenarioExecutionCallback.NO_OP, ScenarioExecutionCallback::andThen);
         return new ScenarioExecutor(stepRunner, callback);
     }
 

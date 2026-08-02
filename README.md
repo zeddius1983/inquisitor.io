@@ -185,6 +185,10 @@ code blocks. Valid JSON bodies are pretty-printed for the log only, and sensitiv
 header values such as authorization tokens and cookies are redacted. SQL tool calls
 show the resolved datasource and execution status, followed by highlighted statement
 and result blocks.
+The harness is intended for tests against local services and therefore logs HTTP
+bodies and SQL results without general-purpose content redaction. Use test data and
+test credentials; do not point verbose harness logging at production systems or
+production datasets.
 Completion breadcrumbs add a human-scale duration segment (`842 ms`, `13.289 s`,
 `2 min 5.4 s`). Their rounded Powerline caps require a patched font with the
 Powerline extra-symbol range; the underlying Markdown remains readable when ANSI

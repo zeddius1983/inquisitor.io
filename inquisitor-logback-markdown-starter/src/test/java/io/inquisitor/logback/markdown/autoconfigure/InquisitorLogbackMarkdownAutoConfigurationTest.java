@@ -35,14 +35,14 @@ import ch.qos.logback.core.FileAppender;
 import ch.qos.logback.core.LayoutBase;
 import ch.qos.logback.core.encoder.EncoderBase;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
-import ch.qos.logback.core.spi.FilterReply;
-import io.inquisitor.logback.markdown.marker.MarkdownMarkerTurboFilter;
 import io.inquisitor.logback.markdown.marker.MarkdownMarkers;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
 import lombok.val;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -108,6 +108,21 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
     }
 
     @Test
+    void unknownPaletteFallsBackToGruvboxDuringAutoconfiguration() {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.ALWAYS);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "%msg");
+
+        runner(loggerContext)
+                .withPropertyValues("inquisitor.logging.markdown.palette=catpuccin")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(console.layout().doLayout(marked("## rendered")))
+                            .contains("38;2;104;157;106");
+                });
+    }
+
+    @Test
     void harnessMarkdownFormatUsesAnExclusivePowerlineConsole() {
         AnsiOutput.setEnabled(AnsiOutput.Enabled.NEVER);
         val loggerContext = loggerContext();
@@ -126,16 +141,11 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
                                     + "\\R    Fetch account\\R")
                             .doesNotContain("prefix", "    ");
                     assertThat(console.layout().doLayout(event("ordinary"))).isEmpty();
-                    assertThat(loggerContext.getTurboFilterList())
-                            .singleElement()
-                            .isInstanceOf(MarkdownMarkerTurboFilter.class);
+                    assertThat(loggerContext.getTurboFilterList()).isEmpty();
 
                     val logger = loggerContext.getLogger("exclusive-test");
                     assertThat(logger.isDebugEnabled()).isFalse();
-                    assertThat(logger.isDebugEnabled(MarkdownMarkers.markdown())).isTrue();
-                    assertThat(loggerContext.getTurboFilterList().getFirst().decide(
-                            null, logger, Level.DEBUG, "ordinary", null, null))
-                            .isEqualTo(FilterReply.NEUTRAL);
+                    assertThat(logger.isDebugEnabled(MarkdownMarkers.markdown())).isFalse();
                     assertThat(markedOutput).endsWith(lineSeparator);
                 });
     }
@@ -176,6 +186,26 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
                         "48;2;59;66;82",
                         "48;2;163;190;140",
                         "38;2;143;188;187");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"catpuccin", " "})
+    void invalidPaletteFallsBackToGruvboxDuringEarlyInstallation(String palette) {
+        AnsiOutput.setEnabled(AnsiOutput.Enabled.ALWAYS);
+        val loggerContext = loggerContext();
+        val console = console(loggerContext, "CONSOLE", "prefix %msg%n");
+        val environment = new MockEnvironment()
+                .withProperty("inquisitor.harness.logging.format", "markdown")
+                .withProperty("inquisitor.logging.markdown.palette", palette);
+
+        new MarkdownLoggingApplicationListener(() -> loggerContext)
+                .onApplicationEvent(environmentPreparedEvent(environment));
+
+        assertThat(console.layout().doLayout(marked("## Harness event")))
+                .contains(
+                        "48;2;60;56;54",
+                        "48;2;152;151;26",
+                        "38;2;104;157;106");
     }
 
     @Test
@@ -272,9 +302,7 @@ class InquisitorLogbackMarkdownAutoConfigurationTest {
 
         assertThat(installer.install(loggerContext)).isEqualTo(1);
         assertThat(installer.install(loggerContext)).isZero();
-        assertThat(loggerContext.getTurboFilterList())
-                .singleElement()
-                .isInstanceOf(MarkdownMarkerTurboFilter.class);
+        assertThat(loggerContext.getTurboFilterList()).isEmpty();
         assertThat(console.layout().doLayout(event("ordinary"))).isEmpty();
         assertThat(console.layout().doLayout(marked("## rendered")))
                 .contains("INFO", "rendered")

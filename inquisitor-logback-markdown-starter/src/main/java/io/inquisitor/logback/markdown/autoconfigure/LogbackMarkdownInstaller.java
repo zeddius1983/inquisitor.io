@@ -40,7 +40,6 @@ import ch.qos.logback.core.pattern.DynamicConverter;
 import ch.qos.logback.core.spi.AppenderAttachable;
 import io.inquisitor.logback.markdown.converter.MarkdownEventConverter;
 import io.inquisitor.logback.markdown.converter.MarkdownMessageConverter;
-import io.inquisitor.logback.markdown.marker.MarkdownMarkerTurboFilter;
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
 import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
@@ -97,7 +96,6 @@ class LogbackMarkdownInstaller {
         try {
             val appenders = reachableAppenders(context);
             int installed = 0;
-            boolean exclusiveLayoutPresent = false;
             for (val appender : appenders) {
                 if (!(appender instanceof ConsoleAppender<?> consoleAppender)) {
                     continue;
@@ -112,10 +110,6 @@ class LogbackMarkdownInstaller {
                 if (install(layout)) {
                     installed++;
                 }
-                exclusiveLayoutPresent |= isExclusive(layout);
-            }
-            if (consoleMode == MarkdownConsoleMode.EXCLUSIVE && exclusiveLayoutPresent) {
-                installMarkerEnabler(context);
             }
             log.debug("Automatic Markdown logging installed into {} console layout(s)", installed);
             return installed;
@@ -212,23 +206,6 @@ class LogbackMarkdownInstaller {
             log.debug("Could not install exclusive Markdown console conversion", exception);
             return false;
         }
-    }
-
-    private static boolean isExclusive(PatternLayout layout) {
-        return EXCLUSIVE_PATTERN.equals(layout.getPattern())
-                && layout.getInstanceConverterMap().get(EVENT_WORD)
-                instanceof MarkdownEventConverterSupplier;
-    }
-
-    private static void installMarkerEnabler(LoggerContext context) {
-        if (context.getTurboFilterList().stream()
-                .anyMatch(MarkdownMarkerTurboFilter.class::isInstance)) {
-            return;
-        }
-        val filter = new MarkdownMarkerTurboFilter();
-        filter.setContext(context);
-        filter.start();
-        context.getTurboFilterList().add(0, filter);
     }
 
     private static Set<Appender<ILoggingEvent>> reachableAppenders(LoggerContext context) {

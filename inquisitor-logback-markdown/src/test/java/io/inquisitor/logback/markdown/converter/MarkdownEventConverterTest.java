@@ -125,7 +125,7 @@ class MarkdownEventConverterTest {
     @Test
     void palettePatternOptionStylesTheDefaultEventRenderer() {
         MarkdownEventConverter converter = new MarkdownEventConverter();
-        converter.setOptionList(List.of("ansi", "palette=tokyo-night"));
+        converter.setOptionList(List.of("ansi", "palette = tokyo-night"));
         converter.start();
 
         String rendered = converter.convert(marked(Level.DEBUG, "## message"));

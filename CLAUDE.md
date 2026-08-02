@@ -138,7 +138,7 @@ Harness run narration uses `inquisitor.harness.logging.format=plain|markdown`
 `EvaluationStepRunnerCallback`, and `ScenarioExecutionCallback` seams keep
 formatting out of the runners; the shipped plain/Markdown loggers implement those
 callbacks and are grouped under `logging.plain` and `logging.markdown`. Step-runner
-callbacks compose in order through `andThen`; the harness
+callbacks and scenario callbacks compose in order through `andThen`; the harness
 starter composes contributed actor callbacks with its selected logger, while the
 evaluation starter chains `StepEvaluationRecorder`, contributed evaluation
 callbacks, and the selected `EvaluationLoggerCallback`, leaving each runner with
@@ -147,10 +147,10 @@ one collaborator. Plain scenario and actor-step starts log only lifecycle data
 instructions are exclusive to Markdown mode.
 Markdown mode emits marker-tagged blocks, and rendering remains optional through
 either Logback Markdown module. With the starter, the Markdown harness format
-selects an exclusive compatible console: marked diagnostics are force-enabled and
-all emit at INFO with a compact colored time/level header, while unmarked console events are
-suppressed from Boot's early logging lifecycle without changing file/structured
-appenders. Event bodies retain four spaces of indentation and are separated by
+selects an exclusive compatible console: shipped diagnostics emit at INFO and marked
+events remain subject to normal logger levels and user TurboFilters, while unmarked
+console events are suppressed from Boot's early logging lifecycle without changing
+file/structured appenders. Event bodies retain four spaces of indentation and are separated by
 blank lines. Powerline and Markdown styles share a muted true-color Gruvbox Dark
 palette by default; `inquisitor.logging.markdown.palette` can select Gruvbox,
 Nord, Catppuccin Mocha, or Tokyo Night consistently across the early event header

@@ -157,6 +157,30 @@ class InquisitorHarnessAutoConfigurationTest {
     }
 
     @Test
+    void composesMultipleContributedScenarioCallbacks() {
+        val first = mock(ScenarioExecutionCallback.class);
+        val second = mock(ScenarioExecutionCallback.class);
+        val stepRunner = mock(StepRunner.class);
+
+        runner.withBean(StepRunner.class, () -> stepRunner)
+                .withBean("firstScenarioObserver", ScenarioExecutionCallback.class, () -> first)
+                .withBean("secondScenarioObserver", ScenarioExecutionCallback.class, () -> second)
+                .run(context -> {
+                    assertThat(context.getBeansOfType(ScenarioExecutionCallback.class)).hasSize(2);
+                    val executor = context.getBean(ScenarioExecutor.class);
+                    val callback = (ScenarioExecutionCallback) ReflectionTestUtils
+                            .getField(executor, "callback");
+                    val scenario = new Scenario("Scenario", "", List.of(
+                            new Step(1, "Step", "Run it")), null);
+
+                    callback.scenarioStarted(scenario);
+
+                    verify(first).scenarioStarted(scenario);
+                    verify(second).scenarioStarted(scenario);
+                });
+    }
+
+    @Test
     void bindsExtraTargetsAndDatasourcesFromProperties() {
         runner.withBean(ChatModel.class, () -> mock(ChatModel.class))
                 .withPropertyValues(

@@ -53,7 +53,7 @@ public class InquisitorLogbackMarkdownAutoConfiguration {
     @ConditionalOnMissingBean
     MarkdownRenderer inquisitorLogbackMarkdownRenderer(MarkdownLoggingProperties properties) {
         return MarkdownConsoleSettings.renderer(
-                MarkdownConsoleSettings.palette(properties.palette()));
+                MarkdownConsoleSettings.paletteOrDefault(properties.palette()));
     }
 
     @Bean
@@ -69,7 +69,7 @@ public class InquisitorLogbackMarkdownAutoConfiguration {
             Environment environment) {
         val consoleMode = MarkdownConsoleSettings.consoleMode(
                 properties.consoleMode(), environment);
-        val palette = MarkdownConsoleSettings.palette(properties.palette());
+        val palette = MarkdownConsoleSettings.paletteOrDefault(properties.palette());
         return new LogbackMarkdownInstaller(
                 renderer, consoleMode, MarkdownConsoleSettings.ansiPolicy(),
                 palette);

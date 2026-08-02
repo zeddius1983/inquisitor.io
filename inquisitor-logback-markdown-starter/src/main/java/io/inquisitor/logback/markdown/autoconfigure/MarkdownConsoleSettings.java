@@ -16,16 +16,20 @@
 
 package io.inquisitor.logback.markdown.autoconfigure;
 
+import java.util.ServiceConfigurationError;
+
 import io.inquisitor.logback.markdown.palette.MarkdownPalette;
 import io.inquisitor.logback.markdown.palette.MarkdownPalettes;
 import io.inquisitor.logback.markdown.renderer.FlexmarkAnsiRenderer;
 import io.inquisitor.logback.markdown.renderer.MarkdownRenderer;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.ansi.AnsiOutput;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 
+@Slf4j
 final class MarkdownConsoleSettings {
 
     private static final String ENABLED = "inquisitor.logging.markdown.enabled";
@@ -60,11 +64,23 @@ final class MarkdownConsoleSettings {
     }
 
     static MarkdownPalette palette(Environment environment) {
-        return palette(environment.getProperty(PALETTE, MarkdownPalettes.DEFAULT_NAME));
+        return paletteOrDefault(environment.getProperty(PALETTE, MarkdownPalettes.DEFAULT_NAME));
     }
 
-    static MarkdownPalette palette(String name) {
-        return MarkdownPalettes.require(name);
+    static MarkdownPalette paletteOrDefault(String name) {
+        try {
+            return MarkdownPalettes.find(name).orElseGet(() -> fallbackPalette(name));
+        }
+        catch (RuntimeException | ServiceConfigurationError exception) {
+            log.warn("Could not resolve Markdown palette '{}'; using {}",
+                    name, MarkdownPalettes.DEFAULT_NAME, exception);
+            return MarkdownPalettes.defaultPalette();
+        }
+    }
+
+    private static MarkdownPalette fallbackPalette(String name) {
+        log.warn("Unknown Markdown palette '{}'; using {}", name, MarkdownPalettes.DEFAULT_NAME);
+        return MarkdownPalettes.defaultPalette();
     }
 
     static MarkdownRenderer renderer(MarkdownPalette palette) {

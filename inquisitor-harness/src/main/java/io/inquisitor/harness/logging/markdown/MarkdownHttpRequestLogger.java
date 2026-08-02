@@ -16,6 +16,7 @@
 
 package io.inquisitor.harness.logging.markdown;
 
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,43 +33,34 @@ import tools.jackson.databind.json.JsonMapper;
 @Slf4j
 public class MarkdownHttpRequestLogger implements HttpRequestLogger {
 
-    private static final String EMPTY = "(none)";
     private static final JsonMapper JSON = JsonMapper.builder()
             .enable(SerializationFeature.INDENT_OUTPUT)
             .build();
 
     @Override
     public void requestStarted(Request request) {
-        val markdown = """
-                ### %s
-
-                ### Headers
-
-                %s
-
-                ### Body
-
-                %s
-                """.formatted(
+        val contentType = contentType(request.headers());
+        val markdown = "### %s%s".formatted(
                 breadcrumb(request),
-                MarkdownLogSupport.codeBlock("http", headers(request.headers())),
-                MarkdownLogSupport.codeBlock(language(request.body(), contentType(request.headers())),
-                        body(request.body(), contentType(request.headers()))));
+                sections(
+                        request.headers().isEmpty() ? "" : section("Headers",
+                                MarkdownLogSupport.codeBlock(
+                                        "http", headers(request.headers()))),
+                        isMissing(request.body()) ? "" : section("Body",
+                                MarkdownLogSupport.codeBlock(
+                                        language(request.body(), contentType),
+                                        body(request.body(), contentType)))));
         log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
     @Override
     public void requestCompleted(Request request, Response response) {
-        val markdown = """
-                ### %s
-
-                ### Response
-
-                %s
-                """.formatted(
+        val markdown = "### %s%s".formatted(
                 breadcrumb(request, "HTTP " + response.status()),
-                MarkdownLogSupport.codeBlock(language(response.body(), response.contentType()),
-                        body(response.body(), response.contentType())));
+                isMissing(response.body()) ? "" : sections(section("Response",
+                        MarkdownLogSupport.codeBlock(
+                                language(response.body(), response.contentType()),
+                                body(response.body(), response.contentType())))));
         log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block(markdown));
     }
 
@@ -91,9 +83,6 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
     }
 
     private static String headers(Map<String, String> headers) {
-        if (headers.isEmpty()) {
-            return EMPTY;
-        }
         return headers.entrySet().stream()
                 .map(entry -> entry.getKey() + ": " + entry.getValue())
                 .collect(Collectors.joining("\n"));
@@ -109,7 +98,7 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
 
     private static String body(@Nullable String body, @Nullable String contentType) {
         if (body == null || body.isBlank()) {
-            return EMPTY;
+            return "";
         }
         if (!isJson(contentType) && !looksLikeJson(body)) {
             return body;
@@ -137,6 +126,21 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
         }
         val stripped = body.stripLeading();
         return stripped.startsWith("{") || stripped.startsWith("[");
+    }
+
+    private static boolean isMissing(@Nullable String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String section(String heading, String content) {
+        return "### " + heading + "\n\n" + content;
+    }
+
+    private static String sections(String... candidates) {
+        val content = Arrays.stream(candidates)
+                .filter(candidate -> !candidate.isEmpty())
+                .collect(Collectors.joining("\n\n"));
+        return content.isEmpty() ? "" : "\n\n" + content;
     }
 
 }

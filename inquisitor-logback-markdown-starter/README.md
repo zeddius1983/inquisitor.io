@@ -100,14 +100,17 @@ the same `palette` property. `ServiceLoader` resolution intentionally happens
 outside the Spring bean lifecycle so the palette is already available to the
 early exclusive-console installer. See the base module's
 [custom palette guide](../inquisitor-logback-markdown/README.md#custom-palettes).
+An unknown, blank, or broken provider selection logs a warning and falls back to
+Gruvbox; a cosmetic palette setting never prevents application startup.
 
 The SLF4J `INQUISITOR_MARKDOWN` marker is the selection contract. A Java marker
 interface is intentionally unnecessary: Logback evaluates events, not Spring bean
-types, and the event marker also supports custom Markdown emitters. A neutral
-TurboFilter force-enables marked DEBUG/TRACE events while leaving unmarked events
-at their normal effective levels. The exclusive console converter then emits only
-marked events; file and structured appenders continue receiving their normal raw
-events and patterns.
+types, and the event marker also supports custom Markdown emitters. The starter
+does not override logger levels or user TurboFilters: a marked event must first pass
+normal SLF4J/Logback filtering. The shipped harness Markdown loggers emit at INFO;
+custom emitters using DEBUG or TRACE must enable those levels normally. The exclusive
+console converter then emits only marked events, while file and structured appenders
+retain their configured levels, filters, raw events, and patterns.
 
 ## ANSI policy
 

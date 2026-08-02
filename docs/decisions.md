@@ -70,8 +70,8 @@ see [roadmap.md](roadmap.md); for stable repo context see
   `LlmStepRunnerCallback`, `EvaluationStepRunnerCallback`, and
   `ScenarioExecutionCallback`, plus the `HttpRequestLogger` and `SqlLogger` used by
   the built-in tools; the shipped loggers implement these generic
-  lifecycle seams while runners remain presentation-agnostic. Step-runner callbacks
-  compose sequentially through `andThen`; `StepEvaluationRecorder` implements the
+  lifecycle seams while runners remain presentation-agnostic. Step-runner and scenario
+  callbacks compose sequentially through `andThen`; `StepEvaluationRecorder` implements the
   evaluation seam and is chained before the narrower `EvaluationLoggerCallback`.
   Scenario lifecycle
   narration is centralized in `ScenarioExecution`; actor step narration is emitted
@@ -82,9 +82,10 @@ see [roadmap.md](roadmap.md); for stable repo context see
 - **Clean Markdown console selection is event-marker-driven.** When the harness
   format is Markdown, the automatic Logback starter replaces compatible console
   patterns with a full-event converter: compact colored time/level header plus the
-  rendered body, and zero bytes for unmarked events. A neutral TurboFilter accepts
-  marked events so DEBUG diagnostics work without broad logger-level overrides;
-  it leaves unmarked events neutral, preserving ordinary file/structured logging.
+  rendered body, and zero bytes for unmarked events. Marker selection does not bypass
+  effective logger levels or user TurboFilters. The shipped Markdown harness loggers
+  emit at INFO, while custom DEBUG/TRACE emitters remain subject to normal Logback
+  configuration; this preserves file and structured appender filtering semantics.
   A Java `MarkdownLogger` interface was rejected because Logback evaluates
   `ILoggingEvent`s, not Spring bean types, while the existing SLF4J marker is both
   direct and open to custom emitters.

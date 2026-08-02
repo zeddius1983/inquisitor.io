@@ -159,6 +159,25 @@ class ScenarioExecutorTest {
         assertThat(events).containsExactly("scenario:Order lifecycle", "aborted:0");
     }
 
+    @Test
+    void scenarioCallbacksComposeInInvocationOrder() {
+        val events = new ArrayList<String>();
+        val first = new NamedScenarioCallback(events, "first");
+        val second = new NamedScenarioCallback(events, "second");
+        val result = new ScenarioResult(threeSteps(), List.of());
+        val failure = new IllegalStateException("failed");
+        val callback = first.andThen(second);
+
+        callback.scenarioStarted(threeSteps());
+        callback.scenarioAborted(result, failure);
+        callback.scenarioCompleted(result);
+
+        assertThat(events).containsExactly(
+                "first:started", "second:started",
+                "first:aborted", "second:aborted",
+                "first:completed", "second:completed");
+    }
+
     private static List<String> executionOrder(Consumer<ScenarioExecutor> invocation) {
         val order = new ArrayList<String>();
         StepRunner runner = request -> {
@@ -240,5 +259,25 @@ class ScenarioExecutorTest {
             events.add("completed:" + (result.passed() ? "PASS" : "FAIL"));
         }
 
+    }
+
+    private record NamedScenarioCallback(
+            List<String> events,
+            String name) implements ScenarioExecutionCallback {
+
+        @Override
+        public void scenarioStarted(Scenario scenario) {
+            events.add(name + ":started");
+        }
+
+        @Override
+        public void scenarioAborted(ScenarioResult partialResult, Throwable cause) {
+            events.add(name + ":aborted");
+        }
+
+        @Override
+        public void scenarioCompleted(ScenarioResult result) {
+            events.add(name + ":completed");
+        }
     }
 }

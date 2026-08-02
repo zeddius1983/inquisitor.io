@@ -16,8 +16,11 @@
 
 package io.inquisitor.harness.executor;
 
+import java.util.Objects;
+
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.ScenarioResult;
+import lombok.val;
 
 /**
  * Receives lifecycle events from a {@link ScenarioExecution}.
@@ -43,4 +46,32 @@ public interface ScenarioExecutionCallback {
 
     /** Invoked when a scenario completes normally, including verdict failures. */
     void scenarioCompleted(ScenarioResult result);
+
+    /**
+     * Returns a callback that invokes this callback followed by {@code after} for each
+     * lifecycle event. If this callback throws, {@code after} is not invoked.
+     */
+    default ScenarioExecutionCallback andThen(ScenarioExecutionCallback after) {
+        Objects.requireNonNull(after, "after");
+        val before = this;
+        return new ScenarioExecutionCallback() {
+            @Override
+            public void scenarioStarted(Scenario scenario) {
+                before.scenarioStarted(scenario);
+                after.scenarioStarted(scenario);
+            }
+
+            @Override
+            public void scenarioAborted(ScenarioResult partialResult, Throwable cause) {
+                before.scenarioAborted(partialResult, cause);
+                after.scenarioAborted(partialResult, cause);
+            }
+
+            @Override
+            public void scenarioCompleted(ScenarioResult result) {
+                before.scenarioCompleted(result);
+                after.scenarioCompleted(result);
+            }
+        };
+    }
 }

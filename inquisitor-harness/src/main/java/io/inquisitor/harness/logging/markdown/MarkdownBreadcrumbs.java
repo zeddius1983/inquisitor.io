@@ -19,6 +19,7 @@ package io.inquisitor.harness.logging.markdown;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.model.Scenario;
@@ -74,30 +75,31 @@ final class MarkdownBreadcrumbs {
         segments.add(method);
         segments.add(path);
         segments.addAll(List.of(trailingSegments));
-        return breadcrumb(segments.stream()
-                .map(MarkdownBreadcrumbs::headingLiteral)
-                .toList());
+        return breadcrumb(segments);
     }
 
     static String sql(String datasource, String status) {
-        return breadcrumb(List.of("SQL", datasource, status).stream()
-                .map(MarkdownBreadcrumbs::headingLiteral)
-                .toList());
+        return breadcrumb(List.of("SQL", datasource, status));
     }
 
     private static String breadcrumb(List<String> segments) {
         return POWERLINE_LEFT_CAP + " "
-                + String.join(" " + POWERLINE_SEPARATOR + " ", segments)
+                + segments.stream()
+                        .map(MarkdownBreadcrumbs::headingLiteral)
+                        .collect(Collectors.joining(" " + POWERLINE_SEPARATOR + " "))
                 + " " + POWERLINE_RIGHT_CAP;
     }
 
-    private static String headingLiteral(String value) {
+    static String headingLiteral(String value) {
         return value.replace("\\", "\\\\")
                 .replace("`", "\\`")
                 .replace("*", "\\*")
                 .replace("_", "\\_")
                 .replace("[", "\\[")
-                .replace("]", "\\]");
+                .replace("]", "\\]")
+                .replace("<", "\\<")
+                .replace(">", "\\>")
+                .replace("&", "\\&");
     }
 
     private static String progress(int current, int total) {

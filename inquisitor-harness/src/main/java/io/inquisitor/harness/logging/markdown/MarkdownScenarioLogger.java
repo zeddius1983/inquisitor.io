@@ -37,7 +37,8 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
 
                 # %s%s
                 """.formatted(MarkdownBreadcrumbs.scenario(scenario, 0, "RUN"),
-                scenario.name(), body(scenario.description())));
+                MarkdownBreadcrumbs.headingLiteral(scenario.name()),
+                body(scenario.description())));
     }
 
     @Override
@@ -45,7 +46,8 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
         val markdown = MarkdownLogSupport.block("""
                 > **Scenario aborted:** %s
                 > Completed `%d/%d` steps before an infrastructure failure.
-                """.formatted(partialResult.scenario().name(), partialResult.results().size(),
+                """.formatted(MarkdownBreadcrumbs.headingLiteral(
+                        partialResult.scenario().name()), partialResult.results().size(),
                 partialResult.scenario().steps().size()));
         log.atInfo()
                 .addMarker(MarkdownLogSupport.marker())

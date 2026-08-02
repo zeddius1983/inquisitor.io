@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.ServiceConfigurationError;
 import java.util.regex.Pattern;
 
 import ch.qos.logback.classic.Level;
@@ -52,7 +51,6 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
     private static final String RIGHT_CAP = "";
     private static final String PLAIN_OPTION = "plain";
     private static final String ANSI_OPTION = "ansi";
-    private static final String PALETTE_OPTION = "palette";
     private static final String CONTENT_INDENT = "    ";
     private static final Pattern NON_EMPTY_LINE_START = Pattern.compile("(?m)^(?=.)");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter
@@ -133,8 +131,8 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
         if (options == null) {
             options = List.of();
         }
-        boolean plain = hasOption(options, PLAIN_OPTION);
-        boolean ansi = hasOption(options, ANSI_OPTION);
+        boolean plain = ConverterOptions.hasFlag(options, PLAIN_OPTION);
+        boolean ansi = ConverterOptions.hasFlag(options, ANSI_OPTION);
         if (plain && ansi) {
             addWarn("Both 'plain' and 'ansi' were configured for %mdEvent; using plain output");
         }
@@ -142,7 +140,7 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
                 ? configuredAnsiEnabled
                 : plain ? false : ansi || AnsiSupport.isAutoEnabled();
         MarkdownPalette palette = configuredPalette == null
-                ? palette(options)
+                ? ConverterOptions.palette(options, "%mdEvent", this::addWarn, this::addWarn)
                 : configuredPalette;
         if (configuredRenderer == null) {
             renderer = new FlexmarkAnsiRenderer(ansiEnabled, palette);
@@ -208,39 +206,6 @@ public final class MarkdownEventConverter extends ThrowableHandlingConverter {
             case Level.TRACE_INT -> AnsiStyler.PowerlineStyle.TRACE;
             default -> AnsiStyler.PowerlineStyle.DURATION;
         };
-    }
-
-    private static boolean hasOption(List<String> options, String expected) {
-        return options.stream().map(String::strip).anyMatch(expected::equalsIgnoreCase);
-    }
-
-    private MarkdownPalette palette(List<String> options) {
-        List<String> configured = options.stream()
-                .map(String::strip)
-                .filter(option -> option.regionMatches(
-                        true, 0, PALETTE_OPTION + "=", 0, PALETTE_OPTION.length() + 1))
-                .toList();
-        if (configured.isEmpty()) {
-            return MarkdownPalettes.defaultPalette();
-        }
-        if (configured.size() > 1) {
-            addWarn("Multiple palette options were configured for %mdEvent; using the last one");
-        }
-        String option = configured.getLast();
-        String name = option.substring(option.indexOf('=') + 1).strip();
-        try {
-            return MarkdownPalettes.find(name).orElseGet(() -> invalidPalette(option));
-        }
-        catch (RuntimeException | ServiceConfigurationError exception) {
-            addWarn("Could not resolve %mdEvent option '" + option
-                    + "'; using palette=gruvbox", exception);
-            return MarkdownPalettes.defaultPalette();
-        }
-    }
-
-    private MarkdownPalette invalidPalette(String option) {
-        addWarn("Invalid %mdEvent option '" + option + "'; using palette=gruvbox");
-        return MarkdownPalettes.defaultPalette();
     }
 
     private static String indent(String value) {
