@@ -31,9 +31,17 @@ import lombok.val;
 public class ScenarioExecutor {
 
     private final StepRunner runner;
+    private final ScenarioExecutionCallback callback;
 
     public ScenarioExecutor(StepRunner runner) {
+        this(runner, ScenarioExecutionCallback.NO_OP);
+    }
+
+    public ScenarioExecutor(
+            StepRunner runner,
+            ScenarioExecutionCallback callback) {
         this.runner = runner;
+        this.callback = callback;
     }
 
     /** Executes every step, stopping at the first failure. */
@@ -47,6 +55,6 @@ public class ScenarioExecutor {
 
     /** Begins a step-at-a-time execution over a fresh conversation. */
     public ScenarioExecution start(Scenario scenario) {
-        return new ScenarioExecution(runner, scenario);
+        return new ScenarioExecution(runner, callback, scenario);
     }
 }

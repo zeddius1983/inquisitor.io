@@ -16,6 +16,7 @@
 
 package io.inquisitor.harness.evaluation;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,58 +43,64 @@ import org.springframework.ai.evaluation.Evaluator;
 @Slf4j
 public class EvaluationStepRunner implements StepRunner {
 
+    private static final String SYNTHETIC_VERDICT_REASON =
+            "Harness-synthesized verdict (no actor claim to audit); not evaluated.";
+
     private final StepRunner delegate;
     private final Evaluator evaluator;
-    private final StepEvaluationRecorder recorder;
+    private final EvaluationStepRunnerCallback callback;
 
-    public EvaluationStepRunner(StepRunner delegate, Evaluator evaluator, StepEvaluationRecorder recorder) {
+    public EvaluationStepRunner(
+            StepRunner delegate,
+            Evaluator evaluator,
+            EvaluationStepRunnerCallback callback) {
         this.delegate = delegate;
         this.evaluator = evaluator;
-        this.recorder = recorder;
+        this.callback = callback;
     }
 
     @Override
     public StepRun run(StepRequest request) {
         val run = delegate.run(request);
 
-        val scenario = request.scenario();
-        val step = request.step();
         if (run.synthetic()) {
             // The harness fabricated this verdict (empty/unparseable model response) —
             // there is no actor claim to audit, so judging it would only produce noise.
-            log.debug("[{}] step {}/{} - NOT_EVALUATED: harness-synthesized verdict",
-                    scenario.name(), step.index(), scenario.steps().size());
-            recorder.recordNotEvaluated(request, run,
-                    "Harness-synthesized verdict (no actor claim to audit); not evaluated.");
+            notifyCallback("skipped", () ->
+                    callback.evaluationSkipped(request, run, SYNTHETIC_VERDICT_REASON));
             return run;
         }
-        log.debug("[{}] step {}/{} - EVALUATE: {}",
-                scenario.name(), step.index(), scenario.steps().size(), step.title());
+        notifyCallback("started", () -> callback.evaluationStarted(request, run));
 
         val context = run.toolCalls().isEmpty()
                 ? List.<Document>of()
                 : List.of(new Document(renderTrace(run.toolCalls())));
+        val evaluationRequest = new EvaluationRequest(
+                request.userMessage(), context, renderVerdict(run.verdict()));
+        val startedNanos = System.nanoTime();
         EvaluationResponse evaluation;
         try {
-            evaluation = evaluator.evaluate(
-                    new EvaluationRequest(request.userMessage(), context, renderVerdict(run.verdict())));
+            evaluation = evaluator.evaluate(evaluationRequest);
         } catch (RuntimeException e) {
             // The judge is an observer: its infrastructure failures (timeouts, transport
             // errors) must never fail the actor's step. Record the gap and move on.
-            log.warn("[{}] step {}/{} - NOT_EVALUATED: the judge call failed",
-                    scenario.name(), step.index(), scenario.steps().size(), e);
-            recorder.recordNotEvaluated(request, run,
-                    "The judge call failed (" + e.getClass().getSimpleName() + ": " + e.getMessage()
-                            + "); not evaluated.");
+            notifyCallback("failed", () -> callback.evaluationFailed(request, run, e));
             return run;
         }
-        recorder.record(request, run, evaluation);
-
-        val category = evaluation.getMetadata() == null ? null : evaluation.getMetadata().get("category");
-        log.debug("[{}] step {}/{} - {}: score {}",
-                scenario.name(), step.index(), scenario.steps().size(),
-                category, evaluation.getScore());
+        val elapsed = Duration.ofNanos(System.nanoTime() - startedNanos);
+        notifyCallback("completed", () ->
+                callback.evaluationCompleted(request, run, evaluation, elapsed));
         return run;
+    }
+
+    private static void notifyCallback(String event, Runnable notification) {
+        try {
+            notification.run();
+        }
+        catch (RuntimeException exception) {
+            log.warn("Evaluation {} callback failed; the actor result remains unchanged",
+                    event, exception);
+        }
     }
 
     private static String renderTrace(List<ToolCallRecord> toolCalls) {

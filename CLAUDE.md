@@ -17,6 +17,8 @@ Base package: `io.inquisitor`. Group: `io.inquisitor`.
 
 | Module | Role |
 |--------|------|
+| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` message and `%mdEvent` full-event Logback converters for ANSI-styled Markdown console messages, including Unicode bordered/aligned/wrapped GFM tables; manual integration, independent of the harness and Spring |
+| `inquisitor-logback-markdown-starter` | Optional Spring Boot autoconfiguration that installs marker-aware Markdown conversion into compatible Logback `PatternLayout` console appenders; automatically uses a marker-only Powerline event stream for Markdown harness runs, leaves file/structured appenders unchanged |
 | `buildSrc/` | Gradle convention plugins (`inquisitor.java-conventions`, `.spring-conventions`, `.publish-conventions`) |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness |
@@ -130,6 +132,42 @@ suite (`ScenarioSuite`, bound to a style bucket by each subclass —
 `ExplicitScenarioSuiteTest`, `CucumberScenarioSuiteTest`; `IntentScenarioSuiteTest`
 for the natural-language bucket). Oracle calibration runs through `FaultDetectionTests`
 (see below).
+
+Harness run narration uses `inquisitor.harness.logging.format=plain|markdown`
+(`plain` by default). Generic `LlmStepRunnerCallback`,
+`EvaluationStepRunnerCallback`, and `ScenarioExecutionCallback` seams keep
+formatting out of the runners; the shipped plain/Markdown loggers implement those
+callbacks and are grouped under `logging.plain` and `logging.markdown`. Step-runner
+callbacks and scenario callbacks compose in order through `andThen`; the harness
+starter composes contributed actor callbacks with its selected logger, while the
+evaluation starter chains `StepEvaluationRecorder`, contributed evaluation
+callbacks, and the selected `EvaluationLoggerCallback`, leaving each runner with
+one collaborator. Plain scenario and actor-step starts log only lifecycle data
+(names, progress, and status); full Markdown scenario descriptions and step
+instructions are exclusive to Markdown mode.
+Markdown mode emits marker-tagged blocks, and rendering remains optional through
+either Logback Markdown module. With the starter, the Markdown harness format
+selects an exclusive compatible console: shipped diagnostics emit at INFO and marked
+events remain subject to normal logger levels and user TurboFilters, while unmarked
+console events are suppressed from Boot's early logging lifecycle without changing
+file/structured appenders. Event bodies retain four spaces of indentation and are separated by
+blank lines. Powerline and Markdown styles share a muted true-color Gruvbox Dark
+palette by default; `inquisitor.logging.markdown.palette` can select Gruvbox,
+Nord, Catppuccin Mocha, or Tokyo Night consistently across the early event header
+and Markdown body. Third parties contribute named palettes through the base
+module's `MarkdownPaletteProvider` ServiceLoader SPI, which remains available
+before Spring bean creation. Powerline text maintains at least 4.5:1 contrast;
+its base classifier knows only generic log/HTTP concepts, while the starter adds
+judge-result vocabulary when Markdown harness mode is active.
+`HttpRequestLogger` and `SqlLogger` have
+plain/Markdown implementations; the former renders resolved target hostname, method,
+path, status, redacted headers, and pretty-printed JSON payloads, while the latter
+renders datasource, status, statement, and result without changing tool results.
+A response advisor observes real actor/judge
+calls and caches the first server-reported model per role. Markdown actor-step
+breadcrumbs put the cached actor name first, reducing model paths to a filename
+without `.gguf` and omitting that segment until it is resolved; the harness renders
+no separate model preamble.
 
 Demo scenarios live under `src/test/resources/scenarios/`, split by authoring style:
 `explicit/` (prescriptive: fenced requests + bulleted asserts), `cucumber/` (Gherkin

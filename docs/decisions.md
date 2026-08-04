@@ -59,10 +59,56 @@ see [roadmap.md](roadmap.md); for stable repo context see
   beans are aggregated and passed through the single unified entry point; the
   `defaultToolCallbacks(...)` overloads are deprecated for removal in Spring AI
   2.0.0-RC1.
-- **Model-dependent beans degrade gracefully.** `ChatClient`/executor beans are
-  `@ConditionalOnBean(ChatModel.class)` and the autoconfig is ordered
-  `afterName` the OpenAI chat autoconfig, so the context still starts (just
-  without the harness) when no model is configured.
+- **Model-dependent beans degrade gracefully.** `ChatClient`/`LlmStepRunner`
+  beans are `@ConditionalOnBean(ChatModel.class)` and the autoconfig is ordered
+  `afterName` the OpenAI chat autoconfig, so the context still starts when no
+  model is configured. The semantic loggers and model registry are always available,
+  and a user-supplied
+  `StepRunner` can still obtain a `ScenarioExecutor` without a `ChatModel`.
+- **Harness logging is semantic and presentation-selectable.**
+  `inquisitor.harness.logging.format=plain|markdown` selects implementations of
+  `LlmStepRunnerCallback`, `EvaluationStepRunnerCallback`, and
+  `ScenarioExecutionCallback`, plus the `HttpRequestLogger` and `SqlLogger` used by
+  the built-in tools; the shipped loggers implement these generic
+  lifecycle seams while runners remain presentation-agnostic. Step-runner and scenario
+  callbacks compose sequentially through `andThen`; `StepEvaluationRecorder` implements the
+  evaluation seam and is chained before the narrower `EvaluationLoggerCallback`.
+  Scenario lifecycle
+  narration is centralized in `ScenarioExecution`; actor step narration is emitted
+  once by `LlmStepRunnerCallback.stepStarted`, together with its running status. This preserves
+  whole-run and JUnit step-at-a-time behavior without duplicate step messages.
+  Markdown events use the `INQUISITOR_MARKDOWN` SLF4J marker; raw, manually
+  rendered, and automatically rendered consoles remain consumer choices.
+- **Clean Markdown console selection is event-marker-driven.** When the harness
+  format is Markdown, the automatic Logback starter replaces compatible console
+  patterns with a full-event converter: compact colored time/level header plus the
+  rendered body, and zero bytes for unmarked events. Marker selection does not bypass
+  effective logger levels or user TurboFilters. The shipped Markdown harness loggers
+  emit at INFO, while custom DEBUG/TRACE emitters remain subject to normal Logback
+  configuration; this preserves file and structured appender filtering semantics.
+  A Java `MarkdownLogger` interface was rejected because Logback evaluates
+  `ILoggingEvent`s, not Spring bean types, while the existing SLF4J marker is both
+  direct and open to custom emitters.
+- **HTTP log presentation never changes tool data.** The HTTP logger receives the
+  normalized request and response alongside the tool invocation, but the compact
+  response returned to the model is unchanged. Markdown mode may pretty-print
+  valid JSON for human-readable code blocks. Sensitive request-header values are
+  redacted before formatting, including authorization, cookies, API keys, tokens,
+  and secrets.
+- **SQL log presentation follows the same tool seam.** `SqlLogger` receives the
+  resolved datasource name, original statement, and already-formatted tool result.
+  Markdown mode renders the statement in an `sql` fence and the result in a plain
+  code fence; neither representation changes the value returned to the model.
+- **Actual model metadata is observed, never probed.** A response advisor on each
+  real actor/judge `ChatClient` call stores the first nonblank server-reported
+  model in a shared `ModelRegistry`; no configured options or endpoints are copied
+  into logging state. Configuration-time probe calls would add cost, side effects,
+  and could report a route different from the scenario request.
+  The Markdown actor logger reads the registry directly and puts the actual actor
+  name first in step breadcrumbs once known. Provider-reported file paths are shown
+  as the filename without `.gguf`. Before the first usable response, the model
+  segment is omitted; there is no model preamble or unresolved placeholder.
+  Credentials, prompts, tool arguments, and default headers are excluded.
 - **Dense local model, temperature 0.** `gemma-4-31B-it-QAT-Q4_0`; MoE models
   shortcut multi-step scenarios by answering from chat memory instead of calling
   the tool, producing hallucinated PASSes.
@@ -344,6 +390,86 @@ see [roadmap.md](roadmap.md); for stable repo context see
   location (not the bare filename) as `source`. Records are split into scenario
   *instances* by group/source changes and step-index resets, because the same file
   legitimately runs several times in one JVM.
+
+## Console Markdown logging
+
+- **Reusable Logback integration is a separate opt-in module.**
+  `inquisitor-logback-markdown` owns the `%mdMsg` converter, Flexmark renderer,
+  marker protocol, and bundled conversion rule without depending on Spring or
+  the harness. Consumers choose which console layout uses it; file and structured
+  appenders remain on `%msg`. This keeps presentation out of the harness and
+  makes the renderer reusable by unrelated applications.
+- **Flexmark core, not `flexmark-all`.** The initial renderer needs the parser,
+  core AST, and AST utilities only. Pulling every Flexmark extension and converter
+  into a published logging utility would inflate every consumer's runtime
+  classpath. Individual extensions, such as tables in task 15D, are added
+  narrowly when their behavior is implemented.
+- **Table layout is measured before ANSI emission.** The narrow Flexmark tables
+  extension supplies structural rows/cells/alignment; those nodes are collected
+  into an immutable internal model before a dedicated terminal renderer measures,
+  allocates, wraps, and emits them. Display width ignores ANSI and combining marks
+  and accounts for common wide Unicode/emoji. This keeps colour independent from
+  geometry and per-render mutable state isolated for concurrent logging.
+- **Jansi emits styles but does not decide whether a destination is a terminal.**
+  Automatic mode requires an attached `System.console()`, honours `NO_COLOR`
+  and `TERM=dumb`, and respects Jansi's process disable property. Manual
+  `plain`/`ansi` converter options provide deterministic overrides. Spring
+  Boot's ANSI policy is separate and is bridged by the optional starter, rather
+  than coupled into this Spring-free module.
+- **Automatic installation mutates only compatible console layout instances.**
+  For exclusive mode, a Spring Boot application listener runs immediately after
+  `LoggingApplicationListener`, so ordinary framework startup records are filtered
+  before application initialization. Autoconfiguration later finalizes shared mode
+  and any contributed renderer. Both paths discover identity-deduplicated console
+  appenders through logger attachments and `AppenderAttachable` composites and
+  update each `PatternLayout#getInstanceConverterMap()` under the `LoggerContext`
+  configuration lock. Shared mode supplies a marker-only converter for `m`, `msg`,
+  and `message`; exclusive mode owns the complete `%mdEvent` console layout. File,
+  JSON, and custom layouts remain untouched. Dynamically created `SiftingAppender`
+  children require manual `%mdMsg{marked}` configuration because they do not exist
+  during starter installation and are not exposed as attached appenders. Global
+  converter maps and consumer logging configuration files remain owned by the
+  application. The configuration lock serializes configuration changes, not active
+  event formatting, so applications should not invoke the installer later while
+  background threads are logging.
+- **No Lombok in the small renderer module.** Its state is deliberately explicit
+  and per-render-call, and the handful of constructors/accessors do not justify
+  adding an annotation processor to this dependency-light published artifact.
+- **Code highlighting is bounded, pluggable, and source-preserving.** ANSI code
+  blocks use equal-width background panels and a small built-in tokenizer for the
+  harness's common JSON/SQL/HTTP/Java/shell fences. `SyntaxHighlighter` remains a
+  public seam for other grammars. Highlighting is skipped for large blocks, and
+  output that does not reconstruct the exact source line falls back to the base
+  code style; a debugging renderer must never mutate logged payloads.
+- **Powerline breadcrumbs are a renderer convention, not embedded ANSI.** A
+  heading shaped as ` segment  segment … ` renders as background-colored
+  Powerlevel10k-style pills. Rounded Powerline caps provide the intended pill
+  silhouette and require a patched font with the extra-symbol range. The source
+  remains readable Markdown, plain output remains escape-free, and the harness
+  stays independent of Logback/Jansi. Powerline segments and styled Markdown use
+  one selected true-color palette. Segment classification is a renderer option:
+  the default recognizes only generic lifecycle, HTTP-status, path, and duration
+  concepts, while applications can inject their own domain vocabulary without
+  adding it to the independently published renderer. The Boot integration adds
+  judge-result vocabulary only when it detects Markdown harness mode. Gruvbox Dark
+  remains the Starship-inspired
+  default, while Nord, Catppuccin Mocha, and Tokyo Night are built in and selected
+  through `inquisitor.logging.markdown.palette`. The early exclusive installer
+  reads the same setting as autoconfiguration so its event header cannot diverge
+  from the Markdown body. `MarkdownPalette` is an open RGB contract; built-in and
+  third-party values both use `RgbMarkdownPalette` and are named through the same
+  `MarkdownPaletteProvider` abstraction. Built-in providers live in a deterministic
+  internal catalog so they cannot disappear with service metadata, while third-party
+  providers use `ServiceLoader` rather than Spring beans because they must be
+  discoverable before the application context exists.
+  Powerline foregrounds select the strongest palette-neutral contrast and fall
+  back to black or white when needed to meet the 4.5:1 normal-text target.
+- **The renderer module is organized by responsibility.** Public rendering types
+  live under `.renderer`, palette values and their provider SPI under `.palette`,
+  syntax highlighting under `.highlight`, terminal styling under `.ansi`,
+  Logback converters under `.converter`, and marker filtering under `.marker`.
+  This keeps extension contracts separate from parser, table, and logging-framework
+  implementation.
 
 > Conventions for code style live in the `java-developer` skill, not here. This
 > file records project-specific decisions only.

@@ -16,11 +16,13 @@
 
 package io.inquisitor.harness.tool;
 
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
-import lombok.extern.slf4j.Slf4j;
+import io.inquisitor.harness.logging.HttpRequestLogger;
+import io.inquisitor.harness.logging.plain.PlainHttpRequestLogger;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
 import org.springframework.ai.tool.annotation.Tool;
@@ -39,13 +41,18 @@ import org.springframework.web.client.RestClientException;
  * a 404 or 422 is often the expected outcome of a step. Connection failures are
  * returned as a readable error string.
  */
-@Slf4j
 public class HttpRequestTool {
 
     private final HttpTargetRegistry registry;
+    private final HttpRequestLogger logger;
 
     public HttpRequestTool(HttpTargetRegistry registry) {
+        this(registry, new PlainHttpRequestLogger());
+    }
+
+    public HttpRequestTool(HttpTargetRegistry registry, HttpRequestLogger logger) {
         this.registry = registry;
+        this.logger = logger;
     }
 
     @Tool(description = "Make an HTTP request to a target application and return its response "
@@ -67,29 +74,43 @@ public class HttpRequestTool {
                             + "body; when a body is sent without one, application/json is assumed.")
             @Nullable String headers) {
 
-        log.debug("httpRequest <- target={}, method={}, path={}, headers={}, body={}",
-                target, method, path, headers, body);
         val httpTarget = registry.resolve(target);
+        val targetName = resolvedTargetName(target);
+        val targetHost = targetHost(httpTarget, targetName);
+        val normalizedMethod = method.strip().toUpperCase(Locale.ROOT);
+        val httpMethod = HttpMethod.valueOf(normalizedMethod);
         val client = RestClient.builder().baseUrl(httpTarget.baseUrl()).build();
+
+        // Per-target default headers first, then the per-request ones (which win on conflict).
+        val merged = new LinkedHashMap<String, String>(httpTarget.defaultHeaders());
+        parseHeaders(headers, merged);
+
+        // Content-Type is applied alongside the body (case-insensitive lookup); every other
+        // header is set directly on the request.
+        String contentType = null;
+        for (val header : merged.entrySet()) {
+            if (header.getKey().equalsIgnoreCase(HttpHeaders.CONTENT_TYPE)) {
+                contentType = header.getValue();
+            }
+        }
+        val hasBody = body != null && !body.isBlank();
+        val effectiveHeaders = new LinkedHashMap<>(merged);
+        if (hasBody && (contentType == null || contentType.isBlank())) {
+            effectiveHeaders.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+        }
+        val request = new HttpRequestLogger.Request(
+                targetHost, normalizedMethod, path, effectiveHeaders, body);
+        logger.requestStarted(request);
+
         try {
-            val spec = client.method(HttpMethod.valueOf(method.strip().toUpperCase(Locale.ROOT))).uri(path);
-
-            // Per-target default headers first, then the per-request ones (which win on conflict).
-            val merged = new LinkedHashMap<String, String>(httpTarget.defaultHeaders());
-            parseHeaders(headers, merged);
-
-            // Content-Type is applied alongside the body (case-insensitive lookup); every other
-            // header is set directly on the request.
-            String contentType = null;
+            val spec = client.method(httpMethod).uri(path);
             for (val header : merged.entrySet()) {
-                if (header.getKey().equalsIgnoreCase(HttpHeaders.CONTENT_TYPE)) {
-                    contentType = header.getValue();
-                } else {
+                if (!header.getKey().equalsIgnoreCase(HttpHeaders.CONTENT_TYPE)) {
                     spec.header(header.getKey(), header.getValue());
                 }
             }
 
-            if (body != null && !body.isBlank()) {
+            if (hasBody) {
                 val mediaType = contentType != null && !contentType.isBlank()
                         ? MediaType.parseMediaType(contentType)
                         : MediaType.APPLICATION_JSON;
@@ -99,15 +120,35 @@ public class HttpRequestTool {
             }
 
             val response = spec.retrieve()
-                    .onStatus(status -> true, (request, ignored) -> { })
+                    .onStatus(status -> true, (clientRequest, ignored) -> { })
                     .toEntity(String.class);
             val result = formatResponse(response.getStatusCode(), response.getHeaders(), response.getBody());
-            log.debug("httpRequest -> {}", result);
+            val responseContentType = response.getHeaders().getContentType();
+            logger.requestCompleted(request, new HttpRequestLogger.Response(
+                    response.getStatusCode().value(),
+                    responseContentType == null ? null : responseContentType.toString(),
+                    response.getBody()));
             return result;
         } catch (RestClientException e) {
             val error = "HTTP request failed: " + e.getMessage();
-            log.debug("httpRequest -> {}", error);
+            logger.requestFailed(request, error);
             return error;
+        }
+    }
+
+    private String resolvedTargetName(@Nullable String target) {
+        return target == null || target.isBlank()
+                ? registry.names().iterator().next()
+                : target.strip();
+    }
+
+    private static String targetHost(HttpTarget target, String fallback) {
+        try {
+            val host = URI.create(target.baseUrl()).getHost();
+            return host == null || host.isBlank() ? fallback : host;
+        }
+        catch (IllegalArgumentException exception) {
+            return fallback;
         }
     }
 

@@ -20,6 +20,8 @@ import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * Extra HTTP targets and datasources the harness exposes to the model, beyond the
@@ -31,15 +33,44 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @param targets     extra HTTP targets, keyed by the name a scenario refers to
  * @param datasources extra JDBC datasources, keyed by the name a scenario refers to
+ * @param logging     harness logging presentation settings
  */
 @ConfigurationProperties("inquisitor.harness")
 public record InquisitorHarnessProperties(
         Map<String, Target> targets,
-        Map<String, Datasource> datasources) {
+        Map<String, Datasource> datasources,
+        Logging logging) {
 
+    @ConstructorBinding
     public InquisitorHarnessProperties {
         targets = targets == null ? Map.of() : Map.copyOf(targets);
         datasources = datasources == null ? Map.of() : Map.copyOf(datasources);
+        logging = logging == null ? new Logging(HarnessLoggingFormat.PLAIN) : logging;
+    }
+
+    /**
+     * Creates plain-logging properties for standalone source compatibility.
+     *
+     * @param targets extra HTTP targets, keyed by name
+     * @param datasources extra JDBC datasources, keyed by name
+     */
+    public InquisitorHarnessProperties(
+            Map<String, Target> targets,
+            Map<String, Datasource> datasources) {
+        this(targets, datasources, new Logging(HarnessLoggingFormat.PLAIN));
+    }
+
+    /**
+     * Harness logging settings.
+     *
+     * @param format presentation format used by the semantic harness loggers
+     */
+    public record Logging(
+            @DefaultValue("plain") HarnessLoggingFormat format) {
+
+        public Logging {
+            format = format == null ? HarnessLoggingFormat.PLAIN : format;
+        }
     }
 
     /**

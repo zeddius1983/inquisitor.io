@@ -18,6 +18,8 @@ package io.inquisitor.harness.tool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -25,10 +27,12 @@ import java.nio.charset.StandardCharsets;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import io.inquisitor.harness.logging.HttpRequestLogger;
 import lombok.val;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class HttpRequestToolTest {
 
@@ -100,6 +104,30 @@ class HttpRequestToolTest {
         assertThat(response).contains("HTTP 200")
                 .contains("X-Request-Id=req-002")
                 .contains("Content-Type=application/json");
+    }
+
+    @Test
+    void reportsResolvedTargetAndEffectiveRequestAndResponseData() {
+        val registry = new HttpTargetRegistry();
+        registry.register("app", HttpTarget.of(
+                "http://localhost:" + server.getAddress().getPort()));
+        val logger = mock(HttpRequestLogger.class);
+        val loggedTool = new HttpRequestTool(registry, logger);
+
+        loggedTool.httpRequest(null, "post", "/echo", "{\"a\":1}", null);
+
+        val request = ArgumentCaptor.forClass(HttpRequestLogger.Request.class);
+        verify(logger).requestStarted(request.capture());
+        assertThat(request.getValue().target()).isEqualTo("localhost");
+        assertThat(request.getValue().method()).isEqualTo("POST");
+        assertThat(request.getValue().headers())
+                .containsEntry("Content-Type", "application/json");
+
+        val response = ArgumentCaptor.forClass(HttpRequestLogger.Response.class);
+        verify(logger).requestCompleted(request.capture(), response.capture());
+        assertThat(response.getValue().status()).isEqualTo(201);
+        assertThat(response.getValue().contentType()).isEqualTo("application/json");
+        assertThat(response.getValue().body()).isEqualTo("{\"a\":1}");
     }
 
     @Test

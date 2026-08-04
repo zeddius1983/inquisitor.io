@@ -110,4 +110,16 @@ class StepEvaluationRecorderTest {
         assertThat(recorder.records()).singleElement()
                 .satisfies(record -> assertThat(record.category()).isNull());
     }
+
+    @Test
+    void normalizesMissingModelTextForReportConsumers() {
+        val recorder = new StepEvaluationRecorder();
+        recorder.record(request(1), run(new StepVerdict(Outcome.PASS, null, List.of())),
+                new EvaluationResponse(true, 1.0f, null, Map.of()));
+
+        assertThat(recorder.records()).singleElement().satisfies(record -> {
+            assertThat(record.reasoning()).isEmpty();
+            assertThat(record.feedback()).isEmpty();
+        });
+    }
 }

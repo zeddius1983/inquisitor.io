@@ -25,8 +25,24 @@ import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.executor.HarnessSystemPrompt;
 import io.inquisitor.harness.executor.LlmStepRunner;
+import io.inquisitor.harness.executor.LlmStepRunnerCallback;
+import io.inquisitor.harness.executor.ScenarioExecutionCallback;
 import io.inquisitor.harness.executor.ScenarioExecutor;
 import io.inquisitor.harness.executor.StepRunner;
+import io.inquisitor.harness.logging.HttpRequestLogger;
+import io.inquisitor.harness.logging.LlmLoggerCallback;
+import io.inquisitor.harness.logging.ModelMetadataAdvisor;
+import io.inquisitor.harness.logging.ModelRegistry;
+import io.inquisitor.harness.logging.ModelRole;
+import io.inquisitor.harness.logging.SqlLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownHttpRequestLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownLlmLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownScenarioLogger;
+import io.inquisitor.harness.logging.markdown.MarkdownSqlLogger;
+import io.inquisitor.harness.logging.plain.PlainHttpRequestLogger;
+import io.inquisitor.harness.logging.plain.PlainLlmLogger;
+import io.inquisitor.harness.logging.plain.PlainScenarioLogger;
+import io.inquisitor.harness.logging.plain.PlainSqlLogger;
 import io.inquisitor.harness.parser.ScenarioParser;
 import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
@@ -77,6 +93,51 @@ public class InquisitorHarnessAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    ModelRegistry inquisitorModelRegistry() {
+        return new ModelRegistry();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(LlmLoggerCallback.class)
+    LlmLoggerCallback inquisitorLlmLoggerCallback(
+            InquisitorHarnessProperties properties,
+            ModelRegistry models) {
+        return switch (properties.logging().format()) {
+            case PLAIN -> new PlainLlmLogger();
+            case MARKDOWN -> new MarkdownLlmLogger(models);
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    ScenarioExecutionCallback inquisitorScenarioExecutionCallback(
+            InquisitorHarnessProperties properties) {
+        return switch (properties.logging().format()) {
+            case PLAIN -> new PlainScenarioLogger();
+            case MARKDOWN -> new MarkdownScenarioLogger();
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    HttpRequestLogger inquisitorHttpRequestLogger(InquisitorHarnessProperties properties) {
+        return switch (properties.logging().format()) {
+            case PLAIN -> new PlainHttpRequestLogger();
+            case MARKDOWN -> new MarkdownHttpRequestLogger();
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    SqlLogger inquisitorSqlLogger(InquisitorHarnessProperties properties) {
+        return switch (properties.logging().format()) {
+            case PLAIN -> new PlainSqlLogger();
+            case MARKDOWN -> new MarkdownSqlLogger();
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     ChatMemory inquisitorChatMemory() {
         return MessageWindowChatMemory.builder().build();
     }
@@ -106,14 +167,16 @@ public class InquisitorHarnessAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    HttpRequestTool inquisitorHttpRequestTool(HttpTargetRegistry registry) {
-        return new HttpRequestTool(registry);
+    HttpRequestTool inquisitorHttpRequestTool(
+            HttpTargetRegistry registry,
+            HttpRequestLogger logger) {
+        return new HttpRequestTool(registry, logger);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    SqlTool inquisitorSqlTool(DataSourceRegistry registry) {
-        return new SqlTool(registry);
+    SqlTool inquisitorSqlTool(DataSourceRegistry registry, SqlLogger logger) {
+        return new SqlTool(registry, logger);
     }
 
     // The built-in tools are exposed as individual ToolCallback beans (each tool has one
@@ -146,7 +209,8 @@ public class InquisitorHarnessAutoConfiguration {
             ChatMemory chatMemory,
             ObjectProvider<ToolCallback> toolCallbacks,
             ObjectProvider<ToolCallbackProvider> toolCallbackProviders,
-            ObjectProvider<Advisor> advisors) {
+            ObjectProvider<Advisor> advisors,
+            ModelRegistry models) {
 
         // Every tool the model may call, as ToolCallbacks: the built-in HTTP/SQL adapters,
         // any user-supplied ToolCallback beans, and any ToolCallbackProvider beans (e.g.
@@ -162,6 +226,7 @@ public class InquisitorHarnessAutoConfiguration {
         // extra advisor beans this is identical to the chat-memory + logging defaults.
         val advisorList = new ArrayList<Advisor>(List.of(
                 MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                new ModelMetadataAdvisor(ModelRole.ACTOR, models),
                 // Logs each request/response (incl. tool-call round-trips) at DEBUG
                 // under org.springframework.ai — silent unless that logger is enabled.
                 new SimpleLoggerAdvisor()));
@@ -179,15 +244,23 @@ public class InquisitorHarnessAutoConfiguration {
     @Bean
     @ConditionalOnBean(ChatClient.class)
     @ConditionalOnMissingBean
-    LlmStepRunner inquisitorLlmStepRunner(ChatClient chatClient) {
-        return new LlmStepRunner(chatClient);
+    LlmStepRunner inquisitorLlmStepRunner(
+            ChatClient chatClient,
+            ObjectProvider<LlmStepRunnerCallback> callbacks) {
+        val callback = callbacks.orderedStream()
+                .reduce(LlmStepRunnerCallback.NO_OP, LlmStepRunnerCallback::andThen);
+        return new LlmStepRunner(chatClient, callback);
     }
 
     @Bean
     @ConditionalOnBean(StepRunner.class)
     @ConditionalOnMissingBean
-    ScenarioExecutor inquisitorScenarioExecutor(StepRunner stepRunner) {
-        return new ScenarioExecutor(stepRunner);
+    ScenarioExecutor inquisitorScenarioExecutor(
+            StepRunner stepRunner,
+            ObjectProvider<ScenarioExecutionCallback> callbacks) {
+        val callback = callbacks.orderedStream()
+                .reduce(ScenarioExecutionCallback.NO_OP, ScenarioExecutionCallback::andThen);
+        return new ScenarioExecutor(stepRunner, callback);
     }
 
     private static DataSource toDataSource(InquisitorHarnessProperties.Datasource properties) {

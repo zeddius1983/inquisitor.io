@@ -17,12 +17,14 @@
 package io.inquisitor.harness.executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import io.inquisitor.harness.model.Outcome;
@@ -30,6 +32,7 @@ import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.ScenarioResult;
 import io.inquisitor.harness.model.Step;
 import io.inquisitor.harness.model.StepVerdict;
+import lombok.val;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -107,6 +110,86 @@ class ScenarioExecutorTest {
         assertThat(evaluation.result().results()).hasSize(2);
     }
 
+    @Test
+    void wholeScenarioLogsScenarioOnceBeforeRunningSteps() {
+        assertThat(executionOrder(executor -> executor.execute(threeSteps())))
+                .containsExactly(
+                        "scenario:Order lifecycle",
+                        "run:Create",
+                        "run:Load",
+                        "run:Delete");
+    }
+
+    @Test
+    void stepAtATimeExecutionUsesTheSameLifecycleOrdering() {
+        assertThat(executionOrder(executor -> {
+            val execution = executor.start(threeSteps());
+            execution.next();
+            execution.next();
+        })).containsExactly(
+                "scenario:Order lifecycle",
+                "run:Create",
+                "run:Load");
+    }
+
+    @Test
+    void logsOneStartAndOneCompletionForAFailedScenario() {
+        val events = new ArrayList<String>();
+        val logger = new LifecycleScenarioLogger(events);
+        val evaluator = new ScriptedEvaluator(step -> step.index() == 2 ? Outcome.FAIL : Outcome.PASS);
+
+        val result = new ScenarioExecutor(evaluator, logger).execute(threeSteps());
+
+        assertThat(result.passed()).isFalse();
+        assertThat(events).containsExactly("scenario:Order lifecycle", "completed:FAIL");
+    }
+
+    @Test
+    void logsPartialResultWhenExecutionIsAbortedByInfrastructureFailure() {
+        val events = new ArrayList<String>();
+        val logger = new LifecycleScenarioLogger(events);
+        StepRunner runner = request -> {
+            throw new IllegalStateException("transport unavailable");
+        };
+        val executor = new ScenarioExecutor(runner, logger);
+
+        assertThatThrownBy(() -> executor.execute(threeSteps()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("transport unavailable");
+        assertThat(events).containsExactly("scenario:Order lifecycle", "aborted:0");
+    }
+
+    @Test
+    void scenarioCallbacksComposeInInvocationOrder() {
+        val events = new ArrayList<String>();
+        val first = new NamedScenarioCallback(events, "first");
+        val second = new NamedScenarioCallback(events, "second");
+        val result = new ScenarioResult(threeSteps(), List.of());
+        val failure = new IllegalStateException("failed");
+        val callback = first.andThen(second);
+
+        callback.scenarioStarted(threeSteps());
+        callback.scenarioAborted(result, failure);
+        callback.scenarioCompleted(result);
+
+        assertThat(events).containsExactly(
+                "first:started", "second:started",
+                "first:aborted", "second:aborted",
+                "first:completed", "second:completed");
+    }
+
+    private static List<String> executionOrder(Consumer<ScenarioExecutor> invocation) {
+        val order = new ArrayList<String>();
+        StepRunner runner = request -> {
+            order.add("run:" + request.step().title());
+            return new StepRun(
+                    new StepVerdict(Outcome.PASS, "scripted", List.of()),
+                    List.of(), Duration.ZERO);
+        };
+        invocation.accept(new ScenarioExecutor(runner, new OrderingScenarioLogger(order)));
+        return List.copyOf(order);
+    }
+
     /** A {@link StepRunner} that returns scripted outcomes and records calls. */
     private static final class ScriptedEvaluator implements StepRunner {
 
@@ -125,6 +208,76 @@ class ScenarioExecutorTest {
             return new StepRun(
                     new StepVerdict(script.apply(request.step()), "scripted", List.of("evidence")),
                     List.of(), Duration.ZERO);
+        }
+    }
+
+    private static final class OrderingScenarioLogger implements ScenarioExecutionCallback {
+
+        private final List<String> order;
+
+        private OrderingScenarioLogger(List<String> order) {
+            this.order = order;
+        }
+
+        @Override
+        public void scenarioStarted(Scenario scenario) {
+            order.add("scenario:" + scenario.name());
+        }
+
+        @Override
+        public void scenarioAborted(ScenarioResult partialResult, Throwable cause) {
+            order.add("aborted:" + partialResult.scenario().name());
+        }
+
+        @Override
+        public void scenarioCompleted(ScenarioResult result) {
+            // Completion is not relevant to the before-run ordering assertion.
+        }
+
+    }
+
+    private static final class LifecycleScenarioLogger implements ScenarioExecutionCallback {
+
+        private final List<String> events;
+
+        private LifecycleScenarioLogger(List<String> events) {
+            this.events = events;
+        }
+
+        @Override
+        public void scenarioStarted(Scenario scenario) {
+            events.add("scenario:" + scenario.name());
+        }
+
+        @Override
+        public void scenarioAborted(ScenarioResult partialResult, Throwable cause) {
+            events.add("aborted:" + partialResult.results().size());
+        }
+
+        @Override
+        public void scenarioCompleted(ScenarioResult result) {
+            events.add("completed:" + (result.passed() ? "PASS" : "FAIL"));
+        }
+
+    }
+
+    private record NamedScenarioCallback(
+            List<String> events,
+            String name) implements ScenarioExecutionCallback {
+
+        @Override
+        public void scenarioStarted(Scenario scenario) {
+            events.add(name + ":started");
+        }
+
+        @Override
+        public void scenarioAborted(ScenarioResult partialResult, Throwable cause) {
+            events.add(name + ":aborted");
+        }
+
+        @Override
+        public void scenarioCompleted(ScenarioResult result) {
+            events.add(name + ":completed");
         }
     }
 }

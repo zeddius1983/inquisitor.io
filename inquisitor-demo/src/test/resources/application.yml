@@ -20,7 +20,14 @@ spring:
       enabled: always
 
 inquisitor:
+  logging:
+    markdown:
+      palette: catppuccin
   harness:
+    logging:
+      # Render scenario, step, actor, and judge lifecycle events through the
+      # optional inquisitor-logback-markdown-starter on the test runtime.
+      format: markdown
     evaluation:
       # Optional step evaluation (LLM-as-judge): scores each verdict against the real
       # tool trace. The module default is off; this demo test profile turns it on so
@@ -32,8 +39,3 @@ inquisitor:
       # back to spring.ai.openai.api-key when unset.
       base-url: ${INQUISITOR_EVAL_BASE_URL:http://127.0.0.1:8001}
       model: ${INQUISITOR_EVAL_MODEL:Qwen3.6-35B-A3B-Q8_0}
-
-logging:
-  level:
-    # Trace each harness tool call (inputs and outputs) during scenario runs.
-    io.inquisitor.harness.tool: DEBUG

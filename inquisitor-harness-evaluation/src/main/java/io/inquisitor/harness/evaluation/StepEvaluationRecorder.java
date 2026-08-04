@@ -16,6 +16,7 @@
 
 package io.inquisitor.harness.evaluation;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -32,9 +33,35 @@ import org.springframework.ai.evaluation.EvaluationResponse;
  * Collects one {@link StepEvaluationRecord} per evaluated step, in execution order, and
  * aggregates the suite-level evaluation score. Thread-safe.
  */
-public class StepEvaluationRecorder {
+public class StepEvaluationRecorder implements EvaluationStepRunnerCallback {
 
     private final List<StepEvaluationRecord> records = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void evaluationStarted(StepRequest request, StepRun actorRun) {
+        // Nothing to record until evaluation finishes or is abandoned.
+    }
+
+    @Override
+    public void evaluationSkipped(StepRequest request, StepRun actorRun, String reason) {
+        recordNotEvaluated(request, actorRun, reason);
+    }
+
+    @Override
+    public void evaluationFailed(StepRequest request, StepRun actorRun, Throwable cause) {
+        recordNotEvaluated(request, actorRun,
+                "The judge call failed (" + cause.getClass().getSimpleName() + ": "
+                        + cause.getMessage() + "); not evaluated.");
+    }
+
+    @Override
+    public void evaluationCompleted(
+            StepRequest request,
+            StepRun actorRun,
+            EvaluationResponse response,
+            Duration elapsed) {
+        record(request, actorRun, response);
+    }
 
     /** Records the evaluator's result for one step. */
     public void record(StepRequest request, StepRun run, EvaluationResponse response) {
@@ -54,7 +81,7 @@ public class StepEvaluationRecorder {
     }
 
     private static StepEvaluationRecord build(StepRequest request, StepRun run,
-            double score, @Nullable String category, String feedback) {
+            double score, @Nullable String category, @Nullable String feedback) {
         val scenario = request.scenario();
         val step = request.step();
         val verdict = run.verdict();
@@ -67,13 +94,13 @@ public class StepEvaluationRecorder {
                 .stepCount(scenario.steps().size())
                 .stepTitle(step.title())
                 .outcome(verdict.outcome())
-                .reasoning(verdict.reasoning())
+                .reasoning(verdict.reasoning() == null ? "" : verdict.reasoning())
                 .evidence(verdict.evidence())
                 .toolCalls(run.toolCalls().stream().map(ToolCallRecord::describe).toList())
                 .elapsedMillis(run.elapsed().toMillis())
                 .score(score)
                 .category(category)
-                .feedback(feedback)
+                .feedback(feedback == null ? "" : feedback)
                 .build();
     }
 

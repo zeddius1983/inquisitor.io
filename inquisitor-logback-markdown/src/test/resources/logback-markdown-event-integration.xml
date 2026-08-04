@@ -1,0 +1,15 @@
+<configuration>
+    <include resource="io/inquisitor/logback/markdown.xml"/>
+
+    <appender name="EVENT_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${TEST_LOG}</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%mdEvent{plain}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="EVENT_FILE"/>
+    </root>
+</configuration>

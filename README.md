@@ -77,6 +77,8 @@ plain CI build (see [Building](#building)).
 
 | Module | Role |
 |--------|------|
+| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` and clean `%mdEvent` Logback converters for ANSI-styled console Markdown. |
+| `inquisitor-logback-markdown-starter` | Automatic shared or marker-only Markdown rendering for compatible Spring Boot Logback consoles. |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness. |
 | `inquisitor-harness-junit` | JUnit 5 layer: `@Harness` on the class + one `@Scenario` method per scenario, each step a sub-test. |
@@ -119,6 +121,94 @@ Then write a `@Harness` test class with one `@Scenario` method per markdown file
 under `src/test/resources/scenarios/`. The scenario file is resolved from the
 method name (`transferBetweenAccounts()` → `transfer-between-accounts.md`) or set
 explicitly with `@Scenario("classpath:scenarios/custom.md")`.
+
+## Harness logging
+
+Plain harness logging keeps scenario start/completion at INFO and detailed actor,
+tool, and judge diagnostics at DEBUG. Markdown logging emits its complete marked
+narrative at INFO. Choose plain text (the default) or marker-tagged Markdown:
+
+```yaml
+inquisitor:
+  harness:
+    logging:
+      format: markdown # plain | markdown
+```
+
+Plain mode keeps the output operational and compact: scenario and step starts
+include their names and lifecycle state, but do not repeat the Markdown
+descriptions or instructions. Enable the two narrow logger namespaces to see
+the step, tool, verdict, and evaluation diagnostics without enabling
+framework-wide DEBUG logging:
+
+```yaml
+logging:
+  level:
+    io.inquisitor.harness.logging: DEBUG
+    io.inquisitor.harness.evaluation.logging: DEBUG # when evaluation is enabled
+```
+
+With `format: markdown` and the optional Logback Markdown starter, no logger-level
+configuration is required. All Markdown harness events are emitted at INFO. Its
+default `auto` console mode recognizes the harness format and switches compatible
+console appenders to an exclusive Markdown stream: marked events are retained,
+while ordinary Spring, application,
+and SQL events are omitted from the console. File and structured appenders keep
+their existing behavior. Each event starts with a compact Powerline header such as
+`13:42:15.123INFO`; the timestamp uses a neutral Gruvbox background, with INFO
+green, WARN yellow, ERROR red, DEBUG purple, and TRACE gray. Exclusive mode is
+installed during Boot's early logging lifecycle, so framework startup output is
+also omitted. Rendered content is indented four spaces and complete events are
+separated by blank lines. Powerline breadcrumbs, Markdown emphasis, tables, and
+code highlighting use the same muted Gruvbox Dark palette instead of bright ANSI
+primary colors. Set `inquisitor.logging.markdown.palette` to `nord`,
+`catppuccin`, or `tokyo-night` to select another built-in palette; `gruvbox`
+remains the default. Additional named palettes can be contributed through the
+renderer module's `MarkdownPaletteProvider` ServiceLoader SPI.
+
+In Markdown mode, the harness logs each scenario, step, tool call, and evaluation
+event at INFO. The first
+nonblank actor-model name reported by real response metadata is cached without a
+probe request. In Markdown mode, it becomes a step-breadcrumb segment as soon as
+it is available: normally on the first completion and every later step event.
+Before that, the model segment is simply omitted—no unresolved placeholder is
+printed.
+
+In `markdown` format, events use the portable `INQUISITOR_MARKDOWN` SLF4J marker.
+With the optional renderer, actor step starts and completions use a
+Powerlevel10k-style pill breadcrumb for actual model (when resolved), scenario,
+step, progress, and status. Provider-reported model file paths are reduced to the
+filename without the `.gguf` extension.
+HTTP tool calls use the same style for target hostname, method, path, and response status;
+request headers and bodies plus response bodies are rendered as syntax-highlighted
+code blocks. Valid JSON bodies are pretty-printed for the log only, and sensitive
+header values such as authorization tokens and cookies are redacted. SQL tool calls
+show the resolved datasource and execution status, followed by highlighted statement
+and result blocks.
+The harness is intended for tests against local services and therefore logs HTTP
+bodies and SQL results without general-purpose content redaction. Use test data and
+test credentials; do not point verbose harness logging at production systems or
+production datasets.
+Completion breadcrumbs add a human-scale duration segment (`842 ms`, `13.289 s`,
+`2 min 5.4 s`). Their rounded Powerline caps require a patched font with the
+Powerline extra-symbol range; the underlying Markdown remains readable when ANSI
+is disabled.
+When evaluation is enabled, judge starts use the same breadcrumb with `EVALUATION`.
+Judge results include the actual judge model, category, labeled score, and
+judge-call duration, followed by wrapped feedback in a Markdown blockquote.
+Choose how they appear:
+
+- add no rendering dependency to keep readable raw Markdown in ordinary logs;
+- add [`inquisitor-logback-markdown`](inquisitor-logback-markdown/README.md) and
+  configure `%mdMsg{marked}` for manual Logback control;
+- add
+  [`inquisitor-logback-markdown-starter`](inquisitor-logback-markdown-starter/README.md)
+  for automatic rendering and a clean marker-only console in compatible Spring
+  Boot layouts.
+
+The harness itself depends on neither optional Markdown module and remains
+portable to other SLF4J backends. Actor and judge invocation diagnostics remain
+at DEBUG under their respective logger implementations.
 
 ## Optional: OpenAPI discovery
 
@@ -222,7 +312,7 @@ database setup.
 
 ## Releasing to Maven Central
 
-The four library modules plus `inquisitor-bom` publish to Maven Central through
+The published library modules plus `inquisitor-bom` publish to Maven Central through
 the [Central Portal](https://central.sonatype.com) via the
 [Vanniktech maven-publish plugin](https://vanniktech.github.io/gradle-maven-publish-plugin/)
 (`inquisitor.publish-conventions`). The demo and the (unimplemented) mock modules

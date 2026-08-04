@@ -7,15 +7,23 @@ jspecify         = "1.0.0"
 dependency-mgmt  = "1.1.7"
 lombok           = "1.18.38"
 vanniktech       = "0.36.0"
+logback          = "1.5.32"
+slf4j            = "2.0.17"
+jansi            = "4.3.1"
 
 [libraries]
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 spring-ai-bom            = { module = "org.springframework.ai:spring-ai-bom",              version.ref = "spring-ai" }
 flexmark-all             = { module = "com.vladsch.flexmark:flexmark-all",                 version.ref = "flexmark" }
+flexmark-core            = { module = "com.vladsch.flexmark:flexmark",                     version.ref = "flexmark" }
+flexmark-tables          = { module = "com.vladsch.flexmark:flexmark-ext-tables",          version.ref = "flexmark" }
 junit-jupiter            = { module = "org.junit.jupiter:junit-jupiter",                   version.ref = "junit-jupiter" }
 jspecify                 = { module = "org.jspecify:jspecify",                             version.ref = "jspecify" }
 lombok                   = { module = "org.projectlombok:lombok",                          version.ref = "lombok" }
 vanniktech-maven-publish = { module = "com.vanniktech:gradle-maven-publish-plugin",        version.ref = "vanniktech" }
+logback-classic          = { module = "ch.qos.logback:logback-classic",                    version.ref = "logback" }
+slf4j-api                = { module = "org.slf4j:slf4j-api",                               version.ref = "slf4j" }
+jansi                    = { module = "org.jline:jansi",                                  version.ref = "jansi" }
 
 [plugins]
 spring-boot            = { id = "org.springframework.boot",         version.ref = "spring-boot" }
