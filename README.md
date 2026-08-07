@@ -3,6 +3,8 @@
 [![build](https://github.com/zeddius1983/inquisitor.io/actions/workflows/build.yml/badge.svg)](https://github.com/zeddius1983/inquisitor.io/actions/workflows/build.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.inquisitor/inquisitor-bom)](https://central.sonatype.com/namespace/io.inquisitor)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![site](https://img.shields.io/badge/site-inquisitor.io-fe8019?logo=firefox&logoColor=white)](https://inquisitor.io)
+[![donate](https://img.shields.io/badge/donate-BTC%20%C2%B7%20USDT-d3869b?logo=bitcoin&logoColor=white)](https://inquisitor.io/#donate)
 
 **LLM-driven integration testing for Spring applications.**
 
