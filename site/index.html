@@ -631,8 +631,10 @@ testImplementation("io.inquisitor:inquisitor-harness-junit-starter")'>copy</butt
   // QR modal
   (function () {
     var overlay = document.getElementById("qr-overlay");
+    var closeBtn = document.getElementById("qr-close");
     var title = document.getElementById("qr-title");
     var addr = document.getElementById("qr-addr");
+    var lastFocus = null;
     var meta = {
       "qr-btc": { label: "btc — bitcoin", text: "bc1qn5dwcstsh4gyp0t4nrzjrchyk7clrg7d8wq977" },
       "qr-usdt": { label: "usdt — tron (trc-20)", text: "TFUmi4so6xfHdcAYB5a9bzvs1tR2u2XmM9" }
@@ -643,17 +645,29 @@ testImplementation("io.inquisitor:inquisitor-harness-junit-starter")'>copy</butt
       });
       title.textContent = meta[id].label;
       addr.textContent = meta[id].text;
+      lastFocus = document.activeElement;
       overlay.hidden = false;
-      document.getElementById("qr-close").focus();
+      closeBtn.focus();
     }
-    function close() { overlay.hidden = true; }
+    function close() {
+      overlay.hidden = true;
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+      lastFocus = null;
+    }
     document.querySelectorAll(".qr-btn").forEach(function (btn) {
       btn.addEventListener("click", function () { open(btn.dataset.qr); });
     });
-    document.getElementById("qr-close").addEventListener("click", close);
+    closeBtn.addEventListener("click", close);
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && !overlay.hidden) close();
+      if (overlay.hidden) return;
+      if (e.key === "Escape") {
+        close();
+      } else if (e.key === "Tab") {
+        // the close button is the dialog's only focusable control — keep focus on it
+        e.preventDefault();
+        closeBtn.focus();
+      }
     });
   })();
 </script>
