@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inquisitor.io / harness — Integration tests in Markdown, executed by an LLM</title>
+<style>
+  :root {
+    --bg: #0c0a0b; --panel: #131011; --panel2: #171314; --line: #2b2325; --line2: #3d3134;
+    --fg: #e9e2d6; --dim: #a29689; --faint: #6e6259;
+    --crimson: #c9283d; --crimson-b: #e8455b; --gold: #c9a227;
+    --green: #7fa650; --blue: #6f92b0; --purple: #a4788f; --aqua: #6fa08c;
+    --serif: "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif;
+    --mono: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--serif);
+    font-size: 17px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+  ::selection { background: rgba(201,40,61,.45); }
+  a { color: var(--crimson-b); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+  /* nav */
+  nav { display: flex; align-items: baseline; gap: 20px; padding: 26px 0;
+    border-bottom: 1px solid var(--line); }
+  .brand { font-size: 19px; letter-spacing: .02em; }
+  .brand b { font-weight: 700; }
+  .brand .mod { font-family: var(--mono); font-size: 12px; color: var(--crimson-b);
+    border: 1px solid rgba(201,40,61,.5); padding: 2px 9px; margin-left: 10px;
+    letter-spacing: .1em; vertical-align: 2px; }
+  nav .links { margin-left: auto; display: flex; gap: 22px; font-size: 14px;
+    font-family: var(--mono); }
+  nav .links a { color: var(--dim); } nav .links a:hover { color: var(--fg); }
+
+  /* hero */
+  header { padding: 84px 0 64px; }
+  .overline { font-family: var(--mono); font-size: 12.5px; letter-spacing: .34em;
+    text-transform: uppercase; color: var(--crimson); margin-bottom: 26px; }
+  .overline::after { content: ""; display: block; width: 64px; height: 1px;
+    background: var(--crimson); margin-top: 14px; }
+  h1 { font-size: clamp(34px, 5.4vw, 56px); line-height: 1.15; font-weight: 400;
+    letter-spacing: -.01em; margin-bottom: 24px; }
+  h1 em { font-style: italic; color: var(--crimson-b); }
+  .sub { color: var(--dim); font-size: 18.5px; max-width: 58ch; margin-bottom: 34px; }
+  .cta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .btn { display: inline-block; padding: 11px 30px; font-family: var(--mono);
+    font-size: 13.5px; letter-spacing: .12em; text-transform: uppercase; transition: .18s; }
+  .btn.primary { background: var(--crimson); color: #f5efe4; }
+  .btn.primary:hover { background: var(--crimson-b); text-decoration: none; }
+  .btn.ghost { color: var(--fg); border: 1px solid var(--line2); }
+  .btn.ghost:hover { border-color: var(--dim); text-decoration: none; }
+  .tags { color: var(--faint); font-size: 13px; font-family: var(--mono); }
+
+  /* code plates */
+  .plate { background: var(--panel); border: 1px solid var(--line); margin: 34px 0 10px; }
+  .plate .bar { display: flex; align-items: center; padding: 9px 18px;
+    border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px;
+    color: var(--faint); letter-spacing: .06em; }
+  .plate .bar::before { content: "❧"; color: var(--crimson); margin-right: 12px; font-size: 14px; }
+  .plate pre { padding: 20px 24px; overflow-x: auto; font-family: var(--mono);
+    font-size: 13.5px; line-height: 1.65; color: #ddd3c4; }
+  .caption { color: var(--faint); font-size: 14px; font-style: italic; }
+  .caption b { color: var(--dim); font-weight: 700; font-style: normal; }
+
+  /* markdown tokens */
+  .md-h { color: var(--crimson-b); font-weight: 700; }
+  .md-b { color: var(--gold); font-weight: 700; }
+  .md-c { color: var(--aqua); background: rgba(111,160,140,.1); padding: 0 5px; }
+  .md-li { color: var(--faint); }
+  .md-fence { color: var(--faint); }
+  .md-http { color: var(--green); font-weight: 700; }
+  /* java tokens */
+  .j-k { color: var(--crimson-b); } .j-a { color: var(--gold); } .j-s { color: var(--green); }
+  .j-t { color: var(--blue); } .j-f { color: var(--purple); }
+  .j-c { color: var(--faint); font-style: italic; }
+  /* run log */
+  .lg-dim { color: var(--faint); } .lg-ok { color: var(--green); font-weight: 700; }
+  .lg-http { color: var(--blue); } .lg-judge { color: var(--purple); } .lg-time { color: var(--faint); }
+  .chip { padding: 0 8px; font-weight: 700; font-size: 12px; letter-spacing: .05em; }
+  .chip.scn { background: rgba(111,146,176,.18); color: var(--blue); }
+  .chip.stp { background: rgba(255,255,255,.06); color: var(--dim); }
+  .chip.ok { background: rgba(127,166,80,.16); color: var(--green); }
+  .chip.run { background: rgba(201,162,39,.16); color: var(--gold); }
+  .chip.model { background: rgba(164,120,143,.16); color: var(--purple); }
+
+  /* sections */
+  section { padding: 72px 0; border-top: 1px solid var(--line); }
+  .numeral { font-family: var(--serif); font-style: italic; font-size: 15px;
+    color: var(--crimson); letter-spacing: .28em; text-transform: uppercase; margin-bottom: 14px; }
+  .numeral::before { content: "§ "; }
+  h2 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 400; margin-bottom: 14px; }
+  h2 em { font-style: italic; color: var(--crimson-b); }
+  .lead { color: var(--dim); max-width: 62ch; margin-bottom: 36px; }
+
+  /* how it works */
+  .steps { counter-reset: step; }
+  .step { display: grid; grid-template-columns: 84px 1fr; gap: 22px; padding: 22px 0;
+    border-bottom: 1px dotted var(--line2); }
+  .step:last-of-type { border-bottom: none; }
+  .step .n { counter-increment: step; font-size: 40px; font-style: italic;
+    color: var(--line2); line-height: 1; }
+  .step .n::before { content: counter(step, upper-roman) "."; }
+  .step h3 { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+  .step p { color: var(--dim); font-size: 15.5px; }
+  .step p code, .benefit p code { font-family: var(--mono); font-size: .85em;
+    color: var(--aqua); background: rgba(111,160,140,.1); padding: 1px 5px; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 26px; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+  .tab { font-family: var(--mono); font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
+    background: none; border: none; color: var(--faint); padding: 10px 2px 12px; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: var(--fg); border-bottom-color: var(--crimson); }
+  .panel { display: none; } .panel.active { display: block; }
+  .panel .plate { margin-top: 26px; }
+  .dialect-note { color: var(--dim); font-size: 15.5px; margin-top: 14px; max-width: 68ch; }
+  .dialect-note b { color: var(--fg); }
+
+  /* benefits */
+  .benefits { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); }
+  .benefit { padding: 26px 28px; border-bottom: 1px solid var(--line); }
+  .benefit:nth-child(odd) { border-right: 1px solid var(--line); }
+  .benefit:nth-last-child(-n+2) { border-bottom: none; }
+  .benefit h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .benefit h3::before { content: "✦ "; color: var(--crimson); font-size: 13px; vertical-align: 2px; }
+  .benefit p { color: var(--dim); font-size: 15px; }
+  .benefit p b { color: var(--fg); }
+
+  /* limitations */
+  .limit { display: grid; grid-template-columns: 180px 1fr; gap: 24px; padding: 20px 0;
+    border-bottom: 1px dotted var(--line2); }
+  .limit:last-of-type { border-bottom: none; }
+  .limit h4 { font-family: var(--mono); font-size: 12px; letter-spacing: .16em;
+    color: var(--gold); padding-top: 4px; }
+  .limit p { color: var(--dim); font-size: 15.5px; }
+  .limit p b { color: var(--fg); }
+  .limits-note { color: var(--faint); font-size: 15px; font-style: italic; margin-top: 26px;
+    max-width: 64ch; border-left: 2px solid var(--crimson); padding-left: 18px; }
+
+  /* start */
+  .start-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .start-grid .plate { margin: 0; }
+
+  footer { border-top: 1px solid var(--line); padding: 38px 0 56px; color: var(--faint);
+    font-size: 14px; font-family: var(--mono); }
+  footer .egg { margin-top: 10px; font-size: 12px; color: #241d1f; }
+  footer .egg:hover { color: var(--crimson); }
+
+  @supports (animation-timeline: view()) {
+    .rv {
+      animation: rv-in .9s ease both;
+      animation-timeline: view();
+      animation-range: entry 5% entry 45%;
+    }
+  }
+  @keyframes rv-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (max-width: 820px) {
+    .benefits, .start-grid { grid-template-columns: 1fr; }
+    .benefit:nth-child(odd) { border-right: none; }
+    .benefit:nth-last-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .benefit:last-child { border-bottom: none; }
+    .limit { grid-template-columns: 1fr; gap: 6px; }
+    .step { grid-template-columns: 56px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav>
+    <span class="brand"><b>inquisitor</b>.io<span class="mod">HARNESS</span></span>
+    <span class="links">
+      <a href="#how">method</a>
+      <a href="#limits">limitations</a>
+      <a href="https://github.com/zeddius1983/inquisitor">github</a>
+    </span>
+  </nav>
+
+  <header>
+    <div class="overline">AI-driven integration testing</div>
+    <h1>Integration tests, written in plain Markdown.<br>
+        <em>Executed by an LLM.</em></h1>
+    <p class="sub">The harness reads your scenario, drives your Spring Boot application through
+      real HTTP and SQL calls, and passes judgment on every step — reported as ordinary
+      JUnit tests.</p>
+    <div class="cta">
+      <a class="btn primary" href="#start">Begin</a>
+      <a class="btn ghost" href="https://github.com/zeddius1983/inquisitor">Source</a>
+    </div>
+    <p class="tags">Spring Boot 4 · JUnit 5 · Spring AI · Apache-2.0 · v0.6.0</p>
+
+    <div class="plate">
+      <div class="bar">scenarios/intent/open-account-and-deposit.md</div>
+      <pre><span class="md-h"># Open an account and make a deposit</span>
+
+<span class="md-h">## Open an account</span>
+Open a new bank account for a customer named "Alice", denominated
+in US dollars. It should be created successfully and start with a
+zero balance.
+
+<span class="md-h">## Deposit funds</span>
+Deposit 500.00 into Alice's newly opened account. The deposit
+should succeed and her balance should then read 500.00.
+
+<span class="md-h">## Confirm the balance</span>
+Look Alice's account up again and confirm its balance is 500.00
+and its currency is US dollars.</pre>
+    </div>
+    <p class="caption"><b>This is the entire test.</b> No endpoints, no request bodies, no
+      assertions in code — the harness works out the calls from your OpenAPI spec.</p>
+  </header>
+
+  <section id="how">
+    <div class="numeral">I · The method</div>
+    <h2 class="rv">Markdown in, <em>verdicts</em> out.</h2>
+    <p class="lead rv">Three moving parts, one of which is a text file.</p>
+    <div class="steps">
+      <div class="step rv"><span class="n"></span>
+        <div><h3>Write scenarios in Markdown</h3>
+        <p>Drop <code>.md</code> files under <code>src/test/resources/scenarios/</code>. Each
+           <code>## heading</code> is a step — write it as strictly or as loosely as you like:
+           fenced requests, Gherkin, or plain intent.</p></div></div>
+      <div class="step rv"><span class="n"></span>
+        <div><h3>Annotate a test class</h3>
+        <p>One test-scope dependency, one <code>@Harness</code> annotation, one empty
+           <code>@Scenario</code> method per scenario — the Markdown is resolved from the
+           method name.</p></div></div>
+      <div class="step rv"><span class="n"></span>
+        <div><h3>The LLM takes it from there</h3>
+        <p>An LLM actor reads each step, calls your running app over HTTP or checks the database
+           over SQL, and issues a verdict. Every step is its own JUnit sub-test in your IDE
+           and CI.</p></div></div>
+    </div>
+
+    <div class="plate rv">
+      <div class="bar">ScenarioSuiteTest.java</div>
+      <pre><span class="j-a">@Harness</span>(scenarioDir = <span class="j-s">"classpath:scenarios/"</span>)
+<span class="j-a">@SpringBootTest</span>(webEnvironment = RANDOM_PORT)
+<span class="j-k">class</span> <span class="j-t">ScenarioSuiteTest</span> {
+
+    <span class="j-a">@Scenario</span> <span class="j-k">void</span> <span class="j-f">openAccountAndDeposit</span>() {}
+    <span class="j-a">@Scenario</span> <span class="j-k">void</span> <span class="j-f">overdraftRejected</span>() {}
+    <span class="j-a">@Scenario</span> <span class="j-k">void</span> <span class="j-f">transferBetweenAccounts</span>() {}
+}</pre>
+    </div>
+  </section>
+
+  <section id="dialects">
+    <div class="numeral">II · The dialects</div>
+    <h2 class="rv">One scenario, <em>three</em> dialects.</h2>
+    <p class="lead rv">The same test, written three ways. Pick the style your team already
+      speaks — or mix them. All three run unchanged.</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="t-explicit">Explicit</button>
+      <button class="tab" data-tab="t-cucumber">Cucumber</button>
+      <button class="tab" data-tab="t-intent">Intent</button>
+    </div>
+
+    <div class="panel active" id="t-explicit">
+      <div class="plate">
+        <div class="bar">scenarios/explicit/open-account-and-deposit.md</div>
+        <pre><span class="md-h"># Open an account and make a deposit</span>
+
+<span class="md-h">## Step 1 — Open an account</span>
+
+<span class="md-b">**Intent:**</span> Open a new account for "Alice" in USD.
+
+<span class="md-fence">```</span>
+<span class="md-http">POST</span> /accounts
+{ "owner": "Alice", "currency": "USD" }
+<span class="md-fence">```</span>
+
+<span class="md-b">**Expected response**</span>
+<span class="md-li">-</span> Status: <span class="md-c">201 Created</span>
+<span class="md-li">-</span> Body has a numeric <span class="md-c">id</span>
+<span class="md-li">-</span> <span class="md-c">balance</span> is <span class="md-c">0.00</span>
+
+<span class="md-h">## Step 2 — Deposit funds</span>
+
+<span class="md-b">**Intent:**</span> Deposit 500.00 into the account opened in Step 1.
+
+<span class="md-fence">```</span>
+<span class="md-http">POST</span> /accounts/{id}/deposits
+{ "amount": 500.00 }
+<span class="md-fence">```</span>
+
+<span class="md-b">**Expected response**</span>
+<span class="md-li">-</span> Status: <span class="md-c">201 Created</span>
+<span class="md-li">-</span> <span class="md-c">balance</span> is <span class="md-c">500.00</span></pre>
+      </div>
+      <p class="dialect-note"><b>Prescriptive.</b> Fenced requests and bulleted expectations —
+        the closest to a conventional test, and the easiest for a smaller model to follow.</p>
+    </div>
+
+    <div class="panel" id="t-cucumber">
+      <div class="plate">
+        <div class="bar">scenarios/cucumber/open-account-and-deposit.md</div>
+        <pre><span class="md-h"># Open an account and make a deposit</span>
+
+<span class="md-h">## Open the account</span>
+
+<span class="md-li">-</span> <span class="md-b">**Given**</span> Alice has no account yet
+<span class="md-li">-</span> <span class="md-b">**When**</span> she opens a new account in USD
+<span class="md-li">-</span> <span class="md-b">**Then**</span> the response is <span class="md-c">201 Created</span>
+<span class="md-li">-</span> <span class="md-b">**And**</span> the returned account has a numeric <span class="md-c">id</span>,
+  a <span class="md-c">balance</span> of <span class="md-c">0.00</span>, and <span class="md-c">currency</span> USD
+
+<span class="md-h">## Make a deposit</span>
+
+<span class="md-li">-</span> <span class="md-b">**Given**</span> Alice's newly opened account
+<span class="md-li">-</span> <span class="md-b">**When**</span> <span class="md-c">500.00</span> is deposited into it
+<span class="md-li">-</span> <span class="md-b">**Then**</span> the response is <span class="md-c">201 Created</span>
+<span class="md-li">-</span> <span class="md-b">**And**</span> her <span class="md-c">balance</span> now reads <span class="md-c">500.00</span></pre>
+      </div>
+      <p class="dialect-note"><b>Gherkin, without Cucumber.</b> Given/When/Then your QA team
+        already writes — except there are no step definitions, no glue code, no regex. The prose
+        <i>is</i> the implementation.</p>
+    </div>
+
+    <div class="panel" id="t-intent">
+      <div class="plate">
+        <div class="bar">scenarios/intent/open-account-and-deposit.md</div>
+        <pre><span class="md-h"># Open an account and make a deposit</span>
+
+<span class="md-h">## Open an account</span>
+
+Open a new bank account for a customer named "Alice", denominated
+in US dollars. It should be created successfully and start with a
+zero balance.
+
+<span class="md-h">## Deposit funds</span>
+
+Deposit 500.00 into Alice's newly opened account. The deposit
+should succeed and her balance should then read 500.00.
+
+<span class="md-h">## Confirm the balance</span>
+
+Look Alice's account up again and confirm its balance is 500.00
+and its currency is US dollars.</pre>
+      </div>
+      <p class="dialect-note"><b>Pure intent.</b> Names no endpoints, paths, or payloads. With
+        OpenAPI discovery enabled, the harness reads your spec and works out the calls itself —
+        rename <b>/accounts</b> and this test still passes.</p>
+    </div>
+  </section>
+
+  <section id="run">
+    <div class="numeral">III · The proceedings</div>
+    <h2 class="rv">Watch it <em>run</em>.</h2>
+    <p class="lead rv">Harness runs narrate themselves — Markdown-rendered console output with
+      per-step verdicts and timings, in the muted Gruvbox palette the harness actually ships.</p>
+
+    <div class="plate rv">
+      <div class="bar">INQUISITOR_LLM_IT=true ./gradlew test</div>
+      <pre><span class="chip scn">SCENARIO</span> <span class="lg-dim">▶</span> Open an account and make a deposit <span class="lg-dim">▶</span> <span class="chip run">RUN</span>
+
+<span class="md-h"># Open an account and make a deposit</span>
+
+<span class="chip stp">STEP 1/3</span> <span class="lg-dim">▶</span> <span class="chip model">gemma-4-31b</span> <span class="lg-dim">▶</span> Open the account
+    <span class="lg-http">POST /accounts</span> <span class="lg-dim">…</span> <span class="lg-ok">201 Created</span>
+<span class="chip stp">STEP 1/3</span> <span class="lg-dim">▶</span> Open the account <span class="lg-dim">▶</span> <span class="chip ok">PASS</span> <span class="lg-time">⧖ 9.4s</span>
+
+<span class="chip stp">STEP 2/3</span> <span class="lg-dim">▶</span> Make a deposit
+    <span class="lg-http">POST /accounts/1/deposits</span> <span class="lg-dim">…</span> <span class="lg-ok">201 Created</span>
+<span class="chip stp">STEP 2/3</span> <span class="lg-dim">▶</span> Make a deposit <span class="lg-dim">▶</span> <span class="chip ok">PASS</span> <span class="lg-time">⧖ 7.1s</span>
+
+<span class="chip stp">STEP 3/3</span> <span class="lg-dim">▶</span> Read the account back
+    <span class="lg-http">GET /accounts/1</span> <span class="lg-dim">…</span> <span class="lg-ok">200 OK</span>
+    <span class="lg-judge">⚖ judge: verdict grounded in tool trace — PASS</span>
+<span class="chip stp">STEP 3/3</span> <span class="lg-dim">▶</span> Read the account back <span class="lg-dim">▶</span> <span class="chip ok">PASS</span> <span class="lg-time">⧖ 6.8s</span>
+
+<span class="chip scn">SCENARIO</span> <span class="lg-dim">▶</span> Open an account and make a deposit <span class="lg-dim">▶</span> <span class="chip ok">3/3 PASS</span> <span class="lg-time">⧖ 23s</span>
+
+<span class="lg-ok">BUILD SUCCESSFUL</span> <span class="lg-dim">in 41s</span></pre>
+    </div>
+    <p class="caption">The <b>⚖ judge</b> line is the optional evaluation module: a second model
+      scoring the actor's verdict against the real tool-call trace.</p>
+  </section>
+
+  <section id="why">
+    <div class="numeral">IV · The case for it</div>
+    <h2 class="rv">Real benefits, <em>not vibes</em>.</h2>
+    <p class="lead rv">Everything below is implemented and exercised by the reference demo today.</p>
+    <div class="benefits">
+      <div class="benefit rv"><h3>Tests anyone can read — and write</h3>
+        <p>A scenario is living documentation. Product owners and QA can review it in a PR, or
+           author it themselves. No DSL to learn; Markdown is the DSL.</p></div>
+      <div class="benefit rv"><h3>Survives refactors</h3>
+        <p>Intent-style scenarios don't hard-code paths or payloads. Restructure your API and
+           the test that states the <b>business</b> outcome keeps passing.</p></div>
+      <div class="benefit rv"><h3>Probes like a human tester</h3>
+        <p>Calibrated by mutation testing: the demo suite runs against deliberately buggy
+           builds, and the current baseline flags <b>3 of 3</b> planted bugs.</p></div>
+      <div class="benefit rv"><h3>Ordinary JUnit 5 underneath</h3>
+        <p>Each step reports as its own sub-test. Your IDE, Gradle, and CI treat scenarios like
+           any other test class — green ticks, red traces, standard reports.</p></div>
+      <div class="benefit rv"><h3>A judge for the judge</h3>
+        <p>Optional LLM-as-judge evaluation re-scores every verdict against the recorded
+           HTTP/SQL trace; <code>./gradlew evaluate</code> writes an HTML report — measure how
+           trustworthy your oracle is.</p></div>
+      <div class="benefit rv"><h3>Local-model friendly</h3>
+        <p>Built and calibrated against a local dense model. No per-run API bill, no test data
+           leaving your machine — or point it at any Spring AI-supported provider.</p></div>
+    </div>
+  </section>
+
+  <section id="limits">
+    <div class="numeral">V · The confession</div>
+    <h2 class="rv">Honest <em>limitations</em>.</h2>
+    <p class="lead rv">An LLM in the test loop buys you expressiveness and costs you guarantees.
+      Know the trade before you make it.</p>
+    <div class="limits">
+      <div class="limit rv"><h4>NONDETERMINISM</h4>
+        <p>An LLM run can flake where a hand-written assert cannot. Treat this as your
+           integration/acceptance layer — <b>it complements your unit suite, it doesn't replace
+           it.</b></p></div>
+      <div class="limit rv"><h4>YOU BRING THE MODEL</h4>
+        <p>An API key (cost, latency) or a capable local model. Small and MoE models tend to
+           hallucinate multi-step tool calls — a strong dense model is recommended.</p></div>
+      <div class="limit rv"><h4>ORACLE TRUST</h4>
+        <p>The actor can occasionally rubber-stamp a verify step without really checking. That's
+           precisely why the evaluation module exists — measure the false-positive rate, don't
+           assume it's zero.</p></div>
+      <div class="limit rv"><h4>SPEED</h4>
+        <p>A scenario is a real conversation with a real app — think seconds per step, not
+           milliseconds. Run scenarios where you'd run integration tests, not on every save.</p></div>
+      <div class="limit rv"><h4>PRE-1.0</h4>
+        <p>APIs still move between minor versions. Pin via the BOM and read the release notes.</p></div>
+      <div class="limit rv"><h4>TOOLING TODAY</h4>
+        <p>The actor currently speaks HTTP and SQL. Message queues and a mock server are on the
+           roadmap, not in the box.</p></div>
+    </div>
+    <p class="limits-note">If your suite needs millisecond determinism, this isn't your tool —
+      and that's fine. Inquisitor is for the layer where you'd otherwise write brittle
+      end-to-end glue or click through the app by hand.</p>
+  </section>
+
+  <section id="start">
+    <div class="numeral">VI · The initiation</div>
+    <h2 class="rv">Two snippets and a <em>scenario</em>.</h2>
+    <p class="lead rv">Configure your model like any Spring AI chat client — plain
+      application.yml, no harness-specific plumbing.</p>
+    <div class="start-grid">
+      <div class="plate rv">
+        <div class="bar">build.gradle.kts</div>
+        <pre><span class="j-f">dependencies</span> {
+    <span class="j-f">testImplementation</span>(<span class="j-f">platform</span>(
+        <span class="j-s">"io.inquisitor:inquisitor-bom:0.6.0"</span>))
+    <span class="j-f">testImplementation</span>(
+        <span class="j-s">"io.inquisitor:inquisitor-harness-junit-starter"</span>)
+}</pre>
+      </div>
+      <div class="plate rv">
+        <div class="bar">shell</div>
+        <pre><span class="j-c"># run the scenario suite</span>
+INQUISITOR_LLM_IT=true ./gradlew test
+
+<span class="j-c"># with LLM-as-judge evaluation + HTML report</span>
+./gradlew evaluate</pre>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>© 2026 inquisitor.io · Apache-2.0 ·
+      <a href="https://github.com/zeddius1983/inquisitor">GitHub</a> ·
+      built on Spring Boot 4 + Spring AI</div>
+    <div class="egg">// nobody expects declarative integration testing</div>
+  </footer>
+
+</div>
+
+<script>
+  document.querySelectorAll(".tab").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".tab").forEach(function (b) { b.classList.remove("active"); });
+      document.querySelectorAll(".panel").forEach(function (p) { p.classList.remove("active"); });
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.tab).classList.add("active");
+    });
+  });
+  // scroll reveal is pure CSS (animation-timeline: view()) — no JS needed
+</script>
+</body>
+</html>
