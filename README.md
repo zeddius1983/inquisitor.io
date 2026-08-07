@@ -1,6 +1,8 @@
-# Inquisitor
+# inquisitor.io
 
 [![build](https://github.com/zeddius1983/inquisitor.io/actions/workflows/build.yml/badge.svg)](https://github.com/zeddius1983/inquisitor.io/actions/workflows/build.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.inquisitor/inquisitor-bom)](https://central.sonatype.com/namespace/io.inquisitor)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 **LLM-driven integration testing for Spring applications.**
 
@@ -17,11 +19,11 @@ test class, and drop your scenarios under `src/test/resources/scenarios/`.
 ```markdown
 # Transfer between accounts
 
-## Step: open two accounts
+## Open two accounts
 **Intent:** create a source and a destination account
 ...
 
-## Step: move money
+## Move money
 **Intent:** transfer 50 from the first account to the second
 ...
 
@@ -55,35 +57,26 @@ plain CI build (see [Building](#building)).
   flows naturally into step 3 — no templating or regex.
 
 > [!WARNING]
-> **An LLM drives and judges these tests, and LLMs are non-deterministic.** The
-> same scenario can pass on one run and fail on another, a weak model may
-> hallucinate a tool result or rubber-stamp a step it never actually verified,
-> and a verdict is only ever as trustworthy as the model behind it. Treat
-> Inquisitor as a complement to deterministic tests, not a replacement — keep
-> hard correctness guarantees in conventional unit/integration tests.
->
-> To keep results as stable as possible:
-> - **Choose the model wisely.** Prefer a capable, instruction-following model
->   and run it at **temperature 0**. Inquisitor's own suite uses a dense local
->   `gemma-4-31B`; MoE models tend to shortcut multi-step scenarios by answering
->   from chat memory instead of calling the tools (see
->   [docs/decisions.md](docs/decisions.md)).
-> - **Write unambiguous scenarios.** Spell out the intent and the expected
->   outcome; the less the model has to guess, the more repeatable the verdict.
-> - **Don't gate critical CI on it blindly.** Review failures — a red step may be
->   a real regression, model flakiness, or an ambiguous scenario.
+> **An LLM drives and judges these tests, and LLMs are non-deterministic.** A
+> scenario can pass on one run and fail on the next, and a verdict is only as
+> trustworthy as the model behind it. Treat Inquisitor as a complement to
+> deterministic tests, not a replacement, and review failures before acting on
+> them — a red step may be a real regression, model flakiness, or an ambiguous
+> scenario.
 
 ## Modules
 
 | Module | Role |
 |--------|------|
-| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` and clean `%mdEvent` Logback converters for ANSI-styled console Markdown. |
-| `inquisitor-logback-markdown-starter` | Automatic shared or marker-only Markdown rendering for compatible Spring Boot Logback consoles. |
 | `inquisitor-harness` | Core scenario execution; Spring AI `ChatClient` orchestration. Parses markdown scenarios (flexmark) and drives the app. |
 | `inquisitor-harness-starter` | Spring Boot autoconfiguration for the harness. |
 | `inquisitor-harness-junit` | JUnit 5 layer: `@Harness` on the class + one `@Scenario` method per scenario, each step a sub-test. |
 | `inquisitor-harness-junit-starter` | Autoconfiguration for the JUnit layer — the single dependency a consumer needs. |
 | `inquisitor-harness-openapi` / `-starter` | Optional OpenAPI discovery: injects your app's spec into the prompt so scenarios can be natural-language intent. Off unless enabled. |
+| `inquisitor-harness-evaluation` / `-starter` | Optional step evaluation (LLM-as-judge): a separate judge model scores each verdict against the recorded tool trace. Off unless enabled. |
+| `inquisitor-harness-evaluation-report` | Writes the evaluation report (HTML by default; markdown/json selectable) when a report directory is configured. Shipped by the evaluation starter; excludable for score-only runs. |
+| `inquisitor-logback-markdown` | Reusable Flexmark-backed `%mdMsg` and `%mdEvent` Logback converters for ANSI-styled console Markdown. |
+| `inquisitor-logback-markdown-starter` | Automatic shared or marker-only Markdown rendering for compatible Spring Boot Logback consoles. |
 | `inquisitor-bom` | Platform BOM aligning the Inquisitor module versions. |
 | `inquisitor-demo` | Banking REST demo app + scenario tests; the reference consumer. |
 
@@ -92,9 +85,16 @@ server and not yet implemented.
 
 ## Getting started
 
-Add the JUnit starter and the BOM to your build (test scope):
+The libraries run on **Java 21+** (building this repo itself needs a Java 26
+toolchain — see [Building](#building)). Add the JUnit starter and the BOM to
+your build (test scope):
 
 ```kotlin
+repositories {
+    mavenCentral()
+    maven("https://repo.spring.io/milestone") // Spring AI 2.0.0-RC1, until its GA reaches Central
+}
+
 dependencies {
     testImplementation(platform("io.inquisitor:inquisitor-bom:<version>"))
     testImplementation("io.inquisitor:inquisitor-harness-junit-starter")
@@ -102,9 +102,7 @@ dependencies {
 ```
 
 Point the harness at an OpenAI-compatible chat model via the standard
-`spring.ai.openai.*` properties (Inquisitor uses a local
-[gemma-4-31B](docs/decisions.md) at temperature 0 for its own tests — dense
-models follow multi-step tool calls more reliably than MoE ones):
+`spring.ai.openai.*` properties:
 
 ```yaml
 spring:
@@ -113,8 +111,7 @@ spring:
       base-url: http://localhost:8000
       api-key: not-needed-for-local
       chat:
-        model: gemma-4-31B-it-QAT-Q4_0
-        temperature: 0.0
+        model: <your-model>
 ```
 
 Then write a `@Harness` test class with one `@Scenario` method per markdown file
@@ -122,11 +119,12 @@ under `src/test/resources/scenarios/`. The scenario file is resolved from the
 method name (`transferBetweenAccounts()` → `transfer-between-accounts.md`) or set
 explicitly with `@Scenario("classpath:scenarios/custom.md")`.
 
+Scenario suites are gated by `@RequiresLlm` so they only run when a model is
+switched on — see [Building](#building) for the `INQUISITOR_LLM_IT` gate.
+
 ## Harness logging
 
-Plain harness logging keeps scenario start/completion at INFO and detailed actor,
-tool, and judge diagnostics at DEBUG. Markdown logging emits its complete marked
-narrative at INFO. Choose plain text (the default) or marker-tagged Markdown:
+Choose plain text (the default) or marker-tagged Markdown narration:
 
 ```yaml
 inquisitor:
@@ -135,11 +133,9 @@ inquisitor:
       format: markdown # plain | markdown
 ```
 
-Plain mode keeps the output operational and compact: scenario and step starts
-include their names and lifecycle state, but do not repeat the Markdown
-descriptions or instructions. Enable the two narrow logger namespaces to see
-the step, tool, verdict, and evaluation diagnostics without enabling
-framework-wide DEBUG logging:
+**Plain** keeps the output operational and compact: scenario and step lifecycle
+at INFO, details at DEBUG. Enable the two narrow logger namespaces to see step,
+tool, verdict, and evaluation diagnostics without framework-wide DEBUG logging:
 
 ```yaml
 logging:
@@ -148,67 +144,34 @@ logging:
     io.inquisitor.harness.evaluation.logging: DEBUG # when evaluation is enabled
 ```
 
-With `format: markdown` and the optional Logback Markdown starter, no logger-level
-configuration is required. All Markdown harness events are emitted at INFO. Its
-default `auto` console mode recognizes the harness format and switches compatible
-console appenders to an exclusive Markdown stream: marked events are retained,
-while ordinary Spring, application,
-and SQL events are omitted from the console. File and structured appenders keep
-their existing behavior. Each event starts with a compact Powerline header such as
-`13:42:15.123INFO`; the timestamp uses a neutral Gruvbox background, with INFO
-green, WARN yellow, ERROR red, DEBUG purple, and TRACE gray. Exclusive mode is
-installed during Boot's early logging lifecycle, so framework startup output is
-also omitted. Rendered content is indented four spaces and complete events are
-separated by blank lines. Powerline breadcrumbs, Markdown emphasis, tables, and
-code highlighting use the same muted Gruvbox Dark palette instead of bright ANSI
-primary colors. Set `inquisitor.logging.markdown.palette` to `nord`,
-`catppuccin`, or `tokyo-night` to select another built-in palette; `gruvbox`
-remains the default. Additional named palettes can be contributed through the
-renderer module's `MarkdownPaletteProvider` ServiceLoader SPI.
-
-In Markdown mode, the harness logs each scenario, step, tool call, and evaluation
-event at INFO. The first
-nonblank actor-model name reported by real response metadata is cached without a
-probe request. In Markdown mode, it becomes a step-breadcrumb segment as soon as
-it is available: normally on the first completion and every later step event.
-Before that, the model segment is simply omitted—no unresolved placeholder is
-printed.
-
-In `markdown` format, events use the portable `INQUISITOR_MARKDOWN` SLF4J marker.
-With the optional renderer, actor step starts and completions use a
-Powerlevel10k-style pill breadcrumb for actual model (when resolved), scenario,
-step, progress, and status. Provider-reported model file paths are reduced to the
-filename without the `.gguf` extension.
-HTTP tool calls use the same style for target hostname, method, path, and response status;
-request headers and bodies plus response bodies are rendered as syntax-highlighted
-code blocks. Valid JSON bodies are pretty-printed for the log only, and sensitive
-header values such as authorization tokens and cookies are redacted. SQL tool calls
-show the resolved datasource and execution status, followed by highlighted statement
-and result blocks.
-The harness is intended for tests against local services and therefore logs HTTP
-bodies and SQL results without general-purpose content redaction. Use test data and
-test credentials; do not point verbose harness logging at production systems or
-production datasets.
-Completion breadcrumbs add a human-scale duration segment (`842 ms`, `13.289 s`,
-`2 min 5.4 s`). Their rounded Powerline caps require a patched font with the
-Powerline extra-symbol range; the underlying Markdown remains readable when ANSI
-is disabled.
-When evaluation is enabled, judge starts use the same breadcrumb with `EVALUATION`.
-Judge results include the actual judge model, category, labeled score, and
-judge-call duration, followed by wrapped feedback in a Markdown blockquote.
-Choose how they appear:
+**Markdown** emits the complete narrative at INFO as events tagged with the
+portable `INQUISITOR_MARKDOWN` SLF4J marker: Powerline-style breadcrumbs for
+scenario, step, model, progress, and status; HTTP and SQL tool calls with
+syntax-highlighted payloads (JSON pretty-printed, authorization/cookie headers
+redacted); judge results with model, score, and feedback. Rendering is optional
+and layered:
 
 - add no rendering dependency to keep readable raw Markdown in ordinary logs;
 - add [`inquisitor-logback-markdown`](inquisitor-logback-markdown/README.md) and
   configure `%mdMsg{marked}` for manual Logback control;
 - add
   [`inquisitor-logback-markdown-starter`](inquisitor-logback-markdown-starter/README.md)
-  for automatic rendering and a clean marker-only console in compatible Spring
-  Boot layouts.
+  for automatic rendering: compatible console appenders switch to an exclusive
+  marked-events-only stream (framework noise omitted), while file and structured
+  appenders keep their existing behavior.
 
-The harness itself depends on neither optional Markdown module and remains
-portable to other SLF4J backends. Actor and judge invocation diagnostics remain
-at DEBUG under their respective logger implementations.
+Colors use a muted Gruvbox Dark palette by default;
+`inquisitor.logging.markdown.palette` selects `nord`, `catppuccin`, or
+`tokyo-night`, and additional palettes plug in through the renderer module's
+`MarkdownPaletteProvider` ServiceLoader SPI. Powerline caps want a patched font
+with the Powerline symbol range; the underlying Markdown stays readable when
+ANSI is disabled. The harness itself depends on neither optional Markdown module
+and remains portable to other SLF4J backends.
+
+> The harness is intended for tests against local services and logs HTTP bodies
+> and SQL results without general-purpose content redaction. Use test data and
+> test credentials; do not point verbose harness logging at production systems
+> or production datasets.
 
 ## Optional: OpenAPI discovery
 
@@ -255,29 +218,34 @@ action.
 > The spec is sent to the model. With a remote model, treat a large or sensitive API
 > description accordingly.
 
-## Verified models
+## Optional: step evaluation (LLM-as-judge)
 
-Results of running the scenario suite (7 scenarios) against various models. The
-list is empirical, not exhaustive — other models may work; these are the ones
-that have been benchmarked. Contributions of further results are welcome.
+The actor model that drives your app also judges each step — and can occasionally
+rubber-stamp a verdict it never really checked. The evaluation module puts a
+**second, independent judge model** behind it: every verdict is re-scored against
+the recorded HTTP/SQL tool trace, so you can measure how trustworthy your oracle
+is instead of assuming it.
 
-| Model | Quantization | Reasoning | Passed | Duration |
-|-------|--------------|-----------|--------|----------|
-| `gemma-4-31B-it-QAT` | `Q4_0` | off | 100% | 10m 31s |
-| `gemma-4-31B-it-QAT` | `Q4_0` | on | 100% | 13m 53s |
-| `gemma-4-12B-it-QAT` | `Q4_0` | off | 86% | 3m 35s |
-| `gemma-4-12B-it-QAT` | `Q4_0` | on | 100% | 6m 16s |
-| `GLM-4.7-Flash` | `Q4_K_M` | off | 0% | — |
-| `GLM-4.7-Flash` | `Q4_K_M` | on | 100% | 2m 43s |
+```kotlin
+testImplementation("io.inquisitor:inquisitor-harness-evaluation-starter")
+```
 
-With reasoning **off**, the 12B model fails the multi-step "Import accounts from
-CSV and plain text" scenario — it skips one of the import calls and rubber-stamps
-the step from chat memory rather than actually executing it. Turning reasoning
-**on** recovers it (100%), at roughly 1.75× the runtime. So thinking buys
-reliability when a model is otherwise too weak for a multi-step step, but only
-costs time once the model is already capable enough (the 31B passes either way) —
-which is why the recommendation above is a default to revisit per model, not an
-absolute.
+```yaml
+inquisitor:
+  harness:
+    evaluation:
+      enabled: true                    # explicit opt-in
+      base-url: http://localhost:8001  # the judge's own endpoint
+      model: <judge-model>             # ideally a different family from the actor
+      # api-key:                       # falls back to spring.ai.openai.api-key
+```
+
+Use a genuinely separate judge — a different model family on its own server, not
+a self-judge — for scores that mean something. When `inquisitor.report.dir` is
+set, the test session also writes a step-by-step evaluation report there (HTML by
+default, grouped by suite and scenario; markdown and json renderers are
+selectable). The module is fully optional and removable without touching the
+core.
 
 ## Building
 
@@ -288,6 +256,10 @@ Docker/Podman for Testcontainers.
 ./gradlew build                       # compile + test everything
 ./gradlew :inquisitor-demo:bootRun    # run the demo app (local profile)
 ```
+
+Every push and PR is verified by the
+[`build`](.github/workflows/build.yml) workflow (`./gradlew build` on a JDK 26
+runner with Docker for Testcontainers).
 
 The scenario suites that actually call an LLM are annotated `@RequiresLlm`, which
 skips them unless a model is configured — so a plain `./gradlew build` stays green
@@ -310,76 +282,12 @@ The demo's `local` profile starts a Postgres Testcontainer automatically
 (`postgres:17-alpine`, reuse enabled) and runs Flyway migrations — no manual
 database setup.
 
-## Releasing to Maven Central
-
-The published library modules plus `inquisitor-bom` publish to Maven Central through
-the [Central Portal](https://central.sonatype.com) via the
-[Vanniktech maven-publish plugin](https://vanniktech.github.io/gradle-maven-publish-plugin/)
-(`inquisitor.publish-conventions`). The demo and the (unimplemented) mock modules
-are not published.
-
-**One-time setup** (none of this lives in the repo):
-
-1. Create a Central Portal account and **verify the `io.inquisitor` namespace** —
-   the Portal gives you a DNS `TXT` record to add to the `inquisitor.io` domain.
-2. Generate a GPG key and publish its public half to a keyserver:
-   ```bash
-   gpg --gen-key
-   gpg --keyserver keys.openpgp.org --send-keys <KEY_ID>
-   ```
-3. Generate a **user token** under your Central Portal account settings.
-4. Put the credentials in `~/.gradle/gradle.properties`:
-   ```properties
-   mavenCentralUsername=<portal-token-username>
-   mavenCentralPassword=<portal-token-password>
-
-   signingInMemoryKey=<armored-private-key>
-   signingInMemoryKeyPassword=<key-passphrase>
-   ```
-   `signingInMemoryKey` must be the **whole** ASCII-armored private key on one
-   line with the line breaks escaped as `\n` — including the blank line after the
-   `-----BEGIN-----` header. Generate it with:
-   ```bash
-   gpg --armor --export-secret-keys <KEY_ID> | awk '{sub(/\r/,""); printf "%s\\n", $0;}'
-   ```
-
-**Cut a release locally:**
-
-1. Set the release `version` in `gradle.properties` (currently `0.1.0`).
-2. Upload, then release from the Portal (publishing tasks aren't
-   configuration-cache compatible, so disable it):
-   ```bash
-   ./gradlew publishToMavenCentral --no-configuration-cache          # staged deployment
-   # or, to upload and auto-release in one step:
-   ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
-   ```
-   Tip: `./gradlew publishToMavenLocal --no-configuration-cache` signs and writes
-   the artifacts to `~/.m2` so you can verify your key/token wiring without
-   touching Central.
-
-**Or release from CI.** The [`release`](.github/workflows/release.yml) workflow
-runs `build` then `publishAndReleaseToMavenCentral` when a `v*` tag is pushed (or
-on manual dispatch). It reads the same credentials from repository secrets —
-`MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `SIGNING_KEY` (the armored
-private key), `SIGNING_KEY_PASSWORD` — so set those under **Settings → Secrets and
-variables → Actions**, then:
-
-```bash
-git tag v0.1.0 && git push origin v0.1.0
-```
-
-Every push and PR is verified by the [`build`](.github/workflows/build.yml)
-workflow (`./gradlew build` on a JDK 26 runner with Docker for Testcontainers).
-
-> Note: the harness depends on Spring AI `2.0.0-RC1`, which lives in
-> `repo.spring.io/milestone` (not Central). Until a GA Spring AI lands, consumers
-> need that milestone repository on their build to resolve transitive deps.
-
 ## Documentation
 
-- [CLAUDE.md](CLAUDE.md) — stable repo context and conventions.
 - [docs/roadmap.md](docs/roadmap.md) — what's done and what's next.
 - [docs/decisions.md](docs/decisions.md) — the "why" behind the design choices.
+- [CLAUDE.md](CLAUDE.md) — repository context and conventions (also used by AI
+  coding agents working on this codebase).
 
 ## License
 
