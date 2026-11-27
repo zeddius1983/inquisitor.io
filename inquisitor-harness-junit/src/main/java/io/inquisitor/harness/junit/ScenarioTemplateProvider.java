@@ -33,9 +33,12 @@ import io.inquisitor.harness.model.Step;
 import io.inquisitor.harness.model.StepResult;
 import io.inquisitor.harness.parser.ScenarioParser;
 import lombok.val;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 import org.junit.platform.commons.support.AnnotationSupport;
@@ -65,7 +68,6 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
     public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(ExtensionContext context) {
         val applicationContext = SpringExtension.getApplicationContext(context);
         val parser = applicationContext.getBean(ScenarioParser.class);
-        val executor = applicationContext.getBean(ScenarioExecutor.class);
 
         val expect = AnnotationSupport.findAnnotation(
                         context.getRequiredTestMethod(), io.inquisitor.harness.junit.Scenario.class)
@@ -82,12 +84,13 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                 : contextualized;
         // One execution shared by every step invocation of this method; they run
         // sequentially, so each invocation advances the same conversation in order.
-        val state = new ScenarioState(executor.start(scenario), expect);
-        // Each step is its own invocation to Spring's TestContext framework; @Sql fixtures
-        // belong to the scenario as a whole, so they must not re-run between steps.
-        ScenarioSqlScripts.scopeToScenario(context, scenario.steps().size());
-
+        val state = new ScenarioState(scenario, expect);
+        // Each step is its own invocation to Spring's TestContext framework and to JUnit's
+        // lifecycle methods, but the scenario is the test: fixtures, context dirtying, mock
+        // resets and @BeforeEach/@AfterEach belong to it as a whole, not to each step.
         val steps = scenario.steps();
+        ScenarioScopedListeners.scopeToScenario(context, steps.size());
+
         return IntStream.range(0, steps.size())
                 .mapToObj(position -> new StepInvocationContext(steps.get(position), position, state));
     }
@@ -125,16 +128,33 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
     /** Mutable per-scenario state shared across the step invocations. */
     private static final class ScenarioState {
-        private final ScenarioExecution execution;
+        private final Scenario scenario;
         private final Expect expect;
+        /**
+         * Started by the first step, from the application context current <em>then</em>:
+         * a {@code @DirtiesContext} before-mode replaces the context after the template
+         * is expanded, and the scenario must run against the replacement.
+         */
+        private @Nullable ScenarioExecution execution;
         /** Set once no further steps should run: a step failed (PASS), or the expected failure landed (FAIL). */
         private boolean done;
         /** How many step invocations reached test execution (their setup did not fail). */
         private int reached;
 
-        ScenarioState(ScenarioExecution execution, Expect expect) {
-            this.execution = execution;
+        ScenarioState(Scenario scenario, Expect expect) {
+            this.scenario = scenario;
             this.expect = expect;
+        }
+
+        ScenarioExecution execution(ExtensionContext context) {
+            var current = execution;
+            if (current == null) {
+                current = SpringExtension.getApplicationContext(context)
+                        .getBean(ScenarioExecutor.class)
+                        .start(scenario);
+                execution = current;
+            }
+            return current;
         }
     }
 
@@ -148,7 +168,40 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
         @Override
         public List<Extension> getAdditionalExtensions() {
-            return List.of(new StepExecution(position, state));
+            return List.of(
+                    new StepExecution(position, state),
+                    new ScenarioLifecycleMethods(position == 0, position == state.scenario.steps().size() - 1));
+        }
+    }
+
+    /**
+     * Runs the test class's {@code @BeforeEach} methods before the first step only and its
+     * {@code @AfterEach} methods after the last step only, so set-up and clean-up bracket
+     * the scenario instead of running between its steps (e.g. a clean-up that would wipe
+     * the data an earlier step created).
+     */
+    private record ScenarioLifecycleMethods(boolean first, boolean last) implements InvocationInterceptor {
+
+        @Override
+        public void interceptBeforeEachMethod(Invocation<@Nullable Void> invocation,
+                ReflectiveInvocationContext<Method> invocationContext, ExtensionContext extensionContext)
+                throws Throwable {
+            if (first) {
+                invocation.proceed();
+            } else {
+                invocation.skip();
+            }
+        }
+
+        @Override
+        public void interceptAfterEachMethod(Invocation<@Nullable Void> invocation,
+                ReflectiveInvocationContext<Method> invocationContext, ExtensionContext extensionContext)
+                throws Throwable {
+            if (last) {
+                invocation.proceed();
+            } else {
+                invocation.skip();
+            }
         }
     }
 
@@ -169,9 +222,10 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                         ? "skipped: the scenario already failed as expected at an earlier step"
                         : "skipped: an earlier step in this scenario failed");
             }
+            val execution = state.execution(context);
             StepResult result;
             try {
-                result = state.execution.next();
+                result = execution.next();
             } catch (RuntimeException e) {
                 // An infrastructure error (not a verdict): without this, the execution's
                 // cursor hasn't advanced and the *next* sub-test would silently re-run this
@@ -188,7 +242,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                 }
                 // This step passed; once it was the last one, the oracle never caught the fault.
                 // (Safe to read hasNext() here: the step passed, so the execution is not failed.)
-                if (!state.execution.hasNext()) {
+                if (!execution.hasNext()) {
                     state.done = true;
                     throw new AssertionError("Expected this scenario to FAIL, but every step passed — "
                             + "the oracle did not catch the fault.\n" + describe(result));

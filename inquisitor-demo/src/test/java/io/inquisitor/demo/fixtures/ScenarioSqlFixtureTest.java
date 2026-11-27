@@ -19,21 +19,18 @@ package io.inquisitor.demo.fixtures;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.sql.DataSource;
 
-import io.inquisitor.harness.executor.ScenarioExecutor;
-import io.inquisitor.harness.executor.StepRun;
-import io.inquisitor.harness.junit.Harness;
+import io.inquisitor.demo.fixtures.FakeActor.FakeStep;
 import io.inquisitor.harness.junit.Scenario;
-import io.inquisitor.harness.model.Outcome;
-import io.inquisitor.harness.model.StepVerdict;
 import lombok.val;
 import org.junit.jupiter.api.AfterAll;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -41,18 +38,15 @@ import org.springframework.test.context.jdbc.Sql;
 
 /**
  * Pins that an {@link Sql @Sql} fixture on a {@link Scenario @Scenario} applies to the
- * scenario as a whole — once, before the first step — not before every step.
+ * scenario as a whole — once, before the first step — not before every step, while a
+ * {@link ParameterizedTest @ParameterizedTest} in the same class keeps Spring's usual
+ * once-per-invocation behaviour.
  *
- * <p>Deterministic and LLM-free (so it runs in every build, unlike the gated suites): the
- * actor is replaced by a fake that plays the scenario's transfer directly in the database
- * and records Dave's balance at each step. Seeded once, the balance reads 500 → 300 → 300;
- * re-seeded before each step, step 3 would read 500 again. Evaluation is switched off so
- * no judge is consulted on the fake verdicts.
+ * <p>The fake actor plays the scenario's transfer directly in the database and records
+ * Dave's balance at each step. Seeded once, it reads 500 → 300 → 300; re-seeded before
+ * each step, step 3 would read 500 again.
  */
-@Harness(scenarioDir = "classpath:scenarios/explicit/")
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "inquisitor.harness.evaluation.enabled=false")
+@FakeActorTest
 class ScenarioSqlFixtureTest {
 
     private static final long DAVE = 900001L;
@@ -61,9 +55,23 @@ class ScenarioSqlFixtureTest {
     /** Dave's balance as observed by each step, in order. */
     static final List<BigDecimal> DAVE_BALANCE_PER_STEP = new CopyOnWriteArrayList<>();
 
+    @Autowired
+    DataSource dataSource;
+
     @Scenario
     @Sql("/fixtures/seeded-accounts.sql")
     void transferBetweenSeededAccounts() {}
+
+    /** Each invocation is its own test, so each starts from a freshly seeded 500. */
+    @ParameterizedTest
+    @ValueSource(ints = {100, 200})
+    @Sql("/fixtures/seeded-accounts.sql")
+    void parameterizedTestIsSeededPerInvocation(int amount) {
+        val jdbc = JdbcClient.create(dataSource);
+        jdbc.sql("UPDATE account SET balance = balance - ? WHERE id = ?").param(amount).param(DAVE).update();
+
+        assertThat(balance(jdbc)).isEqualByComparingTo(BigDecimal.valueOf(500L - amount));
+    }
 
     @AfterAll
     static void fixtureAppliedOncePerScenario() {
@@ -73,23 +81,22 @@ class ScenarioSqlFixtureTest {
                 .containsExactly(new BigDecimal("500"), new BigDecimal("300"), new BigDecimal("300"));
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class FakeActor {
+    private static BigDecimal balance(JdbcClient jdbc) {
+        return jdbc.sql("SELECT balance FROM account WHERE id = ?").param(DAVE).query(BigDecimal.class).single();
+    }
 
-        /** Replaces the LLM-backed executor: each step acts on and reads the database directly. */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class Steps {
+
         @Bean
-        ScenarioExecutor scenarioExecutor(DataSource dataSource) {
+        FakeStep transferAndObserve(DataSource dataSource) {
             val jdbc = JdbcClient.create(dataSource);
-            return new ScenarioExecutor(request -> {
+            return request -> {
                 if (request.step().index() == TRANSFER_STEP) {
                     jdbc.sql("UPDATE account SET balance = balance - 200 WHERE id = ?").param(DAVE).update();
                 }
-                DAVE_BALANCE_PER_STEP.add(jdbc.sql("SELECT balance FROM account WHERE id = ?")
-                        .param(DAVE)
-                        .query(BigDecimal.class)
-                        .single());
-                return new StepRun(new StepVerdict(Outcome.PASS, "fake actor", List.of()), List.of(), Duration.ZERO);
-            });
+                DAVE_BALANCE_PER_STEP.add(balance(jdbc));
+            };
         }
     }
 }
