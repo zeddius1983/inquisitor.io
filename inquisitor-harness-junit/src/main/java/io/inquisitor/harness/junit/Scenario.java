@@ -34,6 +34,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * parameterized test), the steps share one conversation, and the first failing step
  * fails with the rest skipped.
  *
+ * <p>Spring's {@code @Sql} fixtures apply to the scenario as a whole, not to each
+ * step: {@code BEFORE_TEST_METHOD} scripts run once before the first step and
+ * {@code AFTER_TEST_METHOD} scripts once after the last.
+ *
  * <p>The markdown file is {@link #value()} when given, otherwise it is derived from
  * the method name: camelCase becomes kebab-case plus {@code .md}, resolved against
  * the class's {@link Harness#scenarioDir()} (e.g. {@code transferBetweenAccounts()}

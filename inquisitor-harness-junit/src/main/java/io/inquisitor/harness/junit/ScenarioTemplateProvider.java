@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import io.inquisitor.harness.executor.ScenarioExecution;
@@ -82,8 +83,13 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         // One execution shared by every step invocation of this method; they run
         // sequentially, so each invocation advances the same conversation in order.
         val state = new ScenarioState(executor.start(scenario), expect);
+        // Each step is its own invocation to Spring's TestContext framework; @Sql fixtures
+        // belong to the scenario as a whole, so they must not re-run between steps.
+        ScenarioSqlScripts.scopeToScenario(context, scenario.steps().size());
 
-        return scenario.steps().stream().map(step -> new StepInvocationContext(step, state));
+        val steps = scenario.steps();
+        return IntStream.range(0, steps.size())
+                .mapToObj(position -> new StepInvocationContext(steps.get(position), position, state));
     }
 
     private static String resolveLocation(ExtensionContext context) {
@@ -123,6 +129,8 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         private final Expect expect;
         /** Set once no further steps should run: a step failed (PASS), or the expected failure landed (FAIL). */
         private boolean done;
+        /** How many step invocations reached test execution (their setup did not fail). */
+        private int reached;
 
         ScenarioState(ScenarioExecution execution, Expect expect) {
             this.execution = execution;
@@ -130,7 +138,8 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         }
     }
 
-    private record StepInvocationContext(Step step, ScenarioState state) implements TestTemplateInvocationContext {
+    private record StepInvocationContext(Step step, int position, ScenarioState state)
+            implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
@@ -139,15 +148,22 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
         @Override
         public List<Extension> getAdditionalExtensions() {
-            return List.of(new StepExecution(state));
+            return List.of(new StepExecution(position, state));
         }
     }
 
     /** Executes the next step before the (empty) test body, failing or skipping accordingly. */
-    private record StepExecution(ScenarioState state) implements BeforeTestExecutionCallback {
+    private record StepExecution(int position, ScenarioState state) implements BeforeTestExecutionCallback {
 
         @Override
         public void beforeTestExecution(ExtensionContext context) {
+            if (state.reached++ != position && !state.done) {
+                // An earlier step's setup failed (e.g. its @Sql fixture) before it reached
+                // execution, so the execution's cursor is behind: running next() now would
+                // execute that earlier step under this step's name.
+                state.done = true;
+                throw new TestAbortedException("skipped: an earlier step in this scenario did not run");
+            }
             if (state.done) {
                 throw new TestAbortedException(state.expect == Expect.FAIL
                         ? "skipped: the scenario already failed as expected at an earlier step"
