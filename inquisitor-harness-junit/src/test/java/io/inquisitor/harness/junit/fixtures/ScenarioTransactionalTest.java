@@ -62,6 +62,18 @@ class ScenarioTransactionalTest {
                         .hasMessageContaining("@Transactional is not supported on @Scenario nestedRejected"));
     }
 
+    @Test
+    void transactionalOnAnOverriddenMethodIsRejected() {
+        var results = launch(OverridingSuite.class);
+
+        // The override declares nothing, but Spring finds the overridden method's @Transactional.
+        assertThat(results.get("overridden").getThrowable())
+                .hasValueSatisfying(error -> assertThat(error)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("@Transactional is not supported on @Scenario overridden"));
+        assertThat(results.get("plain").getStatus()).isEqualTo(TestExecutionResult.Status.SUCCESSFUL);
+    }
+
     /** Runs the suite and returns each scenario method's result, keyed by method name. */
     private static Map<String, TestExecutionResult> launch(Class<?> suite) {
         var results = new ConcurrentHashMap<String, TestExecutionResult>();
@@ -113,5 +125,30 @@ class ScenarioTransactionalTest {
             @Scenario("classpath:fixtures/three-steps.md")
             void nestedRejected() {}
         }
+    }
+
+    /** A base whose method is transactional; the suite below overrides it as a scenario. */
+    abstract static class TransactionalBase {
+
+        @Transactional
+        void overridden() {}
+    }
+
+    /** Runs only when launched by the test above, not by the build's own test scan. */
+    @FakeActorTest
+    @EnabledIf("io.inquisitor.harness.junit.fixtures.ScenarioTransactionalTest#launched")
+    static class OverridingSuite extends TransactionalBase {
+
+        @Configuration(proxyBeanMethods = false)
+        @Import(FakeActor.class)
+        static class Config {
+        }
+
+        @Override
+        @Scenario("classpath:fixtures/three-steps.md")
+        void overridden() {}
+
+        @Scenario("classpath:fixtures/three-steps.md")
+        void plain() {}
     }
 }

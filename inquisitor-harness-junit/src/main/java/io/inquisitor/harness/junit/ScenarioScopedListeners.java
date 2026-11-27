@@ -117,7 +117,9 @@ final class ScenarioScopedListeners {
     private static void rejectTransactional(Method method, Class<?> testClass) {
         // The method's own declaration wins (e.g. @Transactional(propagation = NOT_SUPPORTED)
         // opting a scenario out of a class-level @Transactional), as in Spring.
-        val transactional = opensTransaction(MergedAnnotations.from(method))
+        // TYPE_HIERARCHY on the method also finds a declaration on a method it overrides (in a
+        // superclass or interface), as Spring's transaction attribute lookup does.
+        val transactional = opensTransaction(MergedAnnotations.from(method, SearchStrategy.TYPE_HIERARCHY))
                 .or(() -> classOpensTransaction(testClass))
                 .orElse(false);
         if (transactional) {
