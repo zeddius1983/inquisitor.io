@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.inquisitor.harness.junit.Scenario;
 import lombok.val;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.platform.engine.TestExecutionResult;
@@ -53,6 +54,11 @@ class ScenarioTransactionalTest {
                         .isInstanceOf(IllegalStateException.class)
                         .hasMessageContaining("@Transactional is not supported on @Scenario rejected"));
         assertThat(results.get("optedOut").getStatus()).isEqualTo(TestExecutionResult.Status.SUCCESSFUL);
+        // A @Nested class inherits the enclosing class's @Transactional, as in Spring.
+        assertThat(results.get("nestedRejected").getThrowable())
+                .hasValueSatisfying(error -> assertThat(error)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("@Transactional is not supported on @Scenario nestedRejected"));
     }
 
     /** Runs the suite and returns each scenario method's result, keyed by method name. */
@@ -94,5 +100,12 @@ class ScenarioTransactionalTest {
         @Scenario("classpath:fixtures/three-steps.md")
         @Transactional(propagation = Propagation.NOT_SUPPORTED)
         void optedOut() {}
+
+        @Nested
+        class Inner {
+
+            @Scenario("classpath:fixtures/three-steps.md")
+            void nestedRejected() {}
+        }
     }
 }

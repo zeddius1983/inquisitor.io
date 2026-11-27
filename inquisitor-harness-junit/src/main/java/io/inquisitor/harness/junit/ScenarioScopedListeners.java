@@ -29,6 +29,7 @@ import org.springframework.core.annotation.MergedAnnotation;
 import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
 import org.springframework.test.context.TestContext;
+import org.springframework.test.context.TestContextAnnotationUtils;
 import org.springframework.test.context.TestContextManager;
 import org.springframework.test.context.TestExecutionListener;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -117,7 +118,7 @@ final class ScenarioScopedListeners {
         // The method's own declaration wins (e.g. @Transactional(propagation = NOT_SUPPORTED)
         // opting a scenario out of a class-level @Transactional), as in Spring.
         val transactional = opensTransaction(MergedAnnotations.from(method))
-                .or(() -> opensTransaction(MergedAnnotations.from(testClass, SearchStrategy.TYPE_HIERARCHY)))
+                .or(() -> classOpensTransaction(testClass))
                 .orElse(false);
         if (transactional) {
             throw new IllegalStateException("@Transactional is not supported on @Scenario " + method.getName()
@@ -126,6 +127,18 @@ final class ScenarioScopedListeners {
                     + "Seed data with @Sql (committed) and clean up with "
                     + "@Sql(executionPhase = AFTER_TEST_METHOD) instead.");
         }
+    }
+
+    /**
+     * The class's transactional declaration: its own (or a superclass's), else — for a
+     * {@code @Nested} class that inherits its enclosing class's test configuration, as
+     * Spring does by default — the enclosing class's, outwards.
+     */
+    private static Optional<Boolean> classOpensTransaction(Class<?> testClass) {
+        return opensTransaction(MergedAnnotations.from(testClass, SearchStrategy.TYPE_HIERARCHY))
+                .or(() -> TestContextAnnotationUtils.searchEnclosingClass(testClass)
+                        ? classOpensTransaction(testClass.getEnclosingClass())
+                        : Optional.empty());
     }
 
     /** Whether the nearest transactional annotation opens a transaction; empty when there is none. */
