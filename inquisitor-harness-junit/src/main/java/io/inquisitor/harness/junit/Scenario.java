@@ -34,6 +34,26 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * parameterized test), the steps share one conversation, and the first failing step
  * fails with the rest skipped.
  *
+ * <p>The scenario, not the step, is the test as far as per-test lifecycle goes: these
+ * run once before the first step and once after the last, not around every step —
+ * <ul>
+ *   <li>Spring's {@code @Sql} fixtures ({@code BEFORE_TEST_METHOD} /
+ *       {@code AFTER_TEST_METHOD} scripts);</li>
+ *   <li>{@code @DirtiesContext} method modes (and the class's
+ *       {@code BEFORE_EACH_TEST_METHOD} / {@code AFTER_EACH_TEST_METHOD} modes);</li>
+ *   <li>the reset of {@code @MockitoBean} / {@code @MockitoSpyBean} mocks;</li>
+ *   <li>{@code @RecordApplicationEvents} (the events of every step are kept) and the
+ *       test-method events of {@code @BeforeTestMethod} / {@code @AfterTestMethod};</li>
+ *   <li>the test class's JUnit {@code @BeforeEach} / {@code @AfterEach} methods.</li>
+ * </ul>
+ * A test-managed {@code @Transactional} is rejected: the application under test serves
+ * requests on its own threads and could never see the test's uncommitted data. Seed
+ * with {@code @Sql} and clean up with an {@code AFTER_TEST_METHOD} script instead.
+ *
+ * <p>This is specific to {@code @Scenario}: {@code @Test}, {@code @ParameterizedTest}
+ * and other templates in the same class keep Spring's and JUnit's usual
+ * per-invocation behaviour.
+ *
  * <p>The markdown file is {@link #value()} when given, otherwise it is derived from
  * the method name: camelCase becomes kebab-case plus {@code .md}, resolved against
  * the class's {@link Harness#scenarioDir()} (e.g. {@code transferBetweenAccounts()}

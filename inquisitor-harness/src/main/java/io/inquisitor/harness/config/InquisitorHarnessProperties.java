@@ -16,6 +16,7 @@
 
 package io.inquisitor.harness.config;
 
+import java.util.List;
 import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
@@ -34,18 +35,35 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param targets     extra HTTP targets, keyed by the name a scenario refers to
  * @param datasources extra JDBC datasources, keyed by the name a scenario refers to
  * @param logging     harness logging presentation settings
+ * @param sql         SQL tool settings
  */
 @ConfigurationProperties("inquisitor.harness")
 public record InquisitorHarnessProperties(
         Map<String, Target> targets,
         Map<String, Datasource> datasources,
-        Logging logging) {
+        Logging logging,
+        Sql sql) {
 
     @ConstructorBinding
     public InquisitorHarnessProperties {
         targets = targets == null ? Map.of() : Map.copyOf(targets);
         datasources = datasources == null ? Map.of() : Map.copyOf(datasources);
         logging = logging == null ? new Logging(HarnessLoggingFormat.PLAIN) : logging;
+        sql = sql == null ? new Sql(List.of()) : sql;
+    }
+
+    /**
+     * Creates properties with the default SQL settings, for source compatibility.
+     *
+     * @param targets     extra HTTP targets, keyed by name
+     * @param datasources extra JDBC datasources, keyed by name
+     * @param logging     harness logging presentation settings
+     */
+    public InquisitorHarnessProperties(
+            Map<String, Target> targets,
+            Map<String, Datasource> datasources,
+            Logging logging) {
+        this(targets, datasources, logging, new Sql(List.of()));
     }
 
     /**
@@ -58,6 +76,26 @@ public record InquisitorHarnessProperties(
             Map<String, Target> targets,
             Map<String, Datasource> datasources) {
         this(targets, datasources, new Logging(HarnessLoggingFormat.PLAIN));
+    }
+
+    /**
+     * SQL tool settings.
+     *
+     * @param scriptLocations the {@code classpath:} roots the SQL script tool looks up
+     *                        script files under (in any subdirectory); defaults to
+     *                        {@code classpath:fixtures/}
+     */
+    @SuppressWarnings("ConstantValue") // binding passes null for an unset list
+    public record Sql(List<String> scriptLocations) {
+
+        /** Where the SQL script tool looks for script files when none are configured. */
+        public static final String DEFAULT_SCRIPT_LOCATION = "classpath:fixtures/";
+
+        public Sql {
+            scriptLocations = scriptLocations == null || scriptLocations.isEmpty()
+                    ? List.of(DEFAULT_SCRIPT_LOCATION)
+                    : List.copyOf(scriptLocations);
+        }
     }
 
     /**

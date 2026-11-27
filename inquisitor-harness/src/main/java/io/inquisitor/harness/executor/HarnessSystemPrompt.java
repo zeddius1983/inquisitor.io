@@ -49,6 +49,9 @@ public final class HarnessSystemPrompt {
               Do not backslash-escape the quotes ({\\"fromId\\": 1}); the body is
               sent verbatim, so escaped quotes reach the app as literal characters
               and it rejects the payload as malformed.
+            - When a step says to run or apply a SQL script file (e.g. accounts.sql),
+              run that file with the SQL script tool by its name; do not retype its
+              statements as individual queries.
             - Compare numbers by value, not text: 0.0000 equals 0.00, and 500 equals
               500.00. Formatting differences alone never fail an expectation.
 

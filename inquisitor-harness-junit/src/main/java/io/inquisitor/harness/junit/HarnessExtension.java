@@ -21,6 +21,7 @@ import io.inquisitor.harness.tool.HttpTarget;
 import io.inquisitor.harness.tool.HttpTargetRegistry;
 import lombok.val;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
@@ -32,11 +33,25 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  * <p>The target depends on the random server port, so it cannot be registered by
  * the starter autoconfiguration. When there is no web server (e.g. a SQL-only
  * suite), registration is skipped.
+ *
+ * <p>It registers again right before execution: a {@code @DirtiesContext} before-mode
+ * replaces the application context (and its port) during Spring's own before-each
+ * phase, which may run after this extension's, and the replacement's registry would
+ * otherwise have no target.
  */
-public class HarnessExtension implements BeforeEachCallback {
+public class HarnessExtension implements BeforeEachCallback, BeforeTestExecutionCallback {
 
     @Override
     public void beforeEach(ExtensionContext context) {
+        register(context);
+    }
+
+    @Override
+    public void beforeTestExecution(ExtensionContext context) {
+        register(context);
+    }
+
+    private static void register(ExtensionContext context) {
         val applicationContext = SpringExtension.getApplicationContext(context);
         val port = applicationContext.getEnvironment().getProperty("local.server.port");
         if (port != null) {

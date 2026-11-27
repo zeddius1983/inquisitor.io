@@ -48,6 +48,7 @@ import io.inquisitor.harness.tool.DataSourceRegistry;
 import io.inquisitor.harness.tool.HttpRequestTool;
 import io.inquisitor.harness.tool.HttpTarget;
 import io.inquisitor.harness.tool.HttpTargetRegistry;
+import io.inquisitor.harness.tool.SqlScriptTool;
 import io.inquisitor.harness.tool.SqlTool;
 import lombok.val;
 import org.springframework.ai.chat.client.ChatClient;
@@ -81,7 +82,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * not here.
  *
  * <p>Tools offered to the model are aggregated from three sources: the built-in
- * {@link HttpRequestTool}/{@link SqlTool}, any user-supplied {@link ToolCallback}
+ * {@link HttpRequestTool}/{@link SqlTool}/{@link SqlScriptTool}, any user-supplied {@link ToolCallback}
  * beans, and any {@link ToolCallbackProvider} beans (e.g. MCP).
  */
 // Ordered after the OpenAI model autoconfig so the ChatModel bean exists before our
@@ -179,6 +180,13 @@ public class InquisitorHarnessAutoConfiguration {
         return new SqlTool(registry, logger);
     }
 
+    @Bean
+    @ConditionalOnMissingBean
+    SqlScriptTool inquisitorSqlScriptTool(
+            DataSourceRegistry registry, InquisitorHarnessProperties properties, SqlLogger logger) {
+        return new SqlScriptTool(registry, properties.sql().scriptLocations(), logger);
+    }
+
     // The built-in tools are exposed as individual ToolCallback beans (each tool has one
     // @Tool method) so the optional evaluation starter can decorate them — a
     // BeanPostProcessor wrapping each ToolCallback to record its calls — without the core
@@ -193,6 +201,12 @@ public class InquisitorHarnessAutoConfiguration {
     @ConditionalOnMissingBean(name = "inquisitorSqlToolCallback")
     ToolCallback inquisitorSqlToolCallback(SqlTool sqlTool) {
         return ToolCallbacks.from(sqlTool)[0];
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "inquisitorSqlScriptToolCallback")
+    ToolCallback inquisitorSqlScriptToolCallback(SqlScriptTool sqlScriptTool) {
+        return ToolCallbacks.from(sqlScriptTool)[0];
     }
 
     @Bean

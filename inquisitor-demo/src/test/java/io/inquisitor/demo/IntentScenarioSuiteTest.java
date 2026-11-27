@@ -21,6 +21,7 @@ import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
 import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.jdbc.Sql;
 
 /**
  * Exercises OpenAPI discovery over the full positive suite: the {@code intent}
@@ -63,4 +64,11 @@ class IntentScenarioSuiteTest {
 
     @Scenario
     void importAccounts() {}
+
+    @Scenario
+    @Sql("/fixtures/seeded-accounts.sql")
+    void transferBetweenSeededAccounts() {}
+
+    @Scenario
+    void transferBetweenScriptSeededAccounts() {}
 }

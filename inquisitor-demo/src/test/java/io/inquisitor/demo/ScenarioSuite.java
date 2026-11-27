@@ -19,6 +19,7 @@ package io.inquisitor.demo;
 import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.jdbc.Sql;
 
 /**
  * The shared scenario suite, run through the ergonomic harness JUnit layer. Each
@@ -64,4 +65,22 @@ abstract class ScenarioSuite {
 
     @Scenario
     void importAccounts() {}
+
+    /**
+     * Starts from accounts seeded by an {@link Sql @Sql} fixture. The fixture applies to
+     * the scenario as a whole — once, before the first step — so the transfer made in one
+     * step is still visible to the balance check in the next; re-seeding between steps
+     * would reset the balances and fail the last step.
+     */
+    @Scenario
+    @Sql("/fixtures/seeded-accounts.sql")
+    void transferBetweenSeededAccounts() {}
+
+    /**
+     * Seeds its own data: the scenario tells the model to run the fixture script
+     * {@code seeded-accounts.sql}, which it does through the SQL script tool (scripts are
+     * looked up under {@code classpath:fixtures/}).
+     */
+    @Scenario
+    void transferBetweenScriptSeededAccounts() {}
 }
