@@ -37,7 +37,8 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 /**
  * Pins that per-test lifecycle brackets a {@link Scenario @Scenario}, not each of its
  * steps: the class's {@link BeforeEach @BeforeEach} runs once before the first step and
- * its {@link AfterEach @AfterEach} once after the last, and
+ * its {@link AfterEach @AfterEach} once after the last — on the same test instance, so
+ * tear-down sees what set-up initialized — and
  * {@link RecordApplicationEvents @RecordApplicationEvents} keeps the events of every step.
  */
 @FakeActorTest
@@ -58,14 +59,19 @@ class ScenarioLifecycleMethodsTest {
     @Scenario("classpath:fixtures/three-steps.md")
     void lifecycleBracketsTheScenario() {}
 
+    /** Initialized by set-up; tear-down must see it although each step has its own instance. */
+    private String resource;
+
     @BeforeEach
     void setUp() {
         BEFORE_EACH.incrementAndGet();
+        resource = "opened";
     }
 
     @AfterEach
     void tearDown() {
         AFTER_EACH.incrementAndGet();
+        assertThat(resource).as("field initialized by @BeforeEach").isEqualTo("opened");
         assertThat(events.stream(StepEvent.class).map(StepEvent::step))
                 .as("events recorded across the scenario")
                 .containsExactly(1, 2, 3);

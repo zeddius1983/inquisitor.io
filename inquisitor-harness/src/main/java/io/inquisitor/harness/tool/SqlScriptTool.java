@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 
 import io.inquisitor.harness.logging.SqlLogger;
@@ -65,7 +64,7 @@ public class SqlScriptTool {
     private final DataSourceRegistry registry;
     private final List<String> locations;
     private final SqlLogger logger;
-    private final ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+    private final ResourcePatternResolver resolver;
 
     public SqlScriptTool(DataSourceRegistry registry) {
         this(registry, List.of(DEFAULT_LOCATION), new PlainSqlLogger());
@@ -77,11 +76,22 @@ public class SqlScriptTool {
      * @param logger    narrates each script run
      */
     public SqlScriptTool(DataSourceRegistry registry, List<String> locations, SqlLogger logger) {
+        this(registry, locations, logger, new PathMatchingResourcePatternResolver());
+    }
+
+    /** Looks scripts up on the given class loader's classpath (for tests). */
+    SqlScriptTool(DataSourceRegistry registry, List<String> locations, SqlLogger logger, ClassLoader classLoader) {
+        this(registry, locations, logger, new PathMatchingResourcePatternResolver(classLoader));
+    }
+
+    private SqlScriptTool(
+            DataSourceRegistry registry, List<String> locations, SqlLogger logger, ResourcePatternResolver resolver) {
         this.registry = registry;
         this.locations = locations.stream()
                 .map(location -> location.endsWith("/") ? location : location + "/")
                 .toList();
         this.logger = logger;
+        this.resolver = resolver;
     }
 
     @Tool(description = "Run a SQL script file (e.g. a test fixture such as accounts.sql) against a datasource. "
@@ -104,12 +114,11 @@ public class SqlScriptTool {
             return "SQL script not found: '" + name + "' under " + locations + ". Available scripts: " + available();
         }
         if (matches.size() > 1) {
-            return "Ambiguous SQL script name '" + name + "': it matches " + matches.keySet()
+            return "Ambiguous SQL script name '" + name + "': it matches " + describe(matches)
                     + ". Give a more specific relative path.";
         }
-        val match = matches.entrySet().iterator().next();
-        val location = match.getKey();
-        val resource = match.getValue();
+        val location = matches.getFirst().location();
+        val resource = matches.getFirst().resource();
 
         val request = new SqlLogger.Request(displayDatasourceName(datasource), "-- " + location + "\n" + read(resource));
         logger.statementStarted(request);
@@ -144,19 +153,46 @@ public class SqlScriptTool {
         return null;
     }
 
-    /** Every script matching {@code name} under the locations, keyed by its display location. */
-    private Map<String, Resource> find(String name) {
-        val matches = new LinkedHashMap<String, Resource>();
+    /** A script found under a location: where it is shown as, and the file itself. */
+    private record Match(String location, Resource resource, String url) {
+    }
+
+    /**
+     * Every distinct script file matching {@code name} under the locations. Files are told
+     * apart by their physical URL, not their display location: two classpath entries (say,
+     * the test resources and a test-support jar) may each hold {@code fixtures/seed.sql},
+     * and that must be reported as ambiguous rather than silently running one of them.
+     */
+    private List<Match> find(String name) {
+        val matches = new LinkedHashMap<String, Match>();
         for (val location : locations) {
             for (val resource : resources(location, "**/" + name)) {
                 // Match whole path segments: "seed.sql" must not match "preseed.sql".
                 val relative = relative(location, resource);
-                if (relative != null && (relative.equals(name) || relative.endsWith("/" + name))) {
-                    matches.putIfAbsent(location + relative, resource);
+                val url = url(resource);
+                if (relative != null && url != null && (relative.equals(name) || relative.endsWith("/" + name))) {
+                    matches.putIfAbsent(url, new Match(location + relative, resource, url));
                 }
             }
         }
-        return matches;
+        return List.copyOf(matches.values());
+    }
+
+    /** The candidates' display locations, with their origin where two would read the same. */
+    private static List<String> describe(List<Match> matches) {
+        return matches.stream()
+                .map(match -> matches.stream().filter(other -> other.location().equals(match.location())).count() > 1
+                        ? match.location() + " (from " + match.url() + ")"
+                        : match.location())
+                .toList();
+    }
+
+    private static @Nullable String url(Resource resource) {
+        try {
+            return resource.getURL().toString();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /** The scripts available under the locations, for a not-found message. */

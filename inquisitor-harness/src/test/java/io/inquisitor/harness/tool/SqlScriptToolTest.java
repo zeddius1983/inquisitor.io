@@ -22,6 +22,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import io.inquisitor.harness.logging.SqlLogger;
@@ -31,6 +36,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -114,6 +120,30 @@ class SqlScriptToolTest {
         assertThat(names()).isEmpty();
         assertThat(tool.sqlScript(null, "b/dup.sql")).startsWith("Executed");
         assertThat(names()).containsExactly("dup-b");
+    }
+
+    @Test
+    void sameRelativePathInTwoClasspathEntriesIsAmbiguous(@TempDir Path testResources, @TempDir Path supportJar)
+            throws IOException {
+        // Two classpath entries that each hold fixtures/twin.sql — e.g. the test resources
+        // and a test-support dependency. They read the same, but are different files.
+        for (val root : List.of(testResources, supportJar)) {
+            Files.createDirectories(root.resolve("fixtures"));
+            Files.writeString(root.resolve("fixtures/twin.sql"),
+                    "INSERT INTO gadget (name) VALUES ('" + root.getFileName() + "');");
+        }
+        val classLoader = new URLClassLoader(
+                new URL[] {testResources.toUri().toURL(), supportJar.toUri().toURL()}, null);
+        val twins = new SqlScriptTool(
+                registry, List.of(SqlScriptTool.DEFAULT_LOCATION), new PlainSqlLogger(), classLoader);
+
+        val result = twins.sqlScript(null, "twin.sql");
+
+        assertThat(result)
+                .startsWith("Ambiguous SQL script name 'twin.sql'")
+                .contains("classpath:fixtures/twin.sql (from " + testResources.toUri().toURL())
+                .contains("classpath:fixtures/twin.sql (from " + supportJar.toUri().toURL());
+        assertThat(names()).isEmpty();
     }
 
     @Test

@@ -34,6 +34,7 @@ import io.inquisitor.harness.model.StepResult;
 import io.inquisitor.harness.parser.ScenarioParser;
 import lombok.val;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 import org.junit.platform.commons.support.AnnotationSupport;
+import org.junit.platform.commons.support.ReflectionSupport;
 import org.opentest4j.TestAbortedException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.Resource;
@@ -140,6 +142,12 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         private boolean done;
         /** How many step invocations reached test execution (their setup did not fail). */
         private int reached;
+        /**
+         * The first step's test instance, which owns the scenario's {@code @BeforeEach} /
+         * {@code @AfterEach}: with JUnit's default per-method lifecycle every step gets a
+         * new instance, and teardown must see the fields setup initialized.
+         */
+        private @Nullable Object lifecycleInstance;
 
         ScenarioState(Scenario scenario, Expect expect) {
             this.scenario = scenario;
@@ -170,7 +178,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         public List<Extension> getAdditionalExtensions() {
             return List.of(
                     new StepExecution(position, state),
-                    new ScenarioLifecycleMethods(position == 0, position == state.scenario.steps().size() - 1));
+                    new ScenarioLifecycleMethods(position == 0, position == state.scenario.steps().size() - 1, state));
         }
     }
 
@@ -179,8 +187,20 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
      * {@code @AfterEach} methods after the last step only, so set-up and clean-up bracket
      * the scenario instead of running between its steps (e.g. a clean-up that would wipe
      * the data an earlier step created).
+     *
+     * <p>Both run on the first step's test instance: under the default per-method
+     * lifecycle the last step has an instance of its own, whose fields {@code @BeforeEach}
+     * never initialized.
      */
-    private record ScenarioLifecycleMethods(boolean first, boolean last) implements InvocationInterceptor {
+    private record ScenarioLifecycleMethods(boolean first, boolean last, ScenarioState state)
+            implements BeforeEachCallback, InvocationInterceptor {
+
+        @Override
+        public void beforeEach(ExtensionContext context) {
+            if (first) {
+                state.lifecycleInstance = context.getRequiredTestInstance();
+            }
+        }
 
         @Override
         public void interceptBeforeEachMethod(Invocation<@Nullable Void> invocation,
@@ -197,11 +217,18 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         public void interceptAfterEachMethod(Invocation<@Nullable Void> invocation,
                 ReflectiveInvocationContext<Method> invocationContext, ExtensionContext extensionContext)
                 throws Throwable {
-            if (last) {
-                invocation.proceed();
-            } else {
+            if (!last) {
                 invocation.skip();
+                return;
             }
+            val owner = state.lifecycleInstance;
+            if (owner == null || owner == invocationContext.getTarget().orElse(null)) {
+                invocation.proceed();
+                return;
+            }
+            invocation.skip();
+            ReflectionSupport.invokeMethod(
+                    invocationContext.getExecutable(), owner, invocationContext.getArguments().toArray());
         }
     }
 
