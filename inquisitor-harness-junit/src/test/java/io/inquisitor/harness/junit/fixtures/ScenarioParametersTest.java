@@ -33,6 +33,7 @@ import io.inquisitor.harness.junit.Scenario;
 import io.inquisitor.harness.junit.fixtures.FakeActor.FakeStep;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -83,6 +84,17 @@ class ScenarioParametersTest {
         return Stream.of(argumentSet("a single owner", "Ivan", 1));
     }
 
+    /** A JUnit Named value: its payload is the value, its name only labels the run. */
+    @Scenario("classpath:fixtures/three-steps.md")
+    @MethodSource("namedValues")
+    void namedValue(String currency) {
+        RESOLVED.add(currency);
+    }
+
+    static Stream<Arguments> namedValues() {
+        return Stream.of(Arguments.of(Named.of("euro case", "EUR")));
+    }
+
     /** A composed argument source: a custom annotation meta-annotated with @CsvSource. */
     @Target(ElementType.METHOD)
     @Retention(RetentionPolicy.RUNTIME)
@@ -115,7 +127,14 @@ class ScenarioParametersTest {
         assertThat(csv).extracting(Seen::seeds).containsExactly(1L, 1L, 1L, 2L, 2L, 2L);
 
         // Typed method parameters, converted from the CSV text (resolved for every step).
-        assertThat(RESOLVED).hasSize(6).allSatisfy(value -> assertThat(value).isInstanceOf(BigDecimal.class));
+        assertThat(RESOLVED).filteredOn(BigDecimal.class::isInstance).hasSize(6);
+
+        // A Named value: the model and the method get the payload, the label gets the name.
+        var namedValue = SEEN.stream()
+                .filter(seen -> seen.scenario().equals("Three steps [currency=euro case]")).toList();
+        assertThat(namedValue).hasSize(3).extracting(Seen::message)
+                .allSatisfy(message -> assertThat(message).startsWith("Parameters for this run:\n- currency: EUR\n\n"));
+        assertThat(RESOLVED).filteredOn(String.class::isInstance).containsExactly("EUR", "EUR", "EUR");
 
         var named = SEEN.stream().filter(seen -> seen.scenario().equals("Three steps [a single owner]")).toList();
         assertThat(named).hasSize(3).extracting(Seen::message)
@@ -126,8 +145,8 @@ class ScenarioParametersTest {
                 .filter(seen -> seen.scenario().equals("Three steps [currency=CHF, amount=5.00]")).toList();
         assertThat(composed).as("runs of the composed @CsvSource").hasSize(3);
 
-        // Once per run: two CSV rows, one named set, one composed row.
-        assertThat(BEFORE_EACH).hasValue(4);
+        // Once per run: two CSV rows, one named set, one Named value, one composed row.
+        assertThat(BEFORE_EACH).hasValue(5);
     }
 
     @Configuration(proxyBeanMethods = false)

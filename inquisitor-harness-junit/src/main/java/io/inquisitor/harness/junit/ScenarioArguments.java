@@ -30,6 +30,7 @@ import java.util.stream.IntStream;
 
 import lombok.val;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
@@ -106,6 +107,13 @@ final class ScenarioArguments {
                             + " from @" + source.getRoot().getType().getSimpleName(), e);
                 }
             }
+            if (!sources.isEmpty() && runs.isEmpty()) {
+                // A declared source that yields nothing is a configuration error (as for
+                // @ParameterizedTest), not an unparameterized scenario: running the steps
+                // without the parameters would hit the application with incomplete input.
+                throw new IllegalStateException("Scenario " + method.getName()
+                        + " declares an argument source, but it provided no arguments");
+            }
             return runs;
         }
 
@@ -114,17 +122,30 @@ final class ScenarioArguments {
             ((AnnotationConsumer<java.lang.annotation.Annotation>) consumer).accept(annotation);
         }
 
+        /**
+         * A {@link Named} value is unwrapped, as {@code @ParameterizedTest} does: its payload
+         * is the parameter value (handed to the model and the method), its name only labels
+         * the run.
+         */
         private static Run run(Method method, Arguments argument) {
-            val values = argument.get();
+            val arguments = argument.get();
+            val values = new @Nullable Object[arguments.length];
             val parameters = new LinkedHashMap<String, String>();
-            for (int i = 0; i < values.length; i++) {
-                parameters.put(name(method, i), String.valueOf(values[i]));
+            val labels = new ArrayList<String>();
+            for (int i = 0; i < arguments.length; i++) {
+                val name = name(method, i);
+                if (arguments[i] instanceof Named<?> named) {
+                    values[i] = named.getPayload();
+                    labels.add(name + "=" + named.getName());
+                } else {
+                    values[i] = arguments[i];
+                    labels.add(name + "=" + arguments[i]);
+                }
+                parameters.put(name, String.valueOf(values[i]));
             }
             val label = argument instanceof Arguments.ArgumentSet set
                     ? set.getName()
-                    : parameters.entrySet().stream()
-                            .map(entry -> entry.getKey() + "=" + entry.getValue())
-                            .collect(Collectors.joining(", "));
+                    : String.join(", ", labels);
             return new Run(label, parameters, values);
         }
 
