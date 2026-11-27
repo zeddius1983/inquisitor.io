@@ -26,7 +26,8 @@ import lombok.val;
  * the evaluator audits.
  *
  * <p>The scenario description is prepended only on the first step; later steps rely on
- * chat memory to carry the context forward.
+ * chat memory to carry the context forward. The run's {@link Scenario#parameters()
+ * parameters}, when present, precede every step.
  */
 final class StepMessages {
 
@@ -35,6 +36,14 @@ final class StepMessages {
 
     static String userMessage(Scenario scenario, Step step) {
         val message = new StringBuilder();
+        if (!scenario.parameters().isEmpty()) {
+            // Repeated with every step (it is short): the scenario text refers to these
+            // values by name and the model works out where each applies.
+            message.append("Parameters for this run:\n");
+            scenario.parameters().forEach((name, value) ->
+                    message.append("- ").append(name).append(": ").append(value).append('\n'));
+            message.append('\n');
+        }
         if (step.index() == 1 && !scenario.description().isBlank()) {
             message.append("Scenario context:\n").append(scenario.description()).append("\n\n");
         }

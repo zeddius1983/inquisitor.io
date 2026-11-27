@@ -16,7 +16,10 @@
 
 package io.inquisitor.harness.model;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import lombok.Builder;
 import lombok.With;
@@ -44,19 +47,34 @@ import org.jspecify.annotations.Nullable;
  *                        with different expectations); optional for standalone runs.
  *                        The evaluation report groups by it, falling back to the
  *                        source directory
+ * @param parameters      named values for this run of the scenario, in declaration
+ *                        order; empty unless the run is parameterized (the JUnit layer
+ *                        sets them from a {@code @Scenario} method's argument source).
+ *                        They are handed to the model as context with every step; the
+ *                        scenario text itself is never rewritten
  */
 @Builder
 @With
 public record Scenario(String name, String description, List<Step> steps, @Nullable String source,
-                       Outcome expectedOutcome, @Nullable String group) {
+                       Outcome expectedOutcome, @Nullable String group, Map<String, String> parameters) {
 
+    @SuppressWarnings("ConstantValue") // the builder passes null for an unset map
     public Scenario {
         steps = List.copyOf(steps);
+        parameters = parameters == null || parameters.isEmpty()
+                ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(parameters));
     }
 
     /** A scenario expected to pass with no group — the parser's default. */
     public Scenario(String name, String description, List<Step> steps, @Nullable String source) {
         this(name, description, steps, source, Outcome.PASS, null);
+    }
+
+    /** A scenario with no parameters. */
+    public Scenario(String name, String description, List<Step> steps, @Nullable String source,
+                    Outcome expectedOutcome, @Nullable String group) {
+        this(name, description, steps, source, expectedOutcome, group, Map.of());
     }
 
     /** Whether this scenario has more than one step. */

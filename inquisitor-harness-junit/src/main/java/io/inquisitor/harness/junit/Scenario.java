@@ -50,6 +50,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * requests on its own threads and could never see the test's uncommitted data. Seed
  * with {@code @Sql} and clean up with an {@code AFTER_TEST_METHOD} script instead.
  *
+ * <p><strong>Parameterized scenarios (experimental).</strong> Add any JUnit argument
+ * source ({@code @CsvSource}, {@code @ValueSource}, {@code @MethodSource}, …) and declare
+ * matching method parameters, and the scenario runs once per argument set, each run with
+ * its own steps, conversation and lifecycle. The values are named after the parameters
+ * and handed to the model as a "Parameters for this run" block with every step; the
+ * scenario text is not rewritten, so it should refer to them by name:
+ *
+ * <pre>{@code
+ * @Scenario
+ * @CsvSource({"EUR, 100.00", "GBP, 0.01"})
+ * void openAccountInCurrency(String currency, BigDecimal deposit) {}
+ * }</pre>
+ *
  * <p>This is specific to {@code @Scenario}: {@code @Test}, {@code @ParameterizedTest}
  * and other templates in the same class keep Spring's and JUnit's usual
  * per-invocation behaviour.
