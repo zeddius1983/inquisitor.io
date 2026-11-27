@@ -40,6 +40,7 @@ import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
+import org.junit.jupiter.api.extension.TestInstances;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 import org.junit.platform.commons.support.AnnotationSupport;
@@ -143,11 +144,12 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         /** How many step invocations reached test execution (their setup did not fail). */
         private int reached;
         /**
-         * The first step's test instance, which owns the scenario's {@code @BeforeEach} /
-         * {@code @AfterEach}: with JUnit's default per-method lifecycle every step gets a
-         * new instance, and teardown must see the fields setup initialized.
+         * The first step's test instances (the test class's and, for a {@code @Nested}
+         * class, each enclosing class's), which own the scenario's {@code @BeforeEach} /
+         * {@code @AfterEach}: with JUnit's default per-method lifecycle every step gets new
+         * instances, and teardown must see the fields setup initialized.
          */
-        private @Nullable Object lifecycleInstance;
+        private @Nullable TestInstances lifecycleInstances;
 
         ScenarioState(Scenario scenario, Expect expect) {
             this.scenario = scenario;
@@ -198,7 +200,7 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         @Override
         public void beforeEach(ExtensionContext context) {
             if (first) {
-                state.lifecycleInstance = context.getRequiredTestInstance();
+                state.lifecycleInstances = context.getRequiredTestInstances();
             }
         }
 
@@ -221,14 +223,17 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
                 invocation.skip();
                 return;
             }
-            val owner = state.lifecycleInstance;
+            // The instance of the class declaring this method: an @AfterEach inherited from
+            // an enclosing class of a @Nested test belongs to the enclosing instance.
+            val instances = state.lifecycleInstances;
+            val method = invocationContext.getExecutable();
+            val owner = instances == null ? null : instances.findInstance(method.getDeclaringClass()).orElse(null);
             if (owner == null || owner == invocationContext.getTarget().orElse(null)) {
                 invocation.proceed();
                 return;
             }
             invocation.skip();
-            ReflectionSupport.invokeMethod(
-                    invocationContext.getExecutable(), owner, invocationContext.getArguments().toArray());
+            ReflectionSupport.invokeMethod(method, owner, invocationContext.getArguments().toArray());
         }
     }
 
