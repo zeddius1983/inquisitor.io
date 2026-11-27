@@ -36,6 +36,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.util.StringUtils;
 
 /**
  * Tool that lets the LLM run a whole SQL script file — typically a fixture a scenario
@@ -219,14 +220,18 @@ public class SqlScriptTool {
         }
     }
 
-    /** The resource's path below whichever copy of {@code location} contains it. */
+    /**
+     * The resource's path below whichever copy of {@code location} contains it, decoded
+     * ({@code seed%20accounts.sql} → {@code seed accounts.sql}) so it compares with the
+     * name the model gives; the raw URL stays the resource's identity.
+     */
     private @Nullable String relative(String location, Resource resource) {
         try {
             val url = resource.getURL().toString();
             for (val root : resolver.getResources(searchable(location))) {
                 val rootUrl = root.getURL().toString();
                 if (url.startsWith(rootUrl)) {
-                    return url.substring(rootUrl.length());
+                    return StringUtils.uriDecode(url.substring(rootUrl.length()), StandardCharsets.UTF_8);
                 }
             }
             return null;

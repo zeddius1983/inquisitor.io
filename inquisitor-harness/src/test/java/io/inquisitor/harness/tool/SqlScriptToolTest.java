@@ -147,6 +147,15 @@ class SqlScriptToolTest {
     }
 
     @Test
+    void findsAndListsScriptsWhoseNamesContainSpaces() {
+        // Resource URLs encode the space as %20; the name the model gives is not encoded.
+        assertThat(tool.sqlScript(null, "seed spaced gadgets.sql"))
+                .isEqualTo("Executed SQL script classpath:fixtures/seed spaced gadgets.sql.");
+        assertThat(names()).containsExactly("spaced");
+        assertThat(tool.sqlScript(null, "missing.sql")).contains("seed spaced gadgets.sql");
+    }
+
+    @Test
     void unknownNameListsTheAvailableScripts() {
         val result = tool.sqlScript(null, "missing.sql");
 
