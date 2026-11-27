@@ -68,4 +68,7 @@ class IntentScenarioSuiteTest {
     @Scenario
     @Sql("/fixtures/seeded-accounts.sql")
     void transferBetweenSeededAccounts() {}
+
+    @Scenario
+    void transferBetweenScriptSeededAccounts() {}
 }

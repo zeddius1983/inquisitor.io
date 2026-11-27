@@ -75,4 +75,12 @@ abstract class ScenarioSuite {
     @Scenario
     @Sql("/fixtures/seeded-accounts.sql")
     void transferBetweenSeededAccounts() {}
+
+    /**
+     * Seeds its own data: the scenario tells the model to run the fixture script
+     * {@code seeded-accounts.sql}, which it does through the SQL script tool (scripts are
+     * looked up under {@code classpath:fixtures/}).
+     */
+    @Scenario
+    void transferBetweenScriptSeededAccounts() {}
 }
