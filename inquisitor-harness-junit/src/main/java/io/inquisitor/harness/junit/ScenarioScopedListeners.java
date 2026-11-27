@@ -79,7 +79,8 @@ final class ScenarioScopedListeners {
 
     /**
      * Scopes the method-phase listeners to the scenario method of {@code context}, whose
-     * {@code steps} invocations are about to run. Call after the Spring context is loaded
+     * step invocations are about to run, {@code steps} per run (a parameterized scenario
+     * has one run per argument set, back to back). Call after the Spring context is loaded
      * (the {@link TestContextManager} then exists).
      *
      * @throws IllegalStateException when the scenario would run in a test-managed transaction
@@ -156,7 +157,7 @@ final class ScenarioScopedListeners {
                 : Optional.empty();
     }
 
-    /** The scenario method whose steps are running, and how many there are. */
+    /** The scenario method whose steps are running, and how many steps each run has. */
     private record Progress(Method method, int steps) {
     }
 
@@ -207,7 +208,9 @@ final class ScenarioScopedListeners {
                 begun = 0;
                 ended = 0;
             }
-            if (begun++ == 0) {
+            // A parameterized scenario runs its steps once per argument set: every run is
+            // its own test as far as these listeners go.
+            if (begun++ % current.steps() == 0) {
                 delegate.beforeTestMethod(testContext);
             }
         }
@@ -227,7 +230,7 @@ final class ScenarioScopedListeners {
             val current = current(testContext);
             if (current == null) {
                 delegate.afterTestMethod(testContext);
-            } else if (current == progress && ++ended == current.steps()) {
+            } else if (current == progress && ++ended % current.steps() == 0) {
                 delegate.afterTestMethod(testContext);
             }
         }
@@ -242,12 +245,11 @@ final class ScenarioScopedListeners {
             return delegate instanceof Ordered ordered ? ordered.getOrder() : Ordered.LOWEST_PRECEDENCE;
         }
 
-        /** Whether the scenario this decorator last began is still between its first and last step. */
+        /** Whether a run of the scenario this decorator last began is between its first and last step. */
         private boolean inProgress(TestContext testContext) {
             return progress != null
                     && testContext.getAttribute(PROGRESS) == progress
-                    && begun > 0
-                    && ended < progress.steps();
+                    && begun % progress.steps() != 0;
         }
 
         /** The progress of the scenario currently running, if this method is one. */

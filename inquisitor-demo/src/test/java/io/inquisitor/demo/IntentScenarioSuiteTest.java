@@ -16,10 +16,13 @@
 
 package io.inquisitor.demo;
 
+import java.math.BigDecimal;
+
 import io.inquisitor.harness.junit.Harness;
 import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
 import io.inquisitor.harness.openapi.EnableOpenApiDiscovery;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.jdbc.Sql;
 
@@ -71,4 +74,8 @@ class IntentScenarioSuiteTest {
 
     @Scenario
     void transferBetweenScriptSeededAccounts() {}
+
+    @Scenario
+    @CsvSource({"Grace, EUR, 250.00", "Heidi, GBP, 0.01"})
+    void openAccountInCurrency(String owner, String currency, BigDecimal deposit) {}
 }

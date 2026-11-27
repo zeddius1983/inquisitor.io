@@ -16,8 +16,11 @@
 
 package io.inquisitor.demo;
 
+import java.math.BigDecimal;
+
 import io.inquisitor.harness.junit.RequiresLlm;
 import io.inquisitor.harness.junit.Scenario;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.jdbc.Sql;
 
@@ -83,4 +86,13 @@ abstract class ScenarioSuite {
      */
     @Scenario
     void transferBetweenScriptSeededAccounts() {}
+
+    /**
+     * Parameterized: one run per CSV row, each reported as its own set of step sub-tests.
+     * The values reach the model as a context block named after the method parameters;
+     * the scenario text refers to them by name and is never rewritten.
+     */
+    @Scenario
+    @CsvSource({"Grace, EUR, 250.00", "Heidi, GBP, 0.01"})
+    void openAccountInCurrency(String owner, String currency, BigDecimal deposit) {}
 }

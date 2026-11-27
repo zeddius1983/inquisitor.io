@@ -17,6 +17,11 @@ dependencies {
     // Resource loading for classpath scenario files.
     implementation("org.springframework:spring-core")
 
+    // Argument sources (@CsvSource, @MethodSource, ...) for parameterized scenarios.
+    // Optional: consumers using them already have it (junit-jupiter); without it every
+    // scenario has a single run.
+    compileOnly("org.junit.jupiter:junit-jupiter-params")
+
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
 
@@ -32,4 +37,10 @@ dependencies {
     // DataSource.
     testImplementation("org.springframework:spring-tx")
     testImplementation("org.mockito:mockito-core")
+}
+
+// Parameterized-scenario tests name their values after the method parameters, which needs
+// the names in the class files — as Spring Boot's Gradle plugin compiles consumer code.
+tasks.named<JavaCompile>("compileTestJava") {
+    options.compilerArgs.add("-parameters")
 }

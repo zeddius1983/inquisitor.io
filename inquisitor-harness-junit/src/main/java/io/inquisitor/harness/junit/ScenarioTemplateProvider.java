@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.IntStream;
@@ -39,6 +40,8 @@ import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 import org.junit.jupiter.api.extension.TestInstances;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
@@ -47,7 +50,9 @@ import org.junit.platform.commons.support.AnnotationSupport;
 import org.junit.platform.commons.support.ReflectionSupport;
 import org.opentest4j.TestAbortedException;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.core.io.Resource;
+import org.springframework.util.ClassUtils;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 /**
@@ -85,17 +90,26 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
         val scenario = expect == Expect.FAIL
                 ? contextualized.withExpectedOutcome(Outcome.FAIL)
                 : contextualized;
-        // One execution shared by every step invocation of this method; they run
-        // sequentially, so each invocation advances the same conversation in order.
-        val state = new ScenarioState(scenario, expect);
+        // A parameterized scenario runs once per argument set; otherwise there is one run.
+        val runs = ScenarioArguments.runs(context);
+        val states = runs.isEmpty()
+                ? List.of(new ScenarioState(scenario, expect, null))
+                : runs.stream()
+                        .map(run -> new ScenarioState(
+                                scenario.withName(scenario.name() + " [" + run.label() + "]")
+                                        .withParameters(run.parameters()),
+                                expect, run))
+                        .toList();
         // Each step is its own invocation to Spring's TestContext framework and to JUnit's
-        // lifecycle methods, but the scenario is the test: fixtures, context dirtying, mock
-        // resets and @BeforeEach/@AfterEach belong to it as a whole, not to each step.
+        // lifecycle methods, but the scenario run is the test: fixtures, context dirtying,
+        // mock resets and @BeforeEach/@AfterEach belong to it as a whole, not to each step.
         val steps = scenario.steps();
         ScenarioScopedListeners.scopeToScenario(context, steps.size());
 
-        return IntStream.range(0, steps.size())
-                .mapToObj(position -> new StepInvocationContext(steps.get(position), position, state));
+        // Within a run, the invocations share one execution and run sequentially, so each
+        // advances the same conversation in order.
+        return states.stream().flatMap(state -> IntStream.range(0, steps.size())
+                .mapToObj(position -> new StepInvocationContext(steps.get(position), position, state)));
     }
 
     private static String resolveLocation(ExtensionContext context) {
@@ -150,10 +164,13 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
          * instances, and teardown must see the fields setup initialized.
          */
         private @Nullable TestInstances lifecycleInstances;
+        /** The argument set of a parameterized run; {@code null} for an unparameterized scenario. */
+        private final ScenarioArguments.@Nullable Run run;
 
-        ScenarioState(Scenario scenario, Expect expect) {
+        ScenarioState(Scenario scenario, Expect expect, ScenarioArguments.@Nullable Run run) {
             this.scenario = scenario;
             this.expect = expect;
+            this.run = run;
         }
 
         ScenarioExecution execution(ExtensionContext context) {
@@ -173,14 +190,44 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
         @Override
         public String getDisplayName(int invocationIndex) {
-            return step.title().isBlank() ? "Step " + step.index() : step.title();
+            val title = step.title().isBlank() ? "Step " + step.index() : step.title();
+            return state.run == null ? title : "[" + state.run.label() + "] " + title;
         }
 
         @Override
         public List<Extension> getAdditionalExtensions() {
-            return List.of(
+            val extensions = new ArrayList<Extension>(List.of(
                     new StepExecution(position, state),
-                    new ScenarioLifecycleMethods(position == 0, position == state.scenario.steps().size() - 1, state));
+                    new ScenarioLifecycleMethods(position == 0, position == state.scenario.steps().size() - 1, state)));
+            if (state.run != null) {
+                extensions.add(new RunArguments(state.run.values()));
+            }
+            return extensions;
+        }
+    }
+
+    /**
+     * Resolves a parameterized scenario method's parameters from its run's values, so the
+     * method can declare them (which is also where their names come from). Values are
+     * converted to the parameter type with Spring's default conversion service.
+     */
+    private record RunArguments(@Nullable Object[] values) implements ParameterResolver {
+
+        @Override
+        public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
+            // Only the scenario method's own parameters: a lifecycle method's (e.g.
+            // @BeforeEach void setUp(TestInfo info)) belong to other resolvers.
+            return parameterContext.getDeclaringExecutable().equals(extensionContext.getTestMethod().orElse(null))
+                    && parameterContext.getIndex() < values.length;
+        }
+
+        @Override
+        public @Nullable Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
+            val value = values[parameterContext.getIndex()];
+            val type = parameterContext.getParameter().getType();
+            return value == null || ClassUtils.resolvePrimitiveIfNecessary(type).isInstance(value)
+                    ? value
+                    : DefaultConversionService.getSharedInstance().convert(value, type);
         }
     }
 
