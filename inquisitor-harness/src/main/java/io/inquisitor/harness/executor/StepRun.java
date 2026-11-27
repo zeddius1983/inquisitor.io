@@ -24,7 +24,7 @@ import io.inquisitor.harness.model.ToolCallRecord;
 
 /**
  * The outcome of running one step: the model's {@link StepVerdict}, the trace of tool
- * calls it made while producing that verdict, and how long the actor took.
+ * calls it made while producing that verdict, and its elapsed time.
  *
  * <p>Surfacing the trace through the return value lets a decorating {@link StepRunner}
  * read it directly — with no thread-locals or shared state — to score how well-grounded the
@@ -33,18 +33,29 @@ import io.inquisitor.harness.model.ToolCallRecord;
  *
  * @param verdict   the LLM's structured judgement for the step
  * @param toolCalls the tool invocations made during the step, in call order
- * @param elapsed   wall-clock time the actor took to produce the verdict; measured by the
- *                  runner so it excludes any downstream evaluation
+ * @param elapsed total wall-clock time spent establishing the step result
+ * @param actorElapsed wall-clock time spent in actor calls; excludes reviewer calls
  * @param synthetic whether the verdict was fabricated by the harness (an empty,
  *                  unparseable or missing model response degraded to a FAIL) rather than
  *                  claimed by the actor. A synthetic verdict is a run-health fact, not an
  *                  actor claim — evaluation skips judging it
+ * @param attempts immutable actor-turn history, empty for legacy/custom runners
  */
 public record StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls, Duration elapsed,
-                      boolean synthetic) {
+                      Duration actorElapsed, boolean synthetic, List<StepAttempt> attempts) {
 
     public StepRun {
         toolCalls = List.copyOf(toolCalls);
+        attempts = List.copyOf(attempts);
+    }
+
+    public StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls, Duration elapsed,
+            boolean synthetic, List<StepAttempt> attempts) {
+        this(verdict, toolCalls, elapsed, elapsed, synthetic, attempts);
+    }
+
+    public StepRun(StepVerdict verdict, List<ToolCallRecord> toolCalls, Duration elapsed, boolean synthetic) {
+        this(verdict, toolCalls, elapsed, elapsed, synthetic, List.of());
     }
 
     /** A run whose verdict the actor genuinely produced. */

@@ -39,7 +39,7 @@ public class PlainLlmLogger implements LlmLoggerCallback {
     public void responseUnparseable(StepRequest request, Throwable cause) {
         val scenario = request.scenario();
         val step = request.step();
-        log.debug("[{}] step {}/{} — unparseable model response, treating as FAIL: {}",
+        log.debug("[{}] step {}/{} — invalid structured output; correction is disabled: {}",
                 scenario.name(), step.index(), scenario.steps().size(), cause.getMessage());
     }
 
@@ -47,8 +47,15 @@ public class PlainLlmLogger implements LlmLoggerCallback {
     public void stepCompleted(StepRequest request, StepRun run) {
         val scenario = request.scenario();
         val step = request.step();
-        log.debug("[{}] step {}/{} — {} in {}: {}", scenario.name(), step.index(),
+        if (run.elapsed().equals(run.actorElapsed())) {
+            log.debug("[{}] actor step {}/{} — {} in {}: {}", scenario.name(), step.index(),
+                    scenario.steps().size(), run.verdict().outcome(),
+                    LogDurationFormatter.format(run.elapsed()), run.verdict().reasoning());
+            return;
+        }
+        log.debug("[{}] actor step {}/{} — {} in {} (actor {}): {}", scenario.name(), step.index(),
                 scenario.steps().size(), run.verdict().outcome(),
-                LogDurationFormatter.format(run.elapsed()), run.verdict().reasoning());
+                LogDurationFormatter.format(run.elapsed()),
+                LogDurationFormatter.format(run.actorElapsed()), run.verdict().reasoning());
     }
 }

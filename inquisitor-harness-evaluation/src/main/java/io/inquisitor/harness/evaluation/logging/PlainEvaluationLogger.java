@@ -18,6 +18,8 @@ package io.inquisitor.harness.evaluation.logging;
 
 import java.time.Duration;
 
+import io.inquisitor.harness.evaluation.StepReview;
+import io.inquisitor.harness.evaluation.StepReviewRound;
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,22 @@ import org.springframework.ai.evaluation.EvaluationResponse;
 /** Conventional single-line judge-evaluation diagnostics. */
 @Slf4j
 public class PlainEvaluationLogger implements EvaluationLoggerCallback {
+
+    @Override
+    public void reviewCompleted(StepRequest request, StepReviewRound round) {
+        val review = round.review();
+        if (review == null) {
+            log.info("[{}] actor step {} attempt {} - INVALID_OUTPUT: {}",
+                    request.scenario().name(), request.step().index(), round.attempt().number(),
+                    round.attempt().error() == null ? "Empty or missing verdict" : round.attempt().error());
+            return;
+        }
+        log.info("[{}] reviewer step {} attempt {} - {}: findings={}; correction={}",
+                request.scenario().name(), request.step().index(), round.attempt().number(),
+                review.decision(), review.findings(),
+                review.decision() == StepReview.Decision.ACCEPT
+                        ? "none" : review.feedback());
+    }
 
     @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {

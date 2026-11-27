@@ -55,6 +55,10 @@ public class MarkdownHttpRequestLogger implements HttpRequestLogger {
     public void requestCompleted(Request request, Response response) {
         val event = MarkdownLogSupport.event(
                 breadcrumb(request, "HTTP " + response.status()));
+        if (!isMissing(response.contentType())) {
+            event.section("Headers", MarkdownLogSupport.codeBlock(
+                    "http", "Content-Type: " + response.contentType()));
+        }
         if (!isMissing(response.body())) {
             event.section("Response", MarkdownLogSupport.codeBlock(
                     language(response.body(), response.contentType()),

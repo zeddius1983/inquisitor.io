@@ -47,8 +47,11 @@ import org.jspecify.annotations.Nullable;
  * @param category        the judge's classification, or {@link #NOT_EVALUATED} for a
  *                        harness-synthesized verdict the judge never saw
  * @param feedback        the judge's findings, joined
+ * @param rounds          actor attempts and their reviews, empty for observation-only evaluation
+ * @param unresolved      execution did not establish an application verdict; outcome is a synthetic fallback
+ * @param terminationReason why supervised execution was stopped, empty for accepted execution
  */
-@Builder
+@Builder(toBuilder = true)
 public record StepEvaluationRecord(
         String scenario,
         @Nullable String scenarioSource,
@@ -64,7 +67,19 @@ public record StepEvaluationRecord(
         long elapsedMillis,
         double score,
         @Nullable String category,
-        String feedback) {
+        String feedback,
+        List<StepReviewRound> rounds,
+        boolean unresolved,
+        String terminationReason) {
+
+    public StepEvaluationRecord(String scenario, @Nullable String scenarioSource, @Nullable String scenarioGroup,
+            Outcome expectedOutcome, int stepIndex, int stepCount, String stepTitle, Outcome outcome,
+            String reasoning, List<String> evidence, List<String> toolCalls, long elapsedMillis,
+            double score, @Nullable String category, String feedback) {
+        this(scenario, scenarioSource, scenarioGroup, expectedOutcome, stepIndex, stepCount, stepTitle,
+                outcome, reasoning, evidence, toolCalls, elapsedMillis, score, category, feedback,
+                List.of(), false, "");
+    }
 
     /**
      * The category recorded for a harness-synthesized verdict (empty/unparseable model
@@ -76,10 +91,21 @@ public record StepEvaluationRecord(
     public StepEvaluationRecord {
         evidence = List.copyOf(evidence);
         toolCalls = List.copyOf(toolCalls);
+        rounds = rounds == null ? List.of() : List.copyOf(rounds);
+        terminationReason = terminationReason == null ? "" : terminationReason;
     }
 
     /** Whether the judge actually scored this step. */
     public boolean evaluated() {
-        return !NOT_EVALUATED.equals(category);
+        return !unresolved && !NOT_EVALUATED.equals(category);
+    }
+
+    public int correctionCount() {
+        return Math.max(0, rounds.size() - 1);
+    }
+
+    public boolean acceptedInitially() {
+        return !rounds.isEmpty() && rounds.getFirst().review() != null
+                && rounds.getFirst().review().decision() == StepReview.Decision.ACCEPT;
     }
 }

@@ -17,6 +17,7 @@
 package io.inquisitor.harness.evaluation;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
 import io.inquisitor.harness.executor.StepRequest;
@@ -26,6 +27,13 @@ import org.springframework.ai.evaluation.EvaluationResponse;
 
 /** Receives lifecycle events from an {@link EvaluationStepRunner}. */
 public interface EvaluationStepRunnerCallback {
+
+    /** Per-attempt narration; recorders should store attempts under their logical step. */
+    default void reviewCompleted(StepRequest request, StepReviewRound round) { }
+
+    /** Final supervised result. This is separate from observation-only evaluation events. */
+    default void supervisionCompleted(StepRequest request, StepRun run, List<StepReviewRound> rounds,
+            boolean unresolved, String reason) { }
 
     /** Invoked before the judge starts an evaluation. */
     void evaluationStarted(StepRequest request, StepRun actorRun);
@@ -51,6 +59,19 @@ public interface EvaluationStepRunnerCallback {
         Objects.requireNonNull(after, "after");
         val before = this;
         return new EvaluationStepRunnerCallback() {
+            @Override
+            public void reviewCompleted(StepRequest request, StepReviewRound round) {
+                before.reviewCompleted(request, round);
+                after.reviewCompleted(request, round);
+            }
+
+            @Override
+            public void supervisionCompleted(StepRequest request, StepRun run, List<StepReviewRound> rounds,
+                    boolean unresolved, String reason) {
+                before.supervisionCompleted(request, run, rounds, unresolved, reason);
+                after.supervisionCompleted(request, run, rounds, unresolved, reason);
+            }
+
             @Override
             public void evaluationStarted(StepRequest request, StepRun actorRun) {
                 before.evaluationStarted(request, actorRun);

@@ -32,11 +32,18 @@ import java.time.Duration;
  * @param result    the tool's returned result, verbatim
  * @param order     0-based position of this call within the step
  * @param elapsed   how long the call took
+ * @param failed    whether the tool threw; its side effects are unknown
  */
-public record ToolCallRecord(String toolName, String arguments, String result, int order, Duration elapsed) {
+public record ToolCallRecord(String toolName, String arguments, String result, int order, Duration elapsed,
+        boolean failed) {
+
+    public ToolCallRecord(String toolName, String arguments, String result, int order, Duration elapsed) {
+        this(toolName, arguments, result, order, elapsed, false);
+    }
 
     /** A one-line rendering for the evaluator transcript and the report. */
     public String describe() {
-        return "#%d %s(%s) -> %s".formatted(order, toolName, arguments, result);
+        return "#%d %s(%s) -> %s%s".formatted(order, toolName, arguments,
+                failed ? "THREW (effects unknown): " : "", result);
     }
 }

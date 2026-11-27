@@ -18,26 +18,52 @@ package io.inquisitor.harness.evaluation;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * Step-evaluation settings, bound from {@code inquisitor.harness.evaluation}. When
- * {@code enabled}, the evaluation starter wraps the actor runner so a separate judge
- * model scores each verdict against the real tool trace.
+ * Judge settings, bound from {@code inquisitor.harness.evaluation}. Observation-only
+ * evaluation and bounded refinement are independent opt-ins; refinement takes
+ * precedence when both are enabled.
  *
  * <p>The judge should be a <em>different</em> model from the actor — a self-judge shares
  * its own failure modes. {@code baseUrl}/{@code apiKey} default to the actor model's
  * {@code spring.ai.openai.*} settings when omitted, in which case only {@code model} differs.
  *
- * @param enabled whether to run step evaluation (the autoconfiguration is conditional on
- *                {@code true}); an explicit opt-in
- * @param model   the judge model name; required when {@code enabled}
+ * @param enabled whether to run observation-only step evaluation; an explicit opt-in
+ * @param model   the judge model name; required when evaluation or refinement is enabled
  * @param baseUrl the judge model's OpenAI-compatible base URL, or {@code null} to reuse the actor's
  * @param apiKey  the judge model's API key, or {@code null} to reuse the actor's
+ * @param refinement optional bounded supervision, disabled by default and independent
+ *                   of observation-only evaluation
  */
 @ConfigurationProperties("inquisitor.harness.evaluation")
 public record EvaluationProperties(
         boolean enabled,
         @Nullable String model,
         @Nullable String baseUrl,
-        @Nullable String apiKey) {
+        @Nullable String apiKey,
+        @DefaultValue Refinement refinement) {
+
+    public EvaluationProperties(boolean enabled, @Nullable String model, @Nullable String baseUrl,
+            @Nullable String apiKey) {
+        this(enabled, model, baseUrl, apiKey, new Refinement(false, 2));
+    }
+
+    @ConstructorBinding
+    public EvaluationProperties {
+        if (refinement == null) {
+            refinement = new Refinement(false, 2);
+        }
+    }
+
+    /** Maximum additional actor turns shared by format and semantic corrections. */
+    public record Refinement(boolean enabled,
+            @DefaultValue("2") int maxCorrections) {
+        public Refinement {
+            if (maxCorrections < 0) {
+                throw new IllegalArgumentException("max-corrections must be nonnegative");
+            }
+        }
+    }
 }

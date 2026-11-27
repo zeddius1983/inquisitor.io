@@ -35,8 +35,9 @@ public final class MarkdownStepLogSupport {
     public static String breadcrumb(
             StepRequest request,
             Optional<String> reportedModel,
+            String role,
             String... trailingSegments) {
-        return MarkdownBreadcrumbs.step(request, reportedModel, trailingSegments);
+        return MarkdownBreadcrumbs.step(request, reportedModel, role, trailingSegments);
     }
 
     /** Renders and wraps text as a Markdown blockquote within the given line width. */

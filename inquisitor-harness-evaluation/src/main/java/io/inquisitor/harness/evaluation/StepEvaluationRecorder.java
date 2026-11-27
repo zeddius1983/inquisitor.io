@@ -38,6 +38,17 @@ public class StepEvaluationRecorder implements EvaluationStepRunnerCallback {
     private final List<StepEvaluationRecord> records = new CopyOnWriteArrayList<>();
 
     @Override
+    public void supervisionCompleted(StepRequest request, StepRun run, List<StepReviewRound> rounds,
+            boolean unresolved, String reason) {
+        val last = rounds.getLast();
+        val review = last.review();
+        val record = build(request, run, review == null ? 0.0 : review.category().score(),
+                unresolved ? "UNRESOLVED" : review == null ? StepEvaluationRecord.NOT_EVALUATED
+                        : review.category().name(), last.feedback());
+        records.add(record.toBuilder().rounds(rounds).unresolved(unresolved).terminationReason(reason).build());
+    }
+
+    @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {
         // Nothing to record until evaluation finishes or is abandoned.
     }
@@ -97,7 +108,7 @@ public class StepEvaluationRecorder implements EvaluationStepRunnerCallback {
                 .reasoning(verdict.reasoning() == null ? "" : verdict.reasoning())
                 .evidence(verdict.evidence())
                 .toolCalls(run.toolCalls().stream().map(ToolCallRecord::describe).toList())
-                .elapsedMillis(run.elapsed().toMillis())
+                .elapsedMillis(run.actorElapsed().toMillis())
                 .score(score)
                 .category(category)
                 .feedback(feedback == null ? "" : feedback)

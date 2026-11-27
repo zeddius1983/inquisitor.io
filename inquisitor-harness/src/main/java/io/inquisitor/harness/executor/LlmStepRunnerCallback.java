@@ -39,6 +39,9 @@ public interface LlmStepRunnerCallback {
     /** Invoked after the actor step completes. */
     void stepCompleted(StepRequest request, StepRun run);
 
+    /** Invoked when supervised execution cannot establish a verdict. */
+    default void stepAborted(StepRequest request, Throwable cause) { }
+
     /**
      * Returns a callback that invokes this callback followed by {@code after} for each
      * lifecycle event. If this callback throws, {@code after} is not invoked.
@@ -63,6 +66,12 @@ public interface LlmStepRunnerCallback {
             public void stepCompleted(StepRequest request, StepRun run) {
                 before.stepCompleted(request, run);
                 after.stepCompleted(request, run);
+            }
+
+            @Override
+            public void stepAborted(StepRequest request, Throwable cause) {
+                before.stepAborted(request, cause);
+                after.stepAborted(request, cause);
             }
         };
     }

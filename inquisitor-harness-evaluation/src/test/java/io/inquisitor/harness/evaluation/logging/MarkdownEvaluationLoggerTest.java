@@ -29,7 +29,11 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.inquisitor.harness.executor.StepRequest;
+import io.inquisitor.harness.executor.StepAttempt;
 import io.inquisitor.harness.executor.StepRun;
+import io.inquisitor.harness.evaluation.EvaluationCategory;
+import io.inquisitor.harness.evaluation.StepReview;
+import io.inquisitor.harness.evaluation.StepReviewRound;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
 import io.inquisitor.harness.logging.markdown.MarkdownLogSupport;
@@ -68,8 +72,8 @@ class MarkdownEvaluationLoggerTest {
             assertThat(event.getFormattedMessage())
                     .startsWith("\n\n")
                     .endsWith("\n")
-                    .contains("###  Import accounts from CSV and plain text  "
-                            + "Reset the database  ▰▱▱▱▱ 1/4  EVALUATION ")
+                    .contains("###  Reviewer  Import accounts from CSV and plain text  "
+                            + "Reset the database  Step 1/4  EVALUATION ")
                     .doesNotContain("**Scenario:**", "**Step:**");
         });
     }
@@ -77,7 +81,8 @@ class MarkdownEvaluationLoggerTest {
     @Test
     void rendersJudgeResultWithModelScoreDurationAndWrappedFeedback() {
         val registry = new ModelRegistry();
-        resolve(registry, "/models/snapshots/abc/gemma-4-31B-it-qat-UD-Q4_K_XL.gguf");
+        resolve(registry, ModelRole.JUDGE,
+                "/models/snapshots/abc/gemma-4-31B-it-qat-UD-Q4_K_XL.gguf");
         val request = request();
         val feedback = "The trace confirms the execution of the TRUNCATE statement and the "
                 + "result indicates successful execution with no existing rows to delete, "
@@ -101,9 +106,9 @@ class MarkdownEvaluationLoggerTest {
                     .toList();
 
             assertThat(message).contains(
-                    "###  gemma-4-31B-it-qat-UD-Q4\\_K\\_XL  "
+                    "###  Reviewer gemma-4-31B-it-qat-UD-Q4\\_K\\_XL  "
                             + "Import accounts from CSV and plain text  Reset the database  "
-                            + "▰▱▱▱▱ 1/4  GROUNDED  Score 1.000  ⧖ 9.807 s ",
+                            + "Step 1/4  GROUNDED  Score 1.000  ⧖ 9.807 s ",
                     "### Feedback");
             assertThat(message).doesNotContain("/models/", ".gguf", "- **Feedback:**");
             assertThat(feedbackLines).hasSizeGreaterThan(1)
@@ -128,6 +133,48 @@ class MarkdownEvaluationLoggerTest {
                         .contains("GROUNDED", "### Feedback", "\n\n>"));
     }
 
+    @Test
+    void rendersMalformedActorResponseOnceWithoutLeakingTheCorrectionSchema() {
+        val registry = new ModelRegistry();
+        resolve(registry, ModelRole.ACTOR, "/models/qwen.gguf");
+        val attempt = new StepAttempt(1, "<answer>", null,
+                "Unexpected character '<'", List.of(), Duration.ofMillis(12_345));
+        val round = new StepReviewRound(attempt, null, 0,
+                "private correction prompt containing JSON Schema");
+
+        val events = capture(() -> new MarkdownEvaluationLogger(registry)
+                .reviewCompleted(request(), round));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .contains("Actor qwen", "Attempt 1", "INVALID OUTPUT", "⧖ 12.345 s",
+                                "### Validation", "Unexpected character '<'")
+                        .doesNotContain("JSON Schema", "```", "treating as FAIL", "### Feedback"));
+    }
+
+    @Test
+    void acceptedReviewShowsFindingsWithoutRepeatingReviewerFeedback() {
+        val review = new StepReview(StepReview.Decision.ACCEPT, EvaluationCategory.GROUNDED,
+                List.of("HTTP 404 is recorded in call #1."), List.of(1),
+                "The actor successfully verified the scenario.");
+        val attempt = new StepAttempt(2, "{}",
+                new StepVerdict(Outcome.PASS, "verified", List.of()), null,
+                List.of(), Duration.ofSeconds(2));
+        val round = new StepReviewRound(attempt, review, 6_016,
+                "combined internal feedback");
+
+        val events = capture(() -> new MarkdownEvaluationLogger(new ModelRegistry())
+                .reviewCompleted(request(), round));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .contains("Reviewer", "Attempt 2", "ACCEPT", "⧖ 6.016 s",
+                                "### Findings", "HTTP 404 is recorded in call #1.")
+                        .doesNotContain("### Feedback", "### Correction",
+                                "The actor successfully verified the scenario.",
+                                "combined internal feedback"));
+    }
+
     private static StepRequest request() {
         return StepRequest.of("conversation", SCENARIO, STEPS.getFirst());
     }
@@ -138,10 +185,10 @@ class MarkdownEvaluationLoggerTest {
                 List.of(), Duration.ofSeconds(2));
     }
 
-    private static void resolve(ModelRegistry registry, String model) {
+    private static void resolve(ModelRegistry registry, ModelRole role, String model) {
         val metadata = mock(ChatResponseMetadata.class);
         when(metadata.getModel()).thenReturn(model);
-        registry.resolve(ModelRole.JUDGE, metadata);
+        registry.resolve(role, metadata);
     }
 
     private static List<ILoggingEvent> capture(Runnable invocation) {

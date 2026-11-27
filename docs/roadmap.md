@@ -100,11 +100,12 @@ The authoritative status is git history + this table.
   `llama-bench`-style console table — μ±σ groundedness score + timing per model,
   with repeats for variance. Reuses the `evaluate` path and the `json` renderer as
   the cross-run interchange; console-only, no artifact. See `tasks/task-14`.
-- **Backlog — self-refine evaluation advisor** (idea, unscheduled): use the judge
-  in-loop to let the actor correct wrong tool interactions / ungrounded assertions
-  during a run, recording the pre-refinement verdict so the score still measures
-  the actor. Non-idempotency, judge-independence, and the "continue don't restart"
-  design are worked through in [notes-self-refine-advisor.md](notes-self-refine-advisor.md).
+- **Supervised step refinement** is implemented on `feature/supervised-step-refinement`:
+  optional bounded continuation with the same actor conversation and tools, a
+  cumulative ledger, ACCEPT/CORRECT/STOP reviews, and per-attempt reporting.
+  JSON and execution corrections share one budget; unresolved runs fail JUnit
+  even when application failure was expected. Automatic fixture resets and
+  scenario restarts remain deferred. See [task-16](../tasks/task-16-supervised-refinement.md).
 - **`inquisitor-mock`** (task-06) design is outlined: LLM-authored mocks of the
   AUT's outbound dependencies (FX rate, account state, asset search), authored in
   NL/typed rules rather than hand-coded stubs. MVP = **live + structured output +

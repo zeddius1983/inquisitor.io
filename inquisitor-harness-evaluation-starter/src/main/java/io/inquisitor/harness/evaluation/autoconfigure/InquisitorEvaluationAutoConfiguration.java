@@ -16,14 +16,19 @@
 
 package io.inquisitor.harness.evaluation.autoconfigure;
 
+import java.util.Arrays;
+
 import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.evaluation.EvaluationProperties;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
 import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
+import io.inquisitor.harness.evaluation.LlmStepReviewer;
 import io.inquisitor.harness.evaluation.RecordingToolCallback;
 import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
 import io.inquisitor.harness.evaluation.StepEvaluator;
+import io.inquisitor.harness.evaluation.StepReviewer;
+import io.inquisitor.harness.evaluation.SupervisedStepRunner;
 import io.inquisitor.harness.evaluation.logging.EvaluationLoggerCallback;
 import io.inquisitor.harness.evaluation.logging.MarkdownEvaluationLogger;
 import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
@@ -35,33 +40,36 @@ import io.inquisitor.harness.logging.ModelMetadataAdvisor;
 import io.inquisitor.harness.logging.ModelRegistry;
 import io.inquisitor.harness.logging.ModelRole;
 import lombok.val;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.evaluation.Evaluator;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.util.Assert;
 
 /**
- * Wires step evaluation when {@code inquisitor.harness.evaluation.enabled=true}: a
- * {@link BeanPostProcessor} that decorates every harness {@link ToolCallback} to record
- * its calls, a separate judge model, the {@link StepEvaluator}, a
- * {@link StepEvaluationRecorder}, and a {@link EvaluationStepRunner} that wraps the actor
- * {@link LlmStepRunner} (made {@code @Primary} so the executor uses it). When disabled — or
- * when this starter is absent — none of this loads and the harness runs the plain
+ * Wires one of two exclusive judge modes when evaluation is enabled. Observation-only
+ * mode creates a {@link StepEvaluator} and an {@link EvaluationStepRunner}; refinement
+ * mode creates a {@link StepReviewer} and a {@link SupervisedStepRunner}, whose final
+ * review is also the evaluation result. Both modes record tool calls and evaluation
+ * results. When disabled — or when this starter is absent — the harness runs the plain
  * {@link LlmStepRunner} with undecorated tools.
  *
  * <p>The judge is an OpenAI-compatible model configured from
@@ -71,9 +79,22 @@ import org.springframework.util.Assert;
  */
 @AutoConfiguration(after = InquisitorHarnessAutoConfiguration.class)
 @ConditionalOnClass({ChatClient.class, Evaluator.class, OpenAiChatModel.class})
-@ConditionalOnProperty(prefix = "inquisitor.harness.evaluation", name = "enabled", havingValue = "true")
+@Conditional(InquisitorEvaluationAutoConfiguration.JudgeModeEnabled.class)
 @EnableConfigurationProperties(EvaluationProperties.class)
-public class InquisitorEvaluationAutoConfiguration {
+public class  InquisitorEvaluationAutoConfiguration {
+
+    /** Activate when either mutually exclusive judge mode is requested. */
+    static class JudgeModeEnabled extends AnyNestedCondition {
+        JudgeModeEnabled() {
+            super(ConfigurationPhase.REGISTER_BEAN);
+        }
+
+        @ConditionalOnProperty(prefix = "inquisitor.harness.evaluation", name = "enabled", havingValue = "true")
+        static class Observation { }
+
+        @ConditionalOnProperty(prefix = "inquisitor.harness.evaluation.refinement", name = "enabled", havingValue = "true")
+        static class Refinement { }
+    }
 
     /**
      * Decorates every {@link ToolCallback} bean so each call is recorded into the per-step
@@ -89,6 +110,13 @@ public class InquisitorEvaluationAutoConfiguration {
         return new BeanPostProcessor() {
             @Override
             public Object postProcessAfterInitialization(Object bean, String beanName) {
+                if (bean instanceof ToolCallbackProvider provider) {
+                    return (ToolCallbackProvider) () ->
+                            Arrays.stream(provider.getToolCallbacks())
+                                    .map(callback -> callback instanceof RecordingToolCallback
+                                            ? callback : new RecordingToolCallback(callback))
+                                    .toArray(ToolCallback[]::new);
+                }
                 return bean instanceof ToolCallback callback && !(callback instanceof RecordingToolCallback)
                         ? new RecordingToolCallback(callback)
                         : bean;
@@ -144,10 +172,26 @@ public class InquisitorEvaluationAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "inquisitor.harness.evaluation.refinement",
+            name = "enabled", havingValue = "false", matchIfMissing = true)
     Evaluator inquisitorStepEvaluator(
             EvaluationProperties properties,
             Environment environment,
             ModelRegistry models) {
+        return new StepEvaluator(judgeClient(properties, environment, models));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(StepReviewer.class)
+    @ConditionalOnProperty(prefix = "inquisitor.harness.evaluation.refinement",
+            name = "enabled", havingValue = "true")
+    StepReviewer inquisitorStepReviewer(
+            EvaluationProperties properties, Environment environment, ModelRegistry models) {
+        return new LlmStepReviewer(judgeClient(properties, environment, models));
+    }
+
+    private static ChatClient judgeClient(EvaluationProperties properties,
+            Environment environment, ModelRegistry models) {
         val baseUrl = properties.baseUrl() != null
                 ? properties.baseUrl()
                 : environment.getProperty("spring.ai.openai.base-url");
@@ -155,7 +199,7 @@ public class InquisitorEvaluationAutoConfiguration {
                 ? properties.apiKey()
                 : environment.getProperty("spring.ai.openai.api-key");
         Assert.hasText(properties.model(),
-                "inquisitor.harness.evaluation.model must be set when evaluation is enabled");
+                "inquisitor.harness.evaluation.model must be set when evaluation or refinement is enabled");
         Assert.hasText(baseUrl, "No judge base URL: set inquisitor.harness.evaluation.base-url "
                 + "or spring.ai.openai.base-url");
         Assert.hasText(apiKey, "No judge API key: set inquisitor.harness.evaluation.api-key "
@@ -173,25 +217,53 @@ public class InquisitorEvaluationAutoConfiguration {
                 .build();
         // A bare judge: no harness system prompt, no chat memory, no tools — it rules on
         // the trace it is given, nothing else.
-        return new StepEvaluator(ChatClient.builder(judgeModel)
-                .defaultAdvisors(new ModelMetadataAdvisor(ModelRole.JUDGE, models))
-                .build());
+        return ChatClient.builder(judgeModel)
+                .defaultAdvisors(
+                        new ModelMetadataAdvisor(ModelRole.JUDGE, models),
+                        new SimpleLoggerAdvisor())
+                .build();
     }
 
     @Bean
     @Primary
     @ConditionalOnBean(LlmStepRunner.class)
+    @ConditionalOnProperty(prefix = "inquisitor.harness.evaluation.refinement",
+            name = "enabled", havingValue = "false", matchIfMissing = true)
     StepRunner inquisitorEvaluationStepRunner(
             LlmStepRunner llmStepRunner,
             Evaluator evaluator,
             StepEvaluationRecorder recorder,
             EvaluationLoggerCallback loggerCallback,
             ObjectProvider<EvaluationStepRunnerCallback> callbacks) {
+        return new EvaluationStepRunner(llmStepRunner, evaluator,
+                evaluationCallback(recorder, loggerCallback, callbacks));
+    }
+
+    @Bean
+    @Primary
+    @ConditionalOnBean(LlmStepRunner.class)
+    @ConditionalOnProperty(prefix = "inquisitor.harness.evaluation.refinement",
+            name = "enabled", havingValue = "true")
+    StepRunner inquisitorSupervisedStepRunner(
+            LlmStepRunner llmStepRunner,
+            StepReviewer reviewer,
+            StepEvaluationRecorder recorder,
+            EvaluationLoggerCallback loggerCallback,
+            EvaluationProperties properties,
+            ObjectProvider<EvaluationStepRunnerCallback> callbacks) {
+        return new SupervisedStepRunner(llmStepRunner, reviewer,
+                properties.refinement().maxCorrections(),
+                evaluationCallback(recorder, loggerCallback, callbacks));
+    }
+
+    private static EvaluationStepRunnerCallback evaluationCallback(
+            StepEvaluationRecorder recorder,
+            EvaluationLoggerCallback loggerCallback,
+            ObjectProvider<EvaluationStepRunnerCallback> callbacks) {
         val first = (EvaluationStepRunnerCallback) recorder;
-        val callback = callbacks.orderedStream()
+        return callbacks.orderedStream()
                 .filter(candidate -> candidate != recorder && candidate != loggerCallback)
                 .reduce(first, EvaluationStepRunnerCallback::andThen)
                 .andThen(loggerCallback);
-        return new EvaluationStepRunner(llmStepRunner, evaluator, callback);
     }
 }

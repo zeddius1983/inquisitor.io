@@ -18,6 +18,8 @@ package io.inquisitor.harness.evaluation.logging;
 
 import java.time.Duration;
 
+import io.inquisitor.harness.evaluation.StepReview;
+import io.inquisitor.harness.evaluation.StepReviewRound;
 import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
 import io.inquisitor.harness.logging.LogDurationFormatter;
@@ -36,6 +38,34 @@ import org.springframework.ai.evaluation.EvaluationResponse;
 public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
 
     private final ModelRegistry models;
+
+    @Override
+    public void reviewCompleted(StepRequest request, StepReviewRound round) {
+        val attempt = round.attempt();
+        val review = round.review();
+        if (review == null) {
+            val breadcrumb = breadcrumb(request, ModelRole.ACTOR, "Actor",
+                    "Attempt " + attempt.number(), "INVALID OUTPUT",
+                    "⧖ " + LogDurationFormatter.format(attempt.elapsed()));
+            info(MarkdownLogSupport.event(breadcrumb)
+                    .section("Validation", MarkdownStepLogSupport.blockquote(
+                            attempt.error() == null ? "Empty or missing verdict" : attempt.error(),
+                            breadcrumb.length()))
+                    .message());
+            return;
+        }
+        val breadcrumb = breadcrumb(request, ModelRole.JUDGE, "Reviewer",
+                "Attempt " + attempt.number(), review.decision().name(),
+                "⧖ " + LogDurationFormatter.format(Duration.ofMillis(round.judgeElapsedMillis())));
+        val event = MarkdownLogSupport.event(breadcrumb)
+                .section("Findings", MarkdownStepLogSupport.blockquote(
+                        String.join("\n", review.findings()), breadcrumb.length()));
+        if (review.decision() != StepReview.Decision.ACCEPT) {
+            event.section("Correction", MarkdownStepLogSupport.blockquote(
+                    review.feedback(), breadcrumb.length()));
+        }
+        info(event.message());
+    }
 
     @Override
     public void evaluationStarted(StepRequest request, StepRun actorRun) {
@@ -77,8 +107,13 @@ public class MarkdownEvaluationLogger implements EvaluationLoggerCallback {
     }
 
     private String breadcrumb(StepRequest request, String... trailingSegments) {
+        return breadcrumb(request, ModelRole.JUDGE, "Reviewer", trailingSegments);
+    }
+
+    private String breadcrumb(StepRequest request, ModelRole modelRole, String role,
+            String... trailingSegments) {
         return MarkdownStepLogSupport.breadcrumb(
-                request, models.actualModel(ModelRole.JUDGE), trailingSegments);
+                request, models.actualModel(modelRole), role, trailingSegments);
     }
 
     private static String category(EvaluationResponse response) {

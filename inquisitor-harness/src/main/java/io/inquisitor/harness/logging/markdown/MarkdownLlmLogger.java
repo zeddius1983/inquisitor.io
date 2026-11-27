@@ -37,9 +37,10 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
     public void stepStarted(StepRequest request) {
         val step = request.step();
         val event = MarkdownLogSupport.event(breadcrumb(request, "RUN"))
-                .content("## %s%s".formatted(
-                        MarkdownBreadcrumbs.headingLiteral(step.title()),
-                        body(step.instruction())));
+                .content(step.title().equalsIgnoreCase(request.scenario().name())
+                        ? step.instruction()
+                        : "## %s%s".formatted(MarkdownBreadcrumbs.headingLiteral(step.title()),
+                                body(step.instruction())));
         log.info(MarkdownLogSupport.marker(), event.message());
     }
 
@@ -48,7 +49,7 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
         val scenario = request.scenario();
         val step = request.step();
         log.info(MarkdownLogSupport.marker(), MarkdownLogSupport.block("""
-                > **Actor response rejected — step %d/%d:** unparseable model response; treating as FAIL.
+                > **Actor response rejected — step %d/%d:** invalid structured output; correction is disabled.
                 >
                 > %s
                 """.formatted(step.index(), scenario.steps().size(), safeMessage(cause))));
@@ -56,8 +57,12 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
 
     @Override
     public void stepCompleted(StepRequest request, StepRun run) {
-        val breadcrumb = breadcrumb(request, run.verdict().outcome().name(),
-                "⧖ " + LogDurationFormatter.format(run.elapsed()));
+        val breadcrumb = run.elapsed().equals(run.actorElapsed())
+                ? breadcrumb(request, run.verdict().outcome().name(),
+                        "⧖ " + LogDurationFormatter.format(run.elapsed()))
+                : breadcrumb(request, run.verdict().outcome().name(),
+                        "Actor " + LogDurationFormatter.format(run.actorElapsed()),
+                        "Total " + LogDurationFormatter.format(run.elapsed()));
         val event = MarkdownLogSupport.event(breadcrumb)
                 .section("Reasoning", MarkdownStepLogSupport.blockquote(
                         run.verdict().reasoning(), breadcrumb.length()));
@@ -70,7 +75,7 @@ public class MarkdownLlmLogger implements LlmLoggerCallback {
 
     private String breadcrumb(StepRequest request, String... trailingSegments) {
         return MarkdownStepLogSupport.breadcrumb(
-                request, models.actualModel(ModelRole.ACTOR), trailingSegments);
+                request, models.actualModel(ModelRole.ACTOR), "Actor", trailingSegments);
     }
 
     private static String body(String instruction) {

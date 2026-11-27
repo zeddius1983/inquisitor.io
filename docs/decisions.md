@@ -302,6 +302,24 @@ see [roadmap.md](roadmap.md); for stable repo context see
 
 ## Evaluation report (task-08 C2)
 
+- **Supervision is explicit opt-in (task-16).** Observation-only evaluation still
+  returns the actor verdict unchanged. With refinement enabled, the reviewer
+  controls ACCEPT/CORRECT/STOP and the actor continues the current step with its
+  accumulated evidence. A supported application FAIL ends refinement successfully.
+  Both formatting and execution corrections consume one shared budget. The final
+  score assesses the actor/reviewer team; initial answers and reviews remain in
+  the report rather than being overwritten. Evaluation and refinement are
+  independent switches but exclusive runtime modes: refinement takes precedence
+  and the observation-only evaluator is neither created nor executed.
+- **Unresolved execution is not an application defect.** STOP, exhausted
+  corrections, actor/tool failures, and reviewer failures abort through
+  `UnresolvedStepException`. Reports mark these separately and JUnit cannot
+  count them as successful fault detection under `expect = FAIL`.
+- **Tool effects remain evidence across rounds.** Tool callbacks and providers
+  are recorded, including thrown calls with explicitly unknown effects.
+  Corrective writes are allowed when they preserve the experiment; automatic
+  fixture resets and scenario restarts are deferred.
+
 - **File handoff, the JaCoCo pattern.** The `evaluate` task is a Gradle `Test` task,
   so the evaluation data lives in the forked test JVM and Gradle sees only test
   outcomes — there is no channel back to the build but files. The test JVM writes

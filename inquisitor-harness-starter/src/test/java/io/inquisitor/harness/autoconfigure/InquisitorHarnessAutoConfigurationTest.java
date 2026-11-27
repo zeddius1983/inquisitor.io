@@ -25,6 +25,7 @@ import java.util.List;
 import javax.sql.DataSource;
 
 import io.inquisitor.harness.config.HarnessLoggingFormat;
+import io.inquisitor.harness.config.StructuredOutputMode;
 import io.inquisitor.harness.config.InquisitorHarnessProperties;
 import io.inquisitor.harness.executor.LlmStepRunner;
 import io.inquisitor.harness.executor.LlmStepRunnerCallback;
@@ -177,6 +178,24 @@ class InquisitorHarnessAutoConfigurationTest {
 
                     verify(first).scenarioStarted(scenario);
                     verify(second).scenarioStarted(scenario);
+                });
+    }
+
+    @Test
+    void structuredOutputDefaultsToPromptAndCanBeConfiguredAsNative() {
+        runner.run(context -> assertThat(
+                context.getBean(InquisitorHarnessProperties.class).structuredOutput())
+                .isEqualTo(StructuredOutputMode.PROMPT));
+
+        runner.withBean(ChatModel.class, () -> mock(ChatModel.class))
+                .withPropertyValues("inquisitor.harness.structured-output=native")
+                .run(context -> {
+                    assertThat(context.getBean(InquisitorHarnessProperties.class).structuredOutput())
+                            .isEqualTo(StructuredOutputMode.NATIVE);
+                    // The mode has to reach the runner, not just bind.
+                    assertThat(ReflectionTestUtils.getField(
+                            context.getBean(LlmStepRunner.class), "structuredOutput"))
+                            .isEqualTo(StructuredOutputMode.NATIVE);
                 });
     }
 

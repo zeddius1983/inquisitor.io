@@ -27,6 +27,9 @@ import io.inquisitor.harness.autoconfigure.InquisitorHarnessAutoConfiguration;
 import io.inquisitor.harness.evaluation.EvaluationStepRunner;
 import io.inquisitor.harness.evaluation.EvaluationStepRunnerCallback;
 import io.inquisitor.harness.evaluation.StepEvaluationRecorder;
+import io.inquisitor.harness.evaluation.StepEvaluator;
+import io.inquisitor.harness.evaluation.StepReviewer;
+import io.inquisitor.harness.evaluation.SupervisedStepRunner;
 import io.inquisitor.harness.evaluation.logging.EvaluationLoggerCallback;
 import io.inquisitor.harness.evaluation.logging.MarkdownEvaluationLogger;
 import io.inquisitor.harness.evaluation.logging.PlainEvaluationLogger;
@@ -43,6 +46,7 @@ import io.inquisitor.harness.model.Step;
 import io.inquisitor.harness.model.StepVerdict;
 import lombok.val;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.evaluation.Evaluator;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -55,6 +59,92 @@ class InquisitorEvaluationAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(
                     InquisitorHarnessAutoConfiguration.class, InquisitorEvaluationAutoConfiguration.class))
             .withBean(ChatModel.class, () -> mock(ChatModel.class));
+
+    @Test
+    void refinementUsesSupervisedRunnerAndBindsCorrectionBudget() {
+        runner.withPropertyValues(
+                        "inquisitor.harness.evaluation.model=judge",
+                        "inquisitor.harness.evaluation.base-url=http://localhost:9999",
+                        "inquisitor.harness.evaluation.api-key=test",
+                        "inquisitor.harness.evaluation.refinement.enabled=true",
+                        "inquisitor.harness.evaluation.refinement.max-corrections=1")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(StepRunner.class))
+                            .isInstanceOf(SupervisedStepRunner.class);
+                    assertThat(context).hasSingleBean(StepReviewer.class);
+                    assertThat(context).doesNotHaveBean(Evaluator.class);
+                    assertThat(context).doesNotHaveBean(EvaluationStepRunner.class);
+                    assertThat(context.getBean(io.inquisitor.harness.evaluation.EvaluationProperties.class)
+                            .refinement().maxCorrections()).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void rejectsNegativeCorrectionBudget() {
+        runner.withPropertyValues(
+                        "inquisitor.harness.evaluation.enabled=true",
+                        "inquisitor.harness.evaluation.refinement.max-corrections=-1")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void refinementDoesNotExecuteObservationOnlyEvaluationAndDefaultsToTwoCorrections() {
+        runner.withPropertyValues("inquisitor.harness.evaluation.refinement.enabled=true",
+                        "inquisitor.harness.evaluation.model=judge",
+                        "inquisitor.harness.evaluation.base-url=http://localhost:9999",
+                        "inquisitor.harness.evaluation.api-key=test")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(StepRunner.class)).isInstanceOf(SupervisedStepRunner.class);
+                    assertThat(context).doesNotHaveBean(Evaluator.class);
+                    assertThat(context).doesNotHaveBean(EvaluationStepRunner.class);
+                    assertThat(context.getBean(io.inquisitor.harness.evaluation.EvaluationProperties.class)
+                            .refinement().maxCorrections()).isEqualTo(2);
+                });
+    }
+
+    @Test
+    void refinementTakesPrecedenceWhenBothModesAreEnabled() {
+        runner.withPropertyValues("inquisitor.harness.evaluation.enabled=true",
+                        "inquisitor.harness.evaluation.refinement.enabled=true",
+                        "inquisitor.harness.evaluation.model=judge",
+                        "inquisitor.harness.evaluation.base-url=http://localhost:9999",
+                        "inquisitor.harness.evaluation.api-key=test")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(StepRunner.class)).isInstanceOf(SupervisedStepRunner.class);
+                    assertThat(context).doesNotHaveBean(Evaluator.class);
+                    assertThat(context).doesNotHaveBean(EvaluationStepRunner.class);
+                });
+    }
+
+    @Test
+    void decoratesProviderToolsAndRecordsExceptions() {
+        val tool = mock(org.springframework.ai.tool.ToolCallback.class);
+        org.mockito.Mockito.when(tool.getToolDefinition()).thenReturn(
+                org.springframework.ai.tool.definition.ToolDefinition.builder()
+                        .name("providerTool").description("provider tool").inputSchema("{}").build());
+        org.mockito.Mockito.when(tool.call(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenThrow(new IllegalStateException("write failed"));
+        runner.withBean(org.springframework.ai.tool.ToolCallbackProvider.class,
+                        () -> () -> new org.springframework.ai.tool.ToolCallback[] {tool})
+                .withPropertyValues("inquisitor.harness.evaluation.enabled=true",
+                        "inquisitor.harness.evaluation.model=judge",
+                        "inquisitor.harness.evaluation.base-url=http://localhost:9999",
+                        "inquisitor.harness.evaluation.api-key=test")
+                .run(context -> {
+                    val callback = context.getBean(org.springframework.ai.tool.ToolCallbackProvider.class)
+                            .getToolCallbacks()[0];
+                    val ledger = new java.util.ArrayList<io.inquisitor.harness.model.ToolCallRecord>();
+                    org.assertj.core.api.Assertions.assertThatThrownBy(() -> callback.call("{}",
+                            new org.springframework.ai.chat.model.ToolContext(java.util.Map.of(
+                                    io.inquisitor.harness.tool.TraceKeys.LEDGER, ledger))))
+                            .isInstanceOf(IllegalStateException.class);
+                    assertThat(ledger).hasSize(1);
+                    assertThat(ledger.getFirst().failed()).isTrue();
+                });
+    }
 
     @Test
     void evaluationIsOffByDefault() {
@@ -76,6 +166,8 @@ class InquisitorEvaluationAutoConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasSingleBean(StepEvaluationRecorder.class);
                     assertThat(context).hasSingleBean(Evaluator.class);
+                    assertThat(context).doesNotHaveBean(StepReviewer.class);
+                    assertThat(context).doesNotHaveBean(SupervisedStepRunner.class);
                     assertThat(context).hasSingleBean(EvaluationLoggerCallback.class);
                     assertThat(context.getBean(EvaluationLoggerCallback.class))
                             .isInstanceOf(PlainEvaluationLogger.class);
@@ -84,6 +176,12 @@ class InquisitorEvaluationAutoConfigurationTest {
                     // The @Primary wrapper is what the executor resolves.
                     assertThat(context.getBean(StepRunner.class)).isInstanceOf(EvaluationStepRunner.class);
                     assertThat(context).hasSingleBean(ScenarioExecutor.class);
+                    val evaluator = (StepEvaluator) context.getBean(Evaluator.class);
+                    val judge = ReflectionTestUtils.getField(evaluator, "judge");
+                    val defaultRequest = ReflectionTestUtils.getField(judge, "defaultChatClientRequest");
+                    val advisors = (List<?>) ReflectionTestUtils.getField(defaultRequest, "advisors");
+                    assertThat(advisors).anySatisfy(advisor ->
+                            assertThat(advisor).isInstanceOf(SimpleLoggerAdvisor.class));
                     val models = context.getBean(ModelRegistry.class);
                     assertThat(models.actualModel(ModelRole.ACTOR)).isEmpty();
                     assertThat(models.actualModel(ModelRole.JUDGE)).isEmpty();

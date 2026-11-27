@@ -24,6 +24,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 
+import io.inquisitor.harness.config.StructuredOutputMode;
 import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.Scenario;
 import io.inquisitor.harness.model.Step;
@@ -37,6 +38,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
 
 class LlmStepRunnerTest {
 
@@ -73,6 +75,19 @@ class LlmStepRunnerTest {
     }
 
     @Test
+    void openConversationLeavesMalformedAttemptNarrationToItsSupervisor() {
+        val logger = new RecordingLlmLogger();
+        val conversation = runner(new StubChatModel(response("not-json")), logger)
+                .openConversation(request());
+
+        val attempt = conversation.execute();
+
+        assertThat(attempt.verdict()).isNull();
+        assertThat(attempt.error()).isNotBlank();
+        assertThat(logger.events).containsExactly("started:Step");
+    }
+
+    @Test
     void callbackCompositionInvokesCallbacksInOrderAndStopsOnFailure() {
         val events = new java.util.ArrayList<String>();
         val first = new OrderedLlmCallback("first", events, false);
@@ -101,6 +116,43 @@ class LlmStepRunnerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("callback failed");
         assertThat(events).containsExactly("failing:started");
+    }
+
+    @Test
+    void nativeModePutsTheVerdictSchemaOnTheRequestOptions() {
+        val model = new StubChatModel(response(VALID_VERDICT));
+
+        val run = new LlmStepRunner(
+                ChatClient.builder(model).build(),
+                LlmStepRunnerCallback.NO_OP,
+                StructuredOutputMode.NATIVE)
+                .run(request());
+
+        assertThat(run.verdict().outcome()).isEqualTo(Outcome.PASS);
+        // The provider is handed the schema, so a compliant server constrains decoding
+        // rather than merely being asked to.
+        val options = (OpenAiChatOptions) model.lastPrompt.getOptions();
+        assertThat(options.getOutputSchema())
+                .isNotNull()
+                .contains("outcome")
+                .contains("PASS");
+        // The configured model survives: options are derived from the model's own.
+        assertThat(options.getModel()).isEqualTo("configured-model");
+    }
+
+    @Test
+    void promptModeLeavesTheSchemaOffTheOptionsAndAppendsFormatInstructions() {
+        val model = new StubChatModel(response(VALID_VERDICT));
+
+        new LlmStepRunner(
+                ChatClient.builder(model).build(),
+                LlmStepRunnerCallback.NO_OP,
+                StructuredOutputMode.PROMPT)
+                .run(request());
+
+        val options = (OpenAiChatOptions) model.lastPrompt.getOptions();
+        assertThat(options.getOutputSchema()).isNull();
+        assertThat(model.lastPrompt.getContents()).contains("outcome");
     }
 
     private static LlmStepRunner runner(ChatModel model, LlmStepRunnerCallback callback) {
@@ -166,6 +218,7 @@ class LlmStepRunnerTest {
     private static final class StubChatModel implements ChatModel {
 
         private final Deque<ChatResponse> responses;
+        private Prompt lastPrompt;
 
         private StubChatModel(ChatResponse... responses) {
             this.responses = new ArrayDeque<>(List.of(responses));
@@ -173,12 +226,15 @@ class LlmStepRunnerTest {
 
         @Override
         public ChatResponse call(Prompt prompt) {
+            lastPrompt = prompt;
             return responses.removeFirst();
         }
 
         @Override
         public ChatOptions getOptions() {
-            return ChatOptions.builder().model("configured-model").build();
+            // A provider options type that carries a schema, as the real OpenAI-compatible
+            // client does; the native path is a no-op for options that cannot hold one.
+            return OpenAiChatOptions.builder().model("configured-model").build();
         }
     }
 }

@@ -52,14 +52,20 @@ final class MarkdownBreadcrumbs {
     static String step(
             StepRequest request,
             Optional<String> reportedModel,
+            String role,
             String... trailingSegments) {
         val scenario = request.scenario();
         val step = request.step();
         val segments = new ArrayList<String>();
-        reportedModel.map(MarkdownBreadcrumbs::displayModelName).ifPresent(segments::add);
+        segments.add(reportedModel.map(MarkdownBreadcrumbs::displayModelName)
+                .map(model -> role + " " + model)
+                .orElse(role));
         segments.add(scenario.name());
-        segments.add(stepTitle(step.title(), step.index()));
-        segments.add(progress(step.index(), scenario.steps().size()));
+        val title = stepTitle(step.title(), step.index());
+        if (!title.equalsIgnoreCase(scenario.name())) {
+            segments.add(title);
+        }
+        segments.add("Step %d/%d".formatted(step.index(), scenario.steps().size()));
         segments.addAll(List.of(trailingSegments));
         return breadcrumb(segments);
     }

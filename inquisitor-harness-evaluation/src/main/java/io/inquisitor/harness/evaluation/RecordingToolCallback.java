@@ -63,17 +63,31 @@ public class RecordingToolCallback implements ToolCallback {
     @Override
     public String call(String toolInput, @Nullable ToolContext toolContext) {
         val ledger = ledgerOf(toolContext);
-        val start = System.nanoTime();
-        val result = delegate.call(toolInput, toolContext);
-        if (ledger != null) {
-            ledger.add(new ToolCallRecord(
-                    getToolDefinition().name(),
-                    toolInput,
-                    result,
-                    ledger.size(),
-                    Duration.ofNanos(System.nanoTime() - start)));
+        if (ledger == null) {
+            return delegate.call(toolInput, toolContext);
         }
-        return result;
+        val start = System.nanoTime();
+        final int order;
+        synchronized (ledger) {
+            order = ledger.size();
+            ledger.add(new ToolCallRecord(getToolDefinition().name(), toolInput,
+                    "Invocation in progress; effects unknown", order, Duration.ZERO));
+        }
+        try {
+            val result = delegate.call(toolInput, toolContext);
+            synchronized (ledger) {
+                ledger.set(order, new ToolCallRecord(getToolDefinition().name(), toolInput,
+                        result, order, Duration.ofNanos(System.nanoTime() - start)));
+            }
+            return result;
+        } catch (RuntimeException | Error exception) {
+            synchronized (ledger) {
+                ledger.set(order, new ToolCallRecord(getToolDefinition().name(), toolInput,
+                        exception.getClass().getSimpleName() + ": " + exception.getMessage(),
+                        order, Duration.ofNanos(System.nanoTime() - start), true));
+            }
+            throw exception;
+        }
     }
 
     @SuppressWarnings("unchecked")

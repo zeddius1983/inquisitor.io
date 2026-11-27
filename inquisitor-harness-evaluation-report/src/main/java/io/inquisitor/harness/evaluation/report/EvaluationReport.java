@@ -67,7 +67,18 @@ public record EvaluationReport(
             int stepsEvaluated,
             int stepsNotEvaluated,
             @Nullable Double meanScore,
-            Map<String, Integer> categories) {
+            Map<String, Integer> categories,
+            int supervisedSteps,
+            int acceptedInitially,
+            int acceptedAfterCorrection,
+            int unresolvedSteps,
+            int corrections) {
+
+        public Totals(int scenarios, int scenariosPassed, int stepsRecorded, int stepsEvaluated,
+                int stepsNotEvaluated, @Nullable Double meanScore, Map<String, Integer> categories) {
+            this(scenarios, scenariosPassed, stepsRecorded, stepsEvaluated, stepsNotEvaluated,
+                    meanScore, categories, 0, 0, 0, 0, 0);
+        }
     }
 
     /** One group: the suite class (JUnit layer) or the source directory (standalone). */
@@ -84,7 +95,11 @@ public record EvaluationReport(
 
         /** An expected failure that never happened — expectation-aware FAILED, flagged. */
         public boolean missedDetection() {
-            return !passed && expectedOutcome == Outcome.FAIL;
+            return !passed && !unresolved() && expectedOutcome == Outcome.FAIL;
+        }
+
+        public boolean unresolved() {
+            return steps.stream().anyMatch(StepEvaluationRecord::unresolved);
         }
     }
 
@@ -146,7 +161,8 @@ public record EvaluationReport(
         val expected = first.expectedOutcome();
         val anyFailed = steps.stream().anyMatch(step -> step.outcome() == Outcome.FAIL);
         val complete = steps.getLast().stepIndex() == first.stepCount();
-        val passed = expected == Outcome.FAIL ? anyFailed : !anyFailed && complete;
+        val unresolved = steps.stream().anyMatch(StepEvaluationRecord::unresolved);
+        val passed = !unresolved && (expected == Outcome.FAIL ? anyFailed : !anyFailed && complete);
         return new GroupedInstance(groupOf(first),
                 new ScenarioReport(first.scenario(), first.scenarioSource(), expected, passed,
                         List.copyOf(steps)));
@@ -179,6 +195,12 @@ public record EvaluationReport(
                 .stepsNotEvaluated(steps.size() - evaluated.size())
                 .meanScore(meanScore)
                 .categories(categories)
+                .supervisedSteps((int) steps.stream().filter(step -> !step.rounds().isEmpty()).count())
+                .acceptedInitially((int) steps.stream().filter(StepEvaluationRecord::acceptedInitially).count())
+                .acceptedAfterCorrection((int) steps.stream()
+                        .filter(step -> !step.unresolved() && step.correctionCount() > 0).count())
+                .unresolvedSteps((int) steps.stream().filter(StepEvaluationRecord::unresolved).count())
+                .corrections(steps.stream().mapToInt(StepEvaluationRecord::correctionCount).sum())
                 .build();
     }
 

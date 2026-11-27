@@ -199,7 +199,8 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         for (val step : scenario.steps()) {
             body.append("<tr><td>").append(step.stepIndex()).append('/').append(step.stepCount())
                     .append("</td><td>").append(escape(step.stepTitle()))
-                    .append("</td><td>").append(outcomeCell(step.outcome()))
+                    .append("</td><td>").append(step.unresolved()
+                            ? "<span class=\"bad\">UNRESOLVED</span>" : outcomeCell(step.outcome()))
                     .append("</td><td>").append(categoryCell(step))
                     .append("</td><td>").append(step.evaluated()
                             ? colored(step.score(), ReportFormats.percent(step.score()))
@@ -254,6 +255,12 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         out.append("<div class=\"tiles\">\n");
         tile(out, totals.scenariosPassed() + "/" + totals.scenarios(), "scenarios passed");
         tile(out, String.valueOf(totals.stepsRecorded()), "steps recorded");
+        if (totals.supervisedSteps() > 0) {
+            tile(out, String.valueOf(totals.acceptedInitially()), "accepted on first attempt");
+            tile(out, String.valueOf(totals.acceptedAfterCorrection()), "accepted after correction");
+            tile(out, String.valueOf(totals.unresolvedSteps()), "unresolved");
+            tile(out, String.valueOf(totals.corrections()), "corrections");
+        }
         rawTile(out, totals.meanScore() == null
                 ? "n/a"
                 : colored(totals.meanScore(), ReportFormats.percent(totals.meanScore())),
@@ -277,13 +284,13 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
 
     /** A finding: any step the judge scored below 1.0, or never scored (with the reason). */
     private static void appendFinding(StringBuilder out, StepEvaluationRecord step) {
-        if (step.evaluated() && step.score() >= 1.0) {
+        if (step.evaluated() && step.score() >= 1.0 && step.rounds().isEmpty()) {
             return;
         }
         out.append("<details><summary>Step ").append(step.stepIndex())
                 .append(" “").append(escape(step.stepTitle())).append("” &mdash; ")
                 .append(escape(String.valueOf(step.category()))).append("</summary>\n")
-                .append("<p><b>Actor verdict:</b> ").append(step.outcome()).append(" &mdash; ")
+                .append("<p><b>Result:</b> ").append(step.unresolved() ? "UNRESOLVED" : step.outcome()).append(" &mdash; ")
                 .append(escape(step.reasoning())).append("</p>\n");
         if (!step.evidence().isEmpty()) {
             out.append("<p><b>Actor evidence:</b> ")
@@ -294,6 +301,18 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
         }
         if (!step.toolCalls().isEmpty()) {
             out.append("<pre>").append(escape(String.join("\n", step.toolCalls()))).append("</pre>\n");
+        }
+        for (val round : step.rounds()) {
+            out.append("<details><summary>Attempt ").append(round.attempt().number())
+                    .append(" &mdash; ").append(round.review() == null ? "NOT REVIEWED" : round.review().decision())
+                    .append(" &mdash; actor ").append(ReportFormats.humanMillis(round.attempt().elapsed().toMillis()))
+                    .append(", judge ").append(ReportFormats.humanMillis(round.judgeElapsedMillis()))
+                    .append("</summary><p>").append(escape(round.feedback())).append("</p><pre>")
+                    .append(escape(round.attempt().rawResponse())).append("</pre>");
+            for (val call : round.attempt().toolCalls()) {
+                out.append("<pre>").append(escape(call.describe())).append("</pre>");
+            }
+            out.append("</details>\n");
         }
         out.append("</details>\n");
     }
@@ -338,6 +357,9 @@ public class HtmlReportRenderer implements EvaluationReportRenderer {
     }
 
     private static String resultCell(EvaluationReport.ScenarioReport scenario) {
+        if (scenario.unresolved()) {
+            return "<span class=\"bad\">FAILED (unresolved execution)</span>";
+        }
         if (scenario.passed()) {
             return "<span class=\"ok\">PASSED</span>";
         }

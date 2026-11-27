@@ -33,7 +33,7 @@ public class MarkdownScenarioLogger implements ScenarioExecutionCallback {
     @Override
     public void scenarioStarted(Scenario scenario) {
         val event = MarkdownLogSupport.event(MarkdownBreadcrumbs.scenario(scenario, 0, "RUN"))
-                .content("# %s%s".formatted(
+                .content(scenario.description().isBlank() ? "" : "# %s%s".formatted(
                         MarkdownBreadcrumbs.headingLiteral(scenario.name()),
                         body(scenario.description())));
         log.info(MarkdownLogSupport.marker(), event.message());

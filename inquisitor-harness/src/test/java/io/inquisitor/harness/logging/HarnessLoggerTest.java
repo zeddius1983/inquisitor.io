@@ -76,6 +76,20 @@ class HarnessLoggerTest {
     }
 
     @Test
+    void markdownScenarioStartDoesNotRepeatItsNameWhenDescriptionIsEmpty() {
+        val scenario = new Scenario("Fetch a non-existent account", "",
+                List.of(new Step(1, "Fetch a non-existent account", "Fetch it.")), null);
+
+        val events = capture(MarkdownScenarioLogger.class, Level.INFO,
+                () -> new MarkdownScenarioLogger().scenarioStarted(scenario));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .isEqualTo("\n\n###  Fetch a non-existent account  ▱▱▱▱▱ 0/1  RUN \n")
+                        .doesNotContain("# Fetch a non-existent account\n"));
+    }
+
+    @Test
     void markdownHeadingsEscapeScenarioAndStepTitlesAsLiteralText() {
         val scenario = new Scenario(
                 "Transfer *must* preserve [amount](x) & <tag>",
@@ -143,19 +157,19 @@ class HarnessLoggerTest {
             assertThat(event.getFormattedMessage()).startsWith("\n\n").endsWith("\n");
         });
         assertThat(events.get(0).getFormattedMessage()).contains(
-                "###  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  RUN ",
+                "###  Actor  Account lifecycle  Open account  Step 1/1  RUN ",
                 "## Step 1 — Open account",
                 "Create Bob in USD.");
         assertThat(events.get(1).getFormattedMessage())
                 .contains(
-                        "###  gemma-4-31B-it-qat-UD-Q4\\_K\\_XL  Account lifecycle  Open account  ▰▰▰▰▰ 1/1  PASS  ⧖ 13.289 s ",
+                        "###  Actor gemma-4-31B-it-qat-UD-Q4\\_K\\_XL  Account lifecycle  Open account  Step 1/1  PASS  ⧖ 13.289 s ",
                         "### Reasoning",
                         "> verified\n> with evidence")
                 .doesNotContain("/models/", ".GGUF", "**Duration:**", "- **Reasoning:**");
     }
 
     @Test
-    void markdownActorBreadcrumbShowsRoundedStepProgress() {
+    void markdownActorBreadcrumbLabelsTheStepOrdinal() {
         val steps = List.of(
                 new Step(1, "Step 1 — Import Alice", "Import Alice."),
                 new Step(2, "Step 2 — Import Bob", "Import Bob."),
@@ -169,7 +183,38 @@ class HarnessLoggerTest {
 
         assertThat(events).singleElement().satisfies(event ->
                 assertThat(event.getFormattedMessage()).contains(
-                        " Import accounts  Import Bob  ▰▰▰▱▱ 2/4  RUN "));
+                        " Actor  Import accounts  Import Bob  Step 2/4  RUN "));
+    }
+
+    @Test
+    void markdownStepStartDoesNotRepeatAnIdenticalScenarioTitle() {
+        val step = new Step(1, "Fetch a non-existent account", "Feature: lookup details.");
+        val scenario = new Scenario(step.title(), "", List.of(step), null);
+        val request = StepRequest.of("conversation", scenario, step);
+
+        val events = capture(MarkdownLlmLogger.class, Level.INFO,
+                () -> new MarkdownLlmLogger(new ModelRegistry()).stepStarted(request));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .contains(" Actor  Fetch a non-existent account  Step 1/1  RUN ",
+                                "Feature: lookup details.")
+                        .doesNotContain("## Fetch a non-existent account"));
+    }
+
+    @Test
+    void markdownSupervisedCompletionDistinguishesActorAndTotalDuration() {
+        val request = StepRequest.of("conversation", SCENARIO, SCENARIO.steps().getFirst());
+        val run = new StepRun(
+                new StepVerdict(Outcome.PASS, "verified", List.of()), List.of(),
+                Duration.ofSeconds(75), Duration.ofSeconds(49), false, List.of());
+
+        val events = capture(MarkdownLlmLogger.class, Level.INFO,
+                () -> new MarkdownLlmLogger(new ModelRegistry()).stepCompleted(request, run));
+
+        assertThat(events).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage())
+                        .contains("PASS  Actor 49 s  Total 1 min 15 s"));
     }
 
     @Test
@@ -315,6 +360,8 @@ class HarnessLoggerTest {
         assertThat(events).singleElement().satisfies(event ->
                 assertThat(event.getFormattedMessage()).contains(
                         "###  HTTP  localhost  POST  /accounts/import  HTTP 201 ",
+                        "### Headers",
+                        "Content-Type: application/json",
                         "### Response",
                         "```json",
                         "\"id\" : 1",

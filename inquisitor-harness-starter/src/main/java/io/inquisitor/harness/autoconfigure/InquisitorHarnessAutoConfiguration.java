@@ -246,10 +246,11 @@ public class InquisitorHarnessAutoConfiguration {
     @ConditionalOnMissingBean
     LlmStepRunner inquisitorLlmStepRunner(
             ChatClient chatClient,
-            ObjectProvider<LlmStepRunnerCallback> callbacks) {
+            ObjectProvider<LlmStepRunnerCallback> callbacks,
+            InquisitorHarnessProperties properties) {
         val callback = callbacks.orderedStream()
                 .reduce(LlmStepRunnerCallback.NO_OP, LlmStepRunnerCallback::andThen);
-        return new LlmStepRunner(chatClient, callback);
+        return new LlmStepRunner(chatClient, callback, properties.structuredOutput());
     }
 
     @Bean

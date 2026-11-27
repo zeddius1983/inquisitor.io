@@ -1,7 +1,11 @@
 # Notes: self-refine evaluation advisor
 
-Status: **idea, not scheduled.** Captured 2026-07-16 from a design discussion.
-Not a task — revisit when we decide to harden the runner.
+Status: **historical design discussion**, captured 2026-07-16.
+Implemented as optional supervised step execution in
+[task-16](../tasks/task-16-supervised-refinement.md). The final result measures the
+actor/reviewer team; every original answer and review remains available.
+The early retry assumptions below are superseded: HTTP errors and exceptions do
+not establish that an operation had no side effects.
 
 ## The idea
 

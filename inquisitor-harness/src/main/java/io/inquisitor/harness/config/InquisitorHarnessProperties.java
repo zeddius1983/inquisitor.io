@@ -31,21 +31,24 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * <p>A scenario only needs to name a target/datasource when more than one is
  * registered; with a single entry the name may be omitted.
  *
- * @param targets     extra HTTP targets, keyed by the name a scenario refers to
- * @param datasources extra JDBC datasources, keyed by the name a scenario refers to
- * @param logging     harness logging presentation settings
+ * @param targets          extra HTTP targets, keyed by the name a scenario refers to
+ * @param datasources      extra JDBC datasources, keyed by the name a scenario refers to
+ * @param logging          harness logging presentation settings
+ * @param structuredOutput how the actor is asked to shape its verdict as JSON
  */
 @ConfigurationProperties("inquisitor.harness")
 public record InquisitorHarnessProperties(
         Map<String, Target> targets,
         Map<String, Datasource> datasources,
-        Logging logging) {
+        Logging logging,
+        StructuredOutputMode structuredOutput) {
 
     @ConstructorBinding
     public InquisitorHarnessProperties {
         targets = targets == null ? Map.of() : Map.copyOf(targets);
         datasources = datasources == null ? Map.of() : Map.copyOf(datasources);
         logging = logging == null ? new Logging(HarnessLoggingFormat.PLAIN) : logging;
+        structuredOutput = structuredOutput == null ? StructuredOutputMode.PROMPT : structuredOutput;
     }
 
     /**
@@ -57,7 +60,22 @@ public record InquisitorHarnessProperties(
     public InquisitorHarnessProperties(
             Map<String, Target> targets,
             Map<String, Datasource> datasources) {
-        this(targets, datasources, new Logging(HarnessLoggingFormat.PLAIN));
+        this(targets, datasources, new Logging(HarnessLoggingFormat.PLAIN), StructuredOutputMode.PROMPT);
+    }
+
+    /**
+     * Creates properties with prompt-based structured output, for source compatibility
+     * with callers written before the mode was configurable.
+     *
+     * @param targets extra HTTP targets, keyed by name
+     * @param datasources extra JDBC datasources, keyed by name
+     * @param logging harness logging presentation settings
+     */
+    public InquisitorHarnessProperties(
+            Map<String, Target> targets,
+            Map<String, Datasource> datasources,
+            Logging logging) {
+        this(targets, datasources, logging, StructuredOutputMode.PROMPT);
     }
 
     /**

@@ -175,6 +175,49 @@ and remains portable to other SLF4J backends.
 > test credentials; do not point verbose harness logging at production systems
 > or production datasets.
 
+## Structured output
+
+Each step's verdict comes back as JSON that deserializes into a `StepVerdict`. By
+default the schema is appended to the prompt as format instructions, which a model
+is free to ignore — a weak or heavily quantized actor may answer in prose instead,
+and the harness degrades that step to a synthetic FAIL that says nothing about the
+application under test.
+
+Set the mode to `native` to send the schema to the provider as a structured-output
+request, so it is enforced while decoding rather than merely asked for:
+
+```yaml
+inquisitor:
+  harness:
+    structured-output: native   # prompt (default) | native
+```
+
+llama.cpp implements this: it converts the schema to a GBNF grammar and masks any
+token that would break it, so malformed JSON becomes impossible and an enum field
+like `outcome` can only be `PASS` or `FAIL`. The hosted OpenAI-style Structured
+Outputs APIs implement it too.
+
+> **`native` is currently incompatible with tool calling on llama.cpp.** The harness
+> always sends its `httpRequest`/`sqlQuery` tools, and llama.cpp cannot build a
+> grammar that admits both a tool call and a schema-constrained answer. Measured
+> against llama.cpp `b10850`:
+>
+> | Request | Result |
+> |---------|--------|
+> | schema, no tools | constrained JSON |
+> | schema + tools | **HTTP 400** `failed to parse grammar` |
+> | tools, no schema | tool call |
+> | schema + tools + `tool_choice: none` | constrained JSON |
+> | `json_object` + tools | constraint silently dropped — prose returned |
+>
+> So enabling `native` against llama.cpp aborts every scenario with a 400 at the
+> first step. It is usable today only where the actor needs no tools, or against a
+> provider that composes the two grammars.
+
+Note also that llama.cpp supports only a subset of JSON Schema;
+`examples/json_schema_to_grammar.py` in the llama.cpp tree will tell you offline
+whether a schema converts cleanly.
+
 ## Optional: OpenAPI discovery
 
 By default a scenario tells the model which endpoints to call. If your app exposes an
@@ -248,6 +291,86 @@ set, the test session also writes a step-by-step evaluation report there (HTML b
 default, grouped by suite and scenario; markdown and json renderers are
 selectable). The module is fully optional and removable without touching the
 core.
+
+### Optional: supervised execution
+
+Enable refinement to let the judge ask the actor to correct missing actions,
+unsupported conclusions, or malformed verdict JSON within the current step:
+
+```yaml
+inquisitor:
+  harness:
+    evaluation:
+      refinement:
+        enabled: true           # false by default
+        max-corrections: 2       # additional actor turns, shared by JSON and execution repair
+```
+
+The actor continues with the same client, tools, conversation, and cumulative
+tool ledger. Corrective writes are allowed; the reviewer checks required actions,
+assertions, and ordering. A supported application FAIL is accepted immediately.
+The reviewer must stop if correction would invalidate the experiment or require
+a fresh fixture; automatic scenario restarts are not implemented.
+The correction limit counts additional actor turns, not individual tool calls.
+The reviewer runs after the actor returns an answer, so it cannot interrupt
+extra tool calls inside an unfinished actor turn.
+
+Exhausted corrections, reviewer failures, and actor/tool call failures produce an
+unresolved execution and abort the scenario. They fail JUnit even under
+`@Scenario(expect = FAIL)`; they never count as detected application defects.
+`evaluation.enabled` and `refinement.enabled` select exclusive modes. With only
+evaluation enabled, the judge performs observation-only scoring. With refinement
+enabled, it takes precedence: the reviewer guides the actor and its final decision
+is recorded directly; the observation-only evaluation step is not created or run,
+and no evaluation lifecycle or score event is emitted.
+
+HTML, Markdown, and JSON reports preserve the raw answer, new tool calls, feedback,
+and timing for each attempt under one logical step. They distinguish initial
+acceptance, acceptance after correction, and unresolved execution. These are
+measurements of the actor/reviewer team; the reviewer participates in the result.
+Raw responses and tool traces can contain application data, so treat report files
+with the same care as test logs. A custom `StepReviewer` bean can replace the
+default reviewer while retaining the bounded execution and reporting.
+
+The judge client includes Spring AI's `SimpleLoggerAdvisor`. Temporarily
+enable its DEBUG logger to inspect the judge request and response:
+
+```yaml
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: DEBUG
+```
+
+The actor uses the same advisor and logger, so this shows both roles; judge requests
+are identifiable by their `You are a test-trace auditor` prompt. In the demo, use
+`INQUISITOR_LLM_LOG=DEBUG` and select plain harness logging because Markdown mode's
+exclusive console intentionally suppresses unmarked framework diagnostics. Prompt
+logs can contain scenario data and real tool results, so leave this disabled outside
+trusted diagnostics.
+
+```bash
+INQUISITOR_HARNESS_LOGGING_FORMAT=plain INQUISITOR_LLM_LOG=DEBUG \
+  ./gradlew :inquisitor-demo:evaluate
+```
+
+### llama.cpp and Qwen 3.6 MTP troubleshooting
+
+When llama.cpp hosts a Qwen 3.6 judge, especially an MTP variant, check the
+logged request before attributing an unrelated verdict to Inquisitor. Upstream
+reports cover Qwen 3.6 hybrid/recurrent prompt-cache and checkpoint handling
+([#22746](https://github.com/ggml-org/llama.cpp/issues/22746),
+[#21831](https://github.com/ggml-org/llama.cpp/issues/21831)) and draft-MTP
+changing deterministic output even with prompt caching disabled
+([#23335](https://github.com/ggml-org/llama.cpp/issues/23335)). One possible
+symptom is cross-request contamination: the logged request contains only the
+current step, but the model's reasoning or verdict substitutes content from a
+previous step.
+
+If this happens, restart llama.cpp or unload and reload the judge, disable MTP
+speculative decoding, and rerun only the affected scenario. If the clean process
+works with MTP disabled, keep MTP off for the judge or update the llama.cpp
+runtime and retest. A non-MTP build or a judge from another model family is the
+safer fallback.
 
 ## Building
 

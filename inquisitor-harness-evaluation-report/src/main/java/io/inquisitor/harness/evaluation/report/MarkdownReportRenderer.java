@@ -79,6 +79,13 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
             out.append("- Judge: ").append(ReportFormats.endpoint(runInfo.judgeModel(), runInfo.judgeBaseUrl())).append('\n');
         }
         out.append("- Result: ").append(gate(totals)).append('\n');
+        if (totals.supervisedSteps() > 0) {
+            out.append("- Supervised steps: ").append(totals.supervisedSteps())
+                    .append("; accepted initially: ").append(totals.acceptedInitially())
+                    .append("; accepted after correction: ").append(totals.acceptedAfterCorrection())
+                    .append("; unresolved: ").append(totals.unresolvedSteps())
+                    .append("; corrections: ").append(totals.corrections()).append('\n');
+        }
         out.append("- Evaluation score: **").append(score(totals)).append("** (")
                 .append(totals.stepsEvaluated()).append(" steps evaluated");
         if (totals.stepsNotEvaluated() > 0) {
@@ -112,6 +119,9 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
     }
 
     private static String resultLabel(EvaluationReport.ScenarioReport scenario) {
+        if (scenario.unresolved()) {
+            return "**FAILED (unresolved execution)**";
+        }
         if (scenario.passed()) {
             return "PASSED";
         }
@@ -124,7 +134,7 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
                         // Everything except a grounded, perfectly-scored step — mirrors the
                         // HTML renderer, so never-scored (NOT_EVALUATED) steps keep their
                         // diagnostic reason instead of vanishing from the Markdown findings.
-                        .filter(step -> !(step.evaluated() && step.score() >= 1.0))
+                        .filter(step -> !step.rounds().isEmpty() || !(step.evaluated() && step.score() >= 1.0))
                         .map(step -> Map.entry(scenario, step)))
                 .toList();
         if (flagged.isEmpty()) {
@@ -137,7 +147,8 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
             out.append("\n#### ").append(scenario.name())
                     .append(" — step ").append(step.stepIndex()).append(" \"").append(step.stepTitle())
                     .append("\" — ").append(step.category()).append('\n')
-                    .append("- Actor verdict: ").append(step.outcome()).append(" — ")
+                    .append(step.unresolved() ? "- Execution: " : "- Actor verdict: ")
+                    .append(step.unresolved() ? "UNRESOLVED" : step.outcome()).append(" — ")
                     .append(step.reasoning()).append('\n');
             if (!step.evidence().isEmpty()) {
                 out.append("- Actor evidence: ").append(String.join("; ", step.evidence())).append('\n');
@@ -149,7 +160,22 @@ public class MarkdownReportRenderer implements EvaluationReportRenderer {
                 out.append("- Trace:\n\n");
                 step.toolCalls().forEach(call -> out.append("      ").append(call).append('\n'));
             }
+            for (val round : step.rounds()) {
+                out.append("\n##### Attempt ").append(round.attempt().number()).append(" — ")
+                        .append(round.review() == null ? "NOT REVIEWED" : round.review().decision())
+                        .append("\n\nActor: ").append(ReportFormats.humanMillis(round.attempt().elapsed().toMillis()))
+                        .append("; judge: ").append(ReportFormats.humanMillis(round.judgeElapsedMillis()))
+                        .append("\n\n");
+                appendIndented(out, round.feedback());
+                appendIndented(out, round.attempt().rawResponse());
+                round.attempt().toolCalls().forEach(call -> appendIndented(out, call.describe()));
+            }
         }
+    }
+
+    private static void appendIndented(StringBuilder out, String text) {
+        text.lines().forEach(line -> out.append("    ").append(line).append('\n'));
+        out.append('\n');
     }
 
     private static String gate(EvaluationReport.Totals totals) {

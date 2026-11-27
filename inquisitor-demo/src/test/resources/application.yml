@@ -24,15 +24,19 @@ inquisitor:
     markdown:
       palette: catppuccin
   harness:
+    #structured-output: native
     logging:
       # Render scenario, step, actor, and judge lifecycle events through the
       # optional inquisitor-logback-markdown-starter on the test runtime.
       format: markdown
     evaluation:
+      refinement:
+        enabled: ${INQUISITOR_REFINEMENT:true}
+        max-corrections: 2
       # Optional step evaluation (LLM-as-judge): scores each verdict against the real
       # tool trace. The module default is off; this demo test profile turns it on so
-      # scenario runs are always scored without the env opt-in — set INQUISITOR_EVAL=false
-      # to switch it back off.
+      # scenario runs are scored when refinement is off. When refinement is on it
+      # takes precedence and its final review is recorded without this evaluation step.
       enabled: ${INQUISITOR_EVAL:true}
       # A genuinely separate judge on its own local server (the strong config — a
       # different model/family from the actor, not a self-judge). The api-key falls
