@@ -91,14 +91,19 @@ final class ScenarioArguments {
             val runs = new ArrayList<Run>();
             for (val source : sources) {
                 val provider = ReflectionSupport.newInstance(source.getClass("value"));
-                if (provider instanceof AnnotationConsumer<?> consumer && source.getDistance() > 0) {
-                    accept(consumer, source.getRoot().synthesize());
+                // The annotation carrying @ArgumentsSource (e.g. the @CsvSource), not the root:
+                // for a composed annotation the root is the custom one, which the provider's
+                // AnnotationConsumer<CsvSource> cannot take. Synthesized, so attribute
+                // overrides declared by the composed annotation apply.
+                val consumed = source.getMetaSource();
+                if (provider instanceof AnnotationConsumer<?> consumer && consumed != null) {
+                    accept(consumer, consumed.synthesize());
                 }
                 try (val arguments = ((ArgumentsProvider) provider).provideArguments(declarations, context)) {
                     arguments.forEach(argument -> runs.add(run(method, argument)));
                 } catch (Exception e) {
                     throw new IllegalStateException("Could not provide the arguments of scenario " + method.getName()
-                            + " from " + source.getRoot().getType().getSimpleName(), e);
+                            + " from @" + source.getRoot().getType().getSimpleName(), e);
                 }
             }
             return runs;

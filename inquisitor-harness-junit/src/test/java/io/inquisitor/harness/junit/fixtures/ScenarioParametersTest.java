@@ -19,6 +19,10 @@ package io.inquisitor.harness.junit.fixtures;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -29,6 +33,7 @@ import io.inquisitor.harness.junit.Scenario;
 import io.inquisitor.harness.junit.fixtures.FakeActor.FakeStep;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -56,8 +61,10 @@ class ScenarioParametersTest {
     static final List<Object> RESOLVED = new CopyOnWriteArrayList<>();
     static final AtomicInteger BEFORE_EACH = new AtomicInteger();
 
+    /** Takes a parameter of its own: run values must only go to the scenario method. */
     @BeforeEach
-    void countRuns() {
+    void countRuns(TestInfo test) {
+        assertThat(test.getTestMethod()).isPresent();
         BEFORE_EACH.incrementAndGet();
     }
 
@@ -76,9 +83,21 @@ class ScenarioParametersTest {
         return Stream.of(argumentSet("a single owner", "Ivan", 1));
     }
 
+    /** A composed argument source: a custom annotation meta-annotated with @CsvSource. */
+    @Target(ElementType.METHOD)
+    @Retention(RetentionPolicy.RUNTIME)
+    @CsvSource({"CHF, 5.00"})
+    @interface SwissFrancRow {
+    }
+
+    @Scenario("classpath:fixtures/three-steps.md")
+    @SwissFrancRow
+    void composedSource(String currency, BigDecimal amount) {}
+
     @AfterAll
     static void eachArgumentSetIsOneRun() {
-        var csv = SEEN.stream().filter(seen -> seen.scenario().startsWith("Three steps [currency=")).toList();
+        var csv = SEEN.stream()
+                .filter(seen -> seen.scenario().matches("Three steps \\[currency=(EUR|GBP), .*")).toList();
         assertThat(csv).extracting(Seen::scenario).containsExactly(
                 "Three steps [currency=EUR, amount=100.00]", "Three steps [currency=EUR, amount=100.00]",
                 "Three steps [currency=EUR, amount=100.00]", "Three steps [currency=GBP, amount=0.01]",
@@ -103,8 +122,12 @@ class ScenarioParametersTest {
                 .allSatisfy(message -> assertThat(message)
                         .startsWith("Parameters for this run:\n- owner: Ivan\n- count: 1\n\n"));
 
-        // Once per run: two CSV rows plus one named set.
-        assertThat(BEFORE_EACH).hasValue(3);
+        var composed = SEEN.stream()
+                .filter(seen -> seen.scenario().equals("Three steps [currency=CHF, amount=5.00]")).toList();
+        assertThat(composed).as("runs of the composed @CsvSource").hasSize(3);
+
+        // Once per run: two CSV rows, one named set, one composed row.
+        assertThat(BEFORE_EACH).hasValue(4);
     }
 
     @Configuration(proxyBeanMethods = false)

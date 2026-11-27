@@ -215,7 +215,9 @@ public class ScenarioTemplateProvider implements TestTemplateInvocationContextPr
 
         @Override
         public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) {
-            return parameterContext.getDeclaringExecutable() instanceof Method
+            // Only the scenario method's own parameters: a lifecycle method's (e.g.
+            // @BeforeEach void setUp(TestInfo info)) belong to other resolvers.
+            return parameterContext.getDeclaringExecutable().equals(extensionContext.getTestMethod().orElse(null))
                     && parameterContext.getIndex() < values.length;
         }
 
