@@ -26,4 +26,10 @@ dependencies {
     // Launcher discovery API for the @Scenario tag-selection test (the conventions
     // already put the launcher on the test runtime classpath; this makes it compilable).
     testImplementation("org.junit.platform:junit-platform-launcher")
+
+    // The scenario-lifecycle tests (fixtures package): @Transactional for the rejection
+    // test and Mockito for @MockitoBean. No database — @Sql runs against a recording
+    // DataSource.
+    testImplementation("org.springframework:spring-tx")
+    testImplementation("org.mockito:mockito-core")
 }

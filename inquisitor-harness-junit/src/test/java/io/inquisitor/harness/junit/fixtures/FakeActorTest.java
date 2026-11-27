@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo.fixtures;
+package io.inquisitor.harness.junit.fixtures;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -22,20 +22,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 import io.inquisitor.harness.junit.Harness;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 /**
- * A {@link Harness @Harness} suite against the running demo app with the {@link FakeActor}
- * in place of the LLM, so it runs deterministically in every build. Evaluation is off: no
- * judge is consulted on the fake verdicts.
+ * A {@link Harness @Harness} suite over a plain Spring context with the {@link FakeActor}
+ * in place of the LLM, so the harness's JUnit plumbing is tested deterministically. The
+ * context is the test class's nested {@code @Configuration} (which imports
+ * {@link FakeActor}); scenarios resolve against {@code classpath:fixtures/}.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@Harness(scenarioDir = "classpath:scenarios/explicit/")
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "inquisitor.harness.evaluation.enabled=false")
-@Import(FakeActor.class)
+@Harness(scenarioDir = "classpath:fixtures/")
+@SpringJUnitConfig
 @interface FakeActorTest {
 }

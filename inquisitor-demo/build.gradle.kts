@@ -33,9 +33,6 @@ dependencies {
     // Render the harness's marker-tagged Markdown in the streamed test console.
     testRuntimeOnly(project(":inquisitor-logback-markdown-starter"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    // Launcher API for the fixtures tests that run a suite and inspect its failures
-    // (the conventions already put the launcher on the test runtime classpath).
-    testImplementation("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<JavaCompile>().configureEach {

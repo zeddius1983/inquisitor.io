@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo.fixtures;
+package io.inquisitor.harness.junit.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.inquisitor.harness.junit.Scenario;
-import lombok.val;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
@@ -29,6 +28,8 @@ import org.junit.platform.launcher.TestExecutionListener;
 import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +48,7 @@ class ScenarioTransactionalTest {
 
     @Test
     void transactionalScenarioIsRejected() {
-        val results = launch(TransactionalSuite.class);
+        var results = launch(TransactionalSuite.class);
 
         assertThat(results.get("rejected").getThrowable())
                 .hasValueSatisfying(error -> assertThat(error)
@@ -63,8 +64,8 @@ class ScenarioTransactionalTest {
 
     /** Runs the suite and returns each scenario method's result, keyed by method name. */
     private static Map<String, TestExecutionResult> launch(Class<?> suite) {
-        val results = new ConcurrentHashMap<String, TestExecutionResult>();
-        val request = LauncherDiscoveryRequestBuilder.request()
+        var results = new ConcurrentHashMap<String, TestExecutionResult>();
+        var request = LauncherDiscoveryRequestBuilder.request()
                 .selectors(DiscoverySelectors.selectClass(suite))
                 .build();
         launched = true;
@@ -91,8 +92,13 @@ class ScenarioTransactionalTest {
     /** Runs only when launched by the test above, not by the build's own test scan. */
     @FakeActorTest
     @Transactional
-    @EnabledIf("io.inquisitor.demo.fixtures.ScenarioTransactionalTest#launched")
+    @EnabledIf("io.inquisitor.harness.junit.fixtures.ScenarioTransactionalTest#launched")
     static class TransactionalSuite {
+
+        @Configuration(proxyBeanMethods = false)
+        @Import(FakeActor.class)
+        static class Config {
+        }
 
         @Scenario("classpath:fixtures/three-steps.md")
         void rejected() {}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo.fixtures;
+package io.inquisitor.harness.junit.fixtures;
 
 import java.time.Duration;
 import java.util.List;
@@ -24,16 +24,18 @@ import io.inquisitor.harness.executor.StepRequest;
 import io.inquisitor.harness.executor.StepRun;
 import io.inquisitor.harness.model.Outcome;
 import io.inquisitor.harness.model.StepVerdict;
+import io.inquisitor.harness.parser.ScenarioParser;
+import io.inquisitor.harness.tool.HttpTargetRegistry;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
- * An LLM-free stand-in for the actor, for tests of the harness's JUnit plumbing rather
- * than of a model: every step is handed to the context's {@link FakeStep} beans (each
- * test contributes what a step should do or observe) and then passes.
+ * The beans a {@code @Harness} suite needs, with an LLM-free stand-in for the actor: every
+ * step is handed to the context's {@link FakeStep} beans (each test contributes what a step
+ * should do or observe) and then passes. A plain Spring context — no Spring Boot, no model.
  */
-@TestConfiguration(proxyBeanMethods = false)
+@Configuration(proxyBeanMethods = false)
 public class FakeActor {
 
     /** What the fake actor does at a step. */
@@ -42,7 +44,17 @@ public class FakeActor {
         void act(StepRequest request);
     }
 
-    /** Replaces the LLM-backed executor of the harness starter. */
+    @Bean
+    ScenarioParser scenarioParser() {
+        return new ScenarioParser();
+    }
+
+    /** Where {@code HarnessExtension} registers the application's HTTP target. */
+    @Bean
+    HttpTargetRegistry httpTargetRegistry() {
+        return new HttpTargetRegistry();
+    }
+
     @Bean
     ScenarioExecutor scenarioExecutor(ObjectProvider<FakeStep> steps) {
         return new ScenarioExecutor(request -> {

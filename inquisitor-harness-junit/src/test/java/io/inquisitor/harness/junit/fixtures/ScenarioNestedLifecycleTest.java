@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo.fixtures;
+package io.inquisitor.harness.junit.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,6 +25,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 
 /**
  * Pins that the enclosing class's {@link BeforeEach @BeforeEach} / {@link AfterEach @AfterEach}
@@ -53,6 +55,11 @@ class ScenarioNestedLifecycleTest {
     @AfterAll
     static void tornDownOnce() {
         assertThat(AFTER_EACH).hasValue(1);
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @Import(FakeActor.class)
+    static class Config {
     }
 
     @Nested

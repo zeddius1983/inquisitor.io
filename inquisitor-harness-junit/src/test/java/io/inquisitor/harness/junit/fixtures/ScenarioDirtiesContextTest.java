@@ -14,38 +14,43 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo.fixtures;
+package io.inquisitor.harness.junit.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.inquisitor.demo.fixtures.FakeActor.FakeStep;
 import io.inquisitor.harness.HarnessDefaults;
 import io.inquisitor.harness.junit.Scenario;
+import io.inquisitor.harness.junit.fixtures.FakeActor.FakeStep;
 import io.inquisitor.harness.tool.HttpTargetRegistry;
-import lombok.val;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.TestInfo;
-import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.MethodMode;
+import org.springframework.test.context.ContextConfiguration;
 
 /**
  * Pins that {@link DirtiesContext @DirtiesContext} on a {@link Scenario @Scenario} dirties
  * the context around the scenario, not between its steps: every step runs in the same
- * application context — the live one, reachable on its own port — so the conversation and
- * the app under test survive from the first step to the last.
+ * application context — the live one, whose HTTP target points at its own port.
  *
- * <p>Each context the suite starts gets a generation number; each step records the
- * generation it ran in, the newest generation, and whether the harness's HTTP target
- * points at the port of the context it ran in.
+ * <p>No web server is needed: each context gets a distinct {@code local.server.port}
+ * (as a running server would) and a generation number. Each step records the generation
+ * it ran in, the newest generation, and whether the HTTP target matches its port.
  */
 @FakeActorTest
+@ContextConfiguration(initializers = ScenarioDirtiesContextTest.PortPerContext.class)
 class ScenarioDirtiesContextTest {
 
     static final AtomicInteger GENERATIONS = new AtomicInteger();
@@ -65,7 +70,7 @@ class ScenarioDirtiesContextTest {
     /** Runs once, after the scenario's last step. */
     @AfterEach
     void oneLiveContextPerScenario(TestInfo test) {
-        val observed = List.copyOf(OBSERVED);
+        var observed = List.copyOf(OBSERVED);
         OBSERVED.clear();
 
         assertThat(observed).as("steps of %s", test.getDisplayName()).hasSize(3);
@@ -80,15 +85,28 @@ class ScenarioDirtiesContextTest {
                 .containsOnly(true);
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class Steps {
+    /** Gives every context its own port, as a context with a running server would have. */
+    static class PortPerContext implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+
+        private static final AtomicInteger NEXT_PORT = new AtomicInteger(20_000);
+
+        @Override
+        public void initialize(ConfigurableApplicationContext context) {
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(
+                    "port", Map.of("local.server.port", String.valueOf(NEXT_PORT.incrementAndGet()))));
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @Import(FakeActor.class)
+    static class Config {
 
         @Bean
         FakeStep observeContext(Environment environment, HttpTargetRegistry targets) {
-            val generation = GENERATIONS.incrementAndGet();
-            return _ -> {
-                val port = environment.getProperty("local.server.port");
-                val target = targets.resolve(HarnessDefaults.APPLICATION).baseUrl();
+            var generation = GENERATIONS.incrementAndGet();
+            return request -> {
+                var port = environment.getProperty("local.server.port");
+                var target = targets.resolve(HarnessDefaults.APPLICATION).baseUrl();
                 OBSERVED.add(new Observation(generation, GENERATIONS.get(), target.endsWith(":" + port)));
             };
         }

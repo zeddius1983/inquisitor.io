@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo.fixtures;
+package io.inquisitor.harness.junit.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -24,12 +24,13 @@ import static org.mockito.Mockito.verify;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import io.inquisitor.demo.fixtures.FakeActor.FakeStep;
+import io.inquisitor.harness.junit.fixtures.FakeActor.FakeStep;
 import io.inquisitor.harness.junit.Scenario;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -40,7 +41,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @FakeActorTest
 class ScenarioMockitoBeanTest {
 
-    /** A collaborator to mock; the demo app has no bean of this type, so the mock is added. */
+    /** A collaborator to mock; the context has no bean of this type, so the mock is added. */
     interface Greeter {
         @Nullable String greet();
     }
@@ -60,8 +61,9 @@ class ScenarioMockitoBeanTest {
         verify(greeter, times(3)).greet();
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class Steps {
+    @Configuration(proxyBeanMethods = false)
+    @Import(FakeActor.class)
+    static class Config {
 
         @Bean
         FakeStep greet(Greeter greeter) {

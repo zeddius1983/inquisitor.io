@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.inquisitor.demo.fixtures;
+package io.inquisitor.harness.junit.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,15 +22,16 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.inquisitor.demo.fixtures.FakeActor.FakeStep;
+import io.inquisitor.harness.junit.fixtures.FakeActor.FakeStep;
 import io.inquisitor.harness.junit.Scenario;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
@@ -85,8 +86,9 @@ class ScenarioLifecycleMethodsTest {
         assertThat(AFTER_EACH).hasValue(1);
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class Steps {
+    @Configuration(proxyBeanMethods = false)
+    @Import(FakeActor.class)
+    static class Config {
 
         @Bean
         FakeStep observeLifecycle(ApplicationEventPublisher publisher) {
